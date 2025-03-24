@@ -1,6 +1,6 @@
 # API Endpoints
 
-## Overview
+### Overview
 This document outlines the API endpoints for the Service Marketplace for Party and Event Organization platform. The API follows RESTful principles and is implemented using Next.js API routes.
 
 ## Authentication Endpoints
