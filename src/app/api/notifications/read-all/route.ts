@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     // Mark all notifications as read
     await prisma.notification.updateMany({
       where: {
-        userId: session.user.id as string,
+        userId: session.user.id,
         isRead: false,
       },
       data: {
@@ -25,7 +25,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, message: 'All notifications marked as read' }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      message: 'All notifications marked as read'
+    }, { status: 200 });
   } catch (error) {
     console.error('Mark all notifications as read error:', error);
     return NextResponse.json(

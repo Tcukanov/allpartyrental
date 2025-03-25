@@ -34,7 +34,7 @@ import { HamburgerIcon, CloseIcon, ChevronDownIcon, MoonIcon, SunIcon } from '@c
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
-import NotificationComponent from '@/components/notification/NotificationComponent';
+import NotificationComponent from '@/components/notification/notificationComponent';
 
 // Navigation links
 const clientLinks = [

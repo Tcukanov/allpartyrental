@@ -450,4 +450,112 @@ export default function ProviderCabinetPage() {
                   <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
                     <Text>No active chats.</Text>
                   </Box>
-                ) : (<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>
+                ) : (
+                  <VStack spacing={4} align="stretch">
+                    {chats.map(chat => (
+                      <Card key={chat.id} cursor="pointer" onClick={() => router.push(`/chats/${chat.id}`)}>
+                        <CardBody>
+                          <Flex justify="space-between" align="center">
+                            <Box>
+                              <Text fontWeight="bold">{chat.clientName}</Text>
+                              <Text noOfLines={1} fontSize="sm" color="gray.600">
+                                {chat.lastMessage}
+                              </Text>
+                            </Box>
+                            <Box textAlign="right">
+                              <Text fontSize="xs" color="gray.500">
+                                {new Date(chat.timestamp).toLocaleDateString()}
+                              </Text>
+                              {chat.unread > 0 && (
+                                <Badge colorScheme="red" borderRadius="full" mt={1}>
+                                  {chat.unread}
+                                </Badge>
+                              )}
+                            </Box>
+                          </Flex>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </VStack>
+                )}
+              </VStack>
+            </TabPanel>
+            
+            {/* Manage Services Tab */}
+            <TabPanel>
+              <VStack spacing={6} align="stretch">
+                <Heading as="h2" size="lg">Manage Services</Heading>
+                
+                {services.length === 0 ? (
+                  <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
+                    <Text>No services available.</Text>
+                  </Box>
+                ) : (
+                  <VStack spacing={4} align="stretch">
+                    {services.map(service => (
+                      <Card key={service.id} cursor="pointer" onClick={() => handleEditService(service)}>
+                        <CardBody>
+                          <Flex justify="space-between" align="center">
+                            <Box>
+                              <Text fontWeight="bold">{service.name}</Text>
+                              <Text noOfLines={1} fontSize="sm" color="gray.600">
+                                {service.category}
+                              </Text>
+                            </Box>
+                            <VStack align="stretch" spacing={2} minW="150px">
+                              <Button leftIcon={<EditIcon />} variant="outline">
+                                View Details
+                              </Button>
+                              <Button leftIcon={<DeleteIcon />} variant="outline" colorScheme="red">
+                                Delete
+                              </Button>
+                            </VStack>
+                          </Flex>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </VStack>
+                )}
+              </VStack>
+            </TabPanel>
+            
+            {/* Advertising Tab */}
+            <TabPanel>
+              <VStack spacing={6} align="stretch">
+                <Heading as="h2" size="lg">Advertising Options</Heading>
+                <Text>
+                  Boost your visibility and get more clients with our advertising packages.
+                </Text>
+                
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+                  {adPackages.map(pkg => (
+                    <Card key={pkg.id}>
+                      <CardBody>
+                        <VStack spacing={3} align="stretch">
+                          <Heading size="md">{pkg.name}</Heading>
+                          <Badge colorScheme="brand" alignSelf="flex-start">
+                            {pkg.duration}
+                          </Badge>
+                          <Text>{pkg.description}</Text>
+                          <Text fontWeight="bold" fontSize="xl">
+                            ${pkg.price.toFixed(2)}
+                          </Text>
+                          <Button
+                            colorScheme="brand"
+                            onClick={() => handlePurchaseAd(pkg.id)}
+                          >
+                            Purchase
+                          </Button>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </SimpleGrid>
+              </VStack>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      </Container>
+    </MainLayout>
+  );
+}

@@ -34,14 +34,14 @@ export async function POST(
     }
 
     // Check if user is authorized to mark this notification as read
-    if (session.user.id !== notification.userId) {
+    if (notification.userId !== session.user.id) {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } },
         { status: 403 }
       );
     }
 
-    // Mark notification as read
+    // Update notification
     const updatedNotification = await prisma.notification.update({
       where: {
         id,
@@ -51,7 +51,10 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({ success: true, data: updatedNotification }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      data: updatedNotification
+    }, { status: 200 });
   } catch (error) {
     console.error('Mark notification as read error:', error);
     return NextResponse.json(
