@@ -175,7 +175,7 @@ export default function ServicesPage() {
         // Build query params for services request
         const queryParams = new URLSearchParams();
         if (searchQuery) queryParams.append('search', searchQuery);
-        if (selectedCategory) queryParams.append('categoryId', selectedCategory);
+        if (selectedCategory) queryParams.append('category', selectedCategory); // Change from categoryId
         if (selectedCity) queryParams.append('cityId', selectedCity);
         if (sortOption) queryParams.append('sort', sortOption);
         
@@ -262,7 +262,6 @@ export default function ServicesPage() {
     fetchServicesData();
   }, [searchQuery, selectedCategory, selectedCity, sortOption, toast]);
   
-  // Handle search form submission
   const handleSearch = (e) => {
     e.preventDefault();
     
@@ -273,9 +272,18 @@ export default function ServicesPage() {
     if (selectedCity) queryParams.append('city', selectedCity);
     if (sortOption) queryParams.append('sort', sortOption);
     
+    // Log the search parameters for debugging
+    console.log('Search params:', {
+      search: searchQuery,
+      category: selectedCategory,
+      city: selectedCity,
+      sort: sortOption
+    });
+    
     // Navigate to the services page with filters
     router.push(`/services?${queryParams.toString()}`);
   };
+  
   
   // Set SEO metadata
   useEffect(() => {
@@ -330,18 +338,19 @@ export default function ServicesPage() {
                   <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
               </Select>
-              
               <Select 
-                placeholder="All Locations" 
-                w={{ base: "full", md: "200px" }}
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value)}
-              >
-                {cities.map(city => (
-                  <option key={city.id} value={city.id}>{city.name}</option>
-                ))}
-              </Select>
-              
+  placeholder="All Locations" 
+  w={{ base: "full", md: "200px" }}
+  value={selectedCity}
+  onChange={(e) => {
+    console.log("City selected:", e.target.value);
+    setSelectedCity(e.target.value);
+  }}
+>
+              {cities.map(city => (
+                <option key={city.id} value={city.id}>{city.name}</option>
+              ))}
+            </Select>
               <Button 
                 type="submit" 
                 colorScheme="brand" 

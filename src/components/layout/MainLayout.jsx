@@ -60,8 +60,7 @@ const adminLinks = [
 const publicLinks = [
   { name: 'Home', href: '/' },
   { name: 'Services', href: '/services' },
-  { name: 'How It Works', href: '/how-it-works' },
-  { name: 'About', href: '/about' },
+  { name: 'How It Works', href: '/about' },
 ];
 
 export default function MainLayout({ children }) {
@@ -113,7 +112,7 @@ export default function MainLayout({ children }) {
                   src="/images/logo.png" 
                   alt="Party Marketplace" 
                   h="40px" 
-                  fallbackSrc="https://via.placeholder.com/150x40?text=PartyMarketplace"
+                  fallbackSrc="https://fakeimg.pl/150x150/ff426e/ffffff?text=All+Party+Rental&font=noto-serif&font_size=20"
                 />
               </Box>
               
@@ -226,7 +225,7 @@ export default function MainLayout({ children }) {
               src="/images/logo.png" 
               alt="Party Marketplace" 
               h="40px" 
-              fallbackSrc="https://via.placeholder.com/150x40?text=PartyMarketplace"
+              fallbackSrc="https://fakeimg.pl/150x150/ff426e/ffffff?text=All+Party+Rental&font=noto-serif&font_size=20"
             />
           </DrawerHeader>
 
@@ -333,7 +332,7 @@ export default function MainLayout({ children }) {
                 alt="Party Marketplace" 
                 h="50px" 
                 mb={4}
-                fallbackSrc="https://via.placeholder.com/150x50?text=PartyMarketplace"
+                fallbackSrc="https://fakeimg.pl/150x150/ff426e/ffffff?text=All+Party+Rental&font=noto-serif&font_size=20"
               />
               <Text>
                 Connecting clients with the best service providers for all your party and event needs.

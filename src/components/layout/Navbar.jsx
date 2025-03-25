@@ -76,7 +76,7 @@ export default function Navbar() {
         <Flex alignItems="center">
           <Link href="/" passHref>
             <Text fontSize="xl" fontWeight="bold" color="brand.600">
-              Party Marketplace
+             All Party Rental
             </Text>
           </Link>
 
