@@ -25,6 +25,7 @@
         "@stripe/react-stripe-js": "^2.3.0",
         "@stripe/stripe-js": "^2.1.6",
         "bcrypt": "^5.1.1",
+        "bufferutil": "^4.0.9",
         "date-fns": "^2.30.0",
         "framer-motion": "^10.16.4",
         "io": "^1.5.3",
@@ -39,7 +40,8 @@
         "socket.io": "^4.7.2",
         "socket.io-client": "^4.7.2",
         "stripe": "^13.8.0",
-        "theme": "^0.1.0"
+        "theme": "^0.1.0",
+        "utf-8-validate": "^6.0.5"
     },
     "devDependencies": {
         "@types/bcrypt": "^5.0.0",
@@ -48,7 +50,7 @@
         "@types/react-dom": "^18.2.11",
         "eslint": "^8.51.0",
         "eslint-config-next": "13.5.4",
-        "prisma": "^5.3.1",
+        "prisma": "^5.22.0",
         "typescript": "^5.2.2"
     }
 }

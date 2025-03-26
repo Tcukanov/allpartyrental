@@ -27,6 +27,7 @@ import { StarIcon, SearchIcon } from '@chakra-ui/icons';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
+import LocationServiceSearch from '@/components/search/LocationServiceSearch';
 
 // Fallback data in case API doesn't work
 const fallbackServices = [
@@ -114,17 +115,9 @@ export default function ServicesPage() {
   const searchParams = useSearchParams();
   const toast = useToast();
   
-  // State for services and filters
+  // State for services
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [cities, setCities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // State for filter values
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
-  const [selectedCity, setSelectedCity] = useState(searchParams.get('city') || '');
-  const [sortOption, setSortOption] = useState(searchParams.get('sort') || 'price_asc');
   
   // Fetch services data
   useEffect(() => {
@@ -132,52 +125,12 @@ export default function ServicesPage() {
       try {
         setIsLoading(true);
         
-        // Try to fetch categories
-        let categoriesData = [];
-        try {
-          const categoriesResponse = await fetch('/api/categories');
-          if (categoriesResponse.ok) {
-            const data = await categoriesResponse.json();
-            if (data.success) {
-              categoriesData = data.data;
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching categories:', error);
-        }
-        
-        // Use fallback categories if API fetch fails
-        if (categoriesData.length === 0) {
-          categoriesData = fallbackCategories;
-        }
-        setCategories(categoriesData);
-        
-        // Try to fetch cities
-        let citiesData = [];
-        try {
-          const citiesResponse = await fetch('/api/cities');
-          if (citiesResponse.ok) {
-            const data = await citiesResponse.json();
-            if (data.success) {
-              citiesData = data.data;
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching cities:', error);
-        }
-        
-        // Use fallback cities if API fetch fails
-        if (citiesData.length === 0) {
-          citiesData = fallbackCities;
-        }
-        setCities(citiesData);
-        
         // Build query params for services request
         const queryParams = new URLSearchParams();
-        if (searchQuery) queryParams.append('search', searchQuery);
-        if (selectedCategory) queryParams.append('category', selectedCategory); // Change from categoryId
-        if (selectedCity) queryParams.append('cityId', selectedCity);
-        if (sortOption) queryParams.append('sort', sortOption);
+        if (searchParams.get('search')) queryParams.append('search', searchParams.get('search'));
+        if (searchParams.get('category')) queryParams.append('category', searchParams.get('category'));
+        if (searchParams.get('city')) queryParams.append('cityId', searchParams.get('city'));
+        if (searchParams.get('sort')) queryParams.append('sort', searchParams.get('sort'));
         
         // Try to fetch services
         let servicesData = [];
@@ -196,47 +149,6 @@ export default function ServicesPage() {
         // Use fallback services if API fetch fails
         if (servicesData.length === 0) {
           servicesData = fallbackServices;
-          
-          // Apply client-side filtering for fallback data
-          if (searchQuery) {
-            servicesData = servicesData.filter(service => 
-              service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              service.provider.name.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-          }
-          
-          if (selectedCategory) {
-            const category = categoriesData.find(cat => cat.id === selectedCategory);
-            if (category) {
-              servicesData = servicesData.filter(service => 
-                service.category.slug === category.slug
-              );
-            }
-          }
-          
-          if (selectedCity) {
-            const city = citiesData.find(c => c.id === selectedCity);
-            if (city) {
-              servicesData = servicesData.filter(service => 
-                service.city.slug === city.slug
-              );
-            }
-          }
-          
-          // Apply sorting
-          switch (sortOption) {
-            case 'price_asc':
-              servicesData.sort((a, b) => a.price - b.price);
-              break;
-            case 'price_desc':
-              servicesData.sort((a, b) => b.price - a.price);
-              break;
-            case 'rating_desc':
-              servicesData.sort((a, b) => b.rating - a.rating);
-              break;
-            default:
-              servicesData.sort((a, b) => a.price - b.price);
-          }
         }
         
         setServices(servicesData);
@@ -251,8 +163,6 @@ export default function ServicesPage() {
         });
         
         // Use fallback data in case of error
-        setCategories(fallbackCategories);
-        setCities(fallbackCities);
         setServices(fallbackServices);
       } finally {
         setIsLoading(false);
@@ -260,30 +170,7 @@ export default function ServicesPage() {
     };
     
     fetchServicesData();
-  }, [searchQuery, selectedCategory, selectedCity, sortOption, toast]);
-  
-  const handleSearch = (e) => {
-    e.preventDefault();
-    
-    // Build the URL with query parameters
-    const queryParams = new URLSearchParams();
-    if (searchQuery) queryParams.append('search', searchQuery);
-    if (selectedCategory) queryParams.append('category', selectedCategory);
-    if (selectedCity) queryParams.append('city', selectedCity);
-    if (sortOption) queryParams.append('sort', sortOption);
-    
-    // Log the search parameters for debugging
-    console.log('Search params:', {
-      search: searchQuery,
-      category: selectedCategory,
-      city: selectedCity,
-      sort: sortOption
-    });
-    
-    // Navigate to the services page with filters
-    router.push(`/services?${queryParams.toString()}`);
-  };
-  
+  }, [searchParams, toast]);
   
   // Set SEO metadata
   useEffect(() => {
@@ -308,70 +195,9 @@ export default function ServicesPage() {
           Find the perfect services for your next party or event
         </Text>
         
-        {/* Search and Filter Bar */}
-        <Box bg="white" p={6} shadow="md" borderRadius="lg" mb={8}>
-          <form onSubmit={handleSearch}>
-            <Flex 
-              direction={{ base: "column", md: "row" }} 
-              gap={4}
-              align="center"
-              mb={4}
-            >
-              <InputGroup flex={1}>
-                <InputLeftElement pointerEvents="none">
-                  <SearchIcon color="gray.400" />
-                </InputLeftElement>
-                <Input 
-                  placeholder="Search for services..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </InputGroup>
-              
-              <Select 
-                placeholder="All Categories" 
-                w={{ base: "full", md: "200px" }}
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </Select>
-              <Select 
-  placeholder="All Locations" 
-  w={{ base: "full", md: "200px" }}
-  value={selectedCity}
-  onChange={(e) => {
-    console.log("City selected:", e.target.value);
-    setSelectedCity(e.target.value);
-  }}
->
-              {cities.map(city => (
-                <option key={city.id} value={city.id}>{city.name}</option>
-              ))}
-            </Select>
-              <Button 
-                type="submit" 
-                colorScheme="brand" 
-                w={{ base: "full", md: "auto" }}
-              >
-                Search
-              </Button>
-            </Flex>
-            
-            <Flex justify="flex-end">
-              <Select 
-                w={{ base: "full", md: "200px" }}
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value)}
-              >
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="rating_desc">Highest Rated</option>
-              </Select>
-            </Flex>
-          </form>
+        {/* Search Component */}
+        <Box mb={8}>
+          <LocationServiceSearch />
         </Box>
         
         {/* Results */}
@@ -386,10 +212,7 @@ export default function ServicesPage() {
             <Button 
               colorScheme="brand" 
               onClick={() => {
-                setSearchQuery('');
-                setSelectedCategory('');
-                setSelectedCity('');
-                setSortOption('price_asc');
+                router.push('/services');
               }}
             >
               Clear Filters
@@ -440,39 +263,34 @@ export default function ServicesPage() {
                 </Box>
                 
                 <CardBody>
-                  <VStack align="start" spacing={2}>
+                  <VStack align="stretch" spacing={2}>
                     <Heading size="md" noOfLines={1}>{service.name}</Heading>
-                    <Text color="gray.600" fontSize="sm">by {service.provider.name}</Text>
                     
-                    {service.category && service.city && (
-                      <Flex wrap="wrap" gap={1}>
-                        <Badge colorScheme="blue" variant="outline">
-                          {service.category.name}
-                        </Badge>
-                        <Badge colorScheme="gray" variant="outline">
-                          {service.city.name}
-                        </Badge>
-                      </Flex>
-                    )}
-                    
-                    <Divider my={2} />
-                    
-                    <Flex justify="space-between" w="100%">
-                      <Text fontWeight="bold" color="brand.600">
-                        ${typeof service.price === 'number' ? service.price.toFixed(2) : service.price}
+                    <HStack justify="space-between">
+                      <Text color="gray.600" fontSize="sm">
+                        {service.provider.name}
                       </Text>
-                      {service.rating && (
-                        <Flex align="center">
-                          <StarIcon color="yellow.400" mr={1} />
-                          <Text>{service.rating}</Text>
-                          {service.reviewCount && (
-                            <Text color="gray.500" fontSize="xs" ml={1}>
-                              ({service.reviewCount})
-                            </Text>
-                          )}
-                        </Flex>
-                      )}
-                    </Flex>
+                      <HStack>
+                        <StarIcon color="yellow.400" boxSize="12px" />
+                        <Text fontSize="sm">{service.rating}</Text>
+                        <Text fontSize="sm" color="gray.500">
+                          ({service.reviewCount})
+                        </Text>
+                      </HStack>
+                    </HStack>
+                    
+                    <Text fontWeight="bold" color="brand.600" fontSize="xl">
+                      ${Number(service.price).toFixed(2)}
+                    </Text>
+                    
+                    <Text fontSize="sm" color="gray.600" noOfLines={2}>
+                      {service.description}
+                    </Text>
+                    
+                    <HStack spacing={2}>
+                      <Badge colorScheme="blue">{service.category.name}</Badge>
+                      <Badge colorScheme="gray">{service.city.name}</Badge>
+                    </HStack>
                   </VStack>
                 </CardBody>
               </Card>

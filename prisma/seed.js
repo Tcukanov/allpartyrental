@@ -65,16 +65,16 @@ async function cleanDatabase() {
 
 async function createServiceCategories() {
   const categories = [
-    { name: 'Decoration', description: 'Decorations for all types of parties' },
-    { name: 'Catering', description: 'Food and beverage services' },
-    { name: 'Entertainment', description: 'DJs, bands, and other entertainment services' },
-    { name: 'Venue', description: 'Locations to host your event' },
-    { name: 'Photography', description: 'Professional photography services' },
-    { name: 'Videography', description: 'Professional video services' },
-    { name: 'Bounce Houses', description: 'Inflatable play structures for kids' },
-    { name: 'Party Supplies', description: 'Plates, cups, napkins, and other supplies' },
-    { name: 'Furniture Rental', description: 'Tables, chairs, and other furniture' },
-    { name: 'Cakes & Desserts', description: 'Custom cakes and dessert tables' },
+    { name: 'Decoration', slug: 'decoration', description: 'Decorations for all types of parties' },
+    { name: 'Catering', slug: 'catering', description: 'Food and beverage services' },
+    { name: 'Entertainment', slug: 'entertainment', description: 'DJs, bands, and other entertainment services' },
+    { name: 'Venue', slug: 'venue', description: 'Locations to host your event' },
+    { name: 'Photography', slug: 'photography', description: 'Professional photography services' },
+    { name: 'Videography', slug: 'videography', description: 'Professional video services' },
+    { name: 'Bounce Houses', slug: 'bounce-houses', description: 'Inflatable play structures for kids' },
+    { name: 'Party Supplies', slug: 'party-supplies', description: 'Plates, cups, napkins, and other supplies' },
+    { name: 'Furniture Rental', slug: 'furniture-rental', description: 'Tables, chairs, and other furniture' },
+    { name: 'Cakes & Desserts', slug: 'cakes-desserts', description: 'Custom cakes and dessert tables' },
   ];
 
   return Promise.all(
@@ -88,16 +88,11 @@ async function createServiceCategories() {
 
 async function createCities() {
   const cities = [
-    { name: 'New York', slug: 'new-york', state: 'NY' },
-    { name: 'Los Angeles', slug: 'los-angeles', state: 'CA' },
-    { name: 'Chicago', slug: 'chicago', state: 'IL' },
-    { name: 'Houston', slug: 'houston', state: 'TX' },
-    { name: 'Miami', slug: 'miami', state: 'FL' },
-    { name: 'San Francisco', slug: 'san-francisco', state: 'CA' },
-    { name: 'Seattle', slug: 'seattle', state: 'WA' },
-    { name: 'Boston', slug: 'boston', state: 'MA' },
-    { name: 'Denver', slug: 'denver', state: 'CO' },
-    { name: 'Atlanta', slug: 'atlanta', state: 'GA' },
+    { name: 'New York', state: 'NY', slug: 'new-york' },
+    { name: 'San Diego', state: 'CA', slug: 'san-diego' },
+    { name: 'Los Angeles', state: 'CA', slug: 'los-angeles' },
+    { name: 'Chicago', state: 'IL', slug: 'chicago' },
+    { name: 'Houston', state: 'TX', slug: 'houston' },
   ];
 
   return Promise.all(
@@ -287,127 +282,70 @@ async function createServices(providers, categories, cities) {
   }, {});
 
   // Create services for each provider based on their specialty
-  const services = [
+  const services = [];
+
+  // Create services for each city
+  cities.forEach(city => {
     // Decoration services
-    {
+    services.push({
       providerId: providers[0].id,
       categoryId: categoryMap['Decoration'],
-      cityId: cityMap['New York'],
-      name: 'Premium Decoration Package',
-      description: 'Complete decoration setup with balloons, banners, table settings, and themed decorations.',
+      cityId: city.id,
+      name: `Premium Decoration Package in ${city.name}`,
+      description: `Complete decoration setup with balloons, banners, table settings, and themed decorations in ${city.name}.`,
       price: 299.99,
       photos: ['https://images.unsplash.com/photo-1530103862676-de8c9debad1d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
-    },
-    {
-      providerId: providers[0].id,
-      categoryId: categoryMap['Decoration'],
-      cityId: cityMap['New York'],
-      name: 'Balloon Arch',
-      description: 'Custom balloon arch in colors of your choice. Perfect for photo opportunities.',
-      price: 149.99,
-      photos: ['https://images.unsplash.com/photo-1533294455009-a77b7557d2d1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
-      status: 'ACTIVE',
-    },
-    {
-      providerId: providers[0].id,
-      categoryId: categoryMap['Decoration'],
-      cityId: cityMap['Los Angeles'],
-      name: 'Theme Party Decorations',
-      description: 'Complete theme-based decoration package including backdrops, table settings, and props.',
-      price: 349.99,
-      photos: ['https://images.unsplash.com/photo-1564145291089-9542d5685637?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
-      status: 'ACTIVE',
-    },
+    });
 
     // Catering services
-    {
+    services.push({
       providerId: providers[1].id,
       categoryId: categoryMap['Catering'],
-      cityId: cityMap['New York'],
-      name: 'Full-Service Catering',
-      description: 'Complete catering service including appetizers, main course, desserts, and service staff.',
+      cityId: city.id,
+      name: `Full-Service Catering in ${city.name}`,
+      description: `Complete catering service including appetizers, main course, desserts, and service staff in ${city.name}.`,
       price: 35.99,
       photos: ['https://images.unsplash.com/photo-1555244162-803834f70033?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
-    },
-    {
-      providerId: providers[1].id,
-      categoryId: categoryMap['Catering'],
-      cityId: cityMap['New York'],
-      name: 'Dessert Table',
-      description: 'Custom dessert table with a variety of sweets, cakes, and cookies.',
-      price: 12.99,
-      photos: ['https://images.unsplash.com/photo-1619558041248-f8e0ee31edb6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1471&q=80'],
-      status: 'ACTIVE',
-    },
+    });
 
     // Entertainment services
-    {
+    services.push({
       providerId: providers[2].id,
       categoryId: categoryMap['Entertainment'],
-      cityId: cityMap['New York'],
-      name: 'Professional DJ Services',
-      description: 'Professional DJ with sound equipment. Will play requested songs and keep the party going.',
+      cityId: city.id,
+      name: `Professional DJ Services in ${city.name}`,
+      description: `Professional DJ with sound equipment. Will play requested songs and keep the party going in ${city.name}.`,
       price: 399.99,
       photos: ['https://images.unsplash.com/photo-1571266028243-5c6d8c2a0d6e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
-    },
-    {
-      providerId: providers[2].id,
-      categoryId: categoryMap['Entertainment'],
-      cityId: cityMap['New York'],
-      name: 'Magician Performance',
-      description: 'Professional magician for children\'s parties. 1-hour show with audience participation.',
-      price: 249.99,
-      photos: ['https://images.unsplash.com/photo-1543157186-e6d61a133455?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1469&q=80'],
-      status: 'ACTIVE',
-    },
+    });
 
     // Bounce house services
-    {
+    services.push({
       providerId: providers[3].id,
       categoryId: categoryMap['Bounce Houses'],
-      cityId: cityMap['New York'],
-      name: 'Standard Bounce House',
-      description: 'Colorful bounce house for up to 6 children. Includes setup and takedown.',
+      cityId: city.id,
+      name: `Standard Bounce House in ${city.name}`,
+      description: `Colorful bounce house for up to 6 children. Includes setup and takedown in ${city.name}.`,
       price: 199.99,
       photos: ['https://images.unsplash.com/photo-1573982680571-f6e9a8a5850b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
-    },
-    {
-      providerId: providers[3].id,
-      categoryId: categoryMap['Bounce Houses'],
-      cityId: cityMap['New York'],
-      name: 'Water Slide',
-      description: 'Inflatable water slide with splash pool. Perfect for hot summer days.',
-      price: 249.99,
-      photos: ['https://images.unsplash.com/photo-1558181409-4fa124ccbda4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
-      status: 'ACTIVE',
-    },
+    });
 
     // Photography services
-    {
+    services.push({
       providerId: providers[4].id,
       categoryId: categoryMap['Photography'],
-      cityId: cityMap['New York'],
-      name: 'Party Photography Package',
-      description: 'Professional photography for your event. Includes editing and digital delivery.',
+      cityId: city.id,
+      name: `Party Photography Package in ${city.name}`,
+      description: `Professional photography for your event in ${city.name}. Includes editing and digital delivery.`,
       price: 349.99,
       photos: ['https://images.unsplash.com/photo-1516035069371-29a1b244cc32?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
-    },
-    {
-      providerId: providers[4].id,
-      categoryId: categoryMap['Photography'],
-      cityId: cityMap['New York'],
-      name: 'Photo Booth Rental',
-      description: 'Fun photo booth with props and instant prints. Includes attendant.',
-      price: 299.99,
-      photos: ['https://images.unsplash.com/photo-1583329550487-0fa8dd6f8870?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
-      status: 'ACTIVE',
-    },
-  ];
+    });
+  });
 
   return Promise.all(
     services.map(service => 
@@ -426,51 +364,48 @@ async function createParties(clients, cities) {
   }, {});
 
   const parties = [
-    // Active parties for Sarah
     {
-      clientId: clients[0].id,
-      cityId: cityMap['New York'],
-      name: 'Emily\'s 7th Birthday',
-      date: new Date('2024-05-15'),
-      startTime: '14:00',
-      duration: 3,
-      guestCount: 15,
-      status: 'PUBLISHED',
-    },
-    {
-      clientId: clients[0].id,
-      cityId: cityMap['New York'],
-      name: 'Summer Graduation Party',
-      date: new Date('2024-06-10'),
-      startTime: '17:00',
-      duration: 4,
-      guestCount: 30,
-      status: 'DRAFT',
-    },
-
-    // Active party for Michael
-    {
-      clientId: clients[1].id,
-      cityId: cityMap['Los Angeles'],
-      name: 'Anniversary Celebration',
-      date: new Date('2024-08-05'),
-      startTime: '18:00',
-      duration: 5,
-      guestCount: 50,
-      status: 'IN_PROGRESS',
-    },
-
-    // Active party for Jennifer
-    {
-      clientId: clients[2].id,
-      cityId: cityMap['Miami'],
       name: 'Graduation Party',
       date: new Date('2024-05-10'),
       startTime: '16:00',
       duration: 4,
       guestCount: 40,
       status: 'PUBLISHED',
+      client: {
+        connect: { id: clients[0].id }
+      },
+      city: {
+        connect: { id: cityMap['New York'] }
+      }
     },
+    {
+      name: 'Birthday Party',
+      date: new Date('2024-06-15'),
+      startTime: '14:00',
+      duration: 3,
+      guestCount: 25,
+      status: 'PUBLISHED',
+      client: {
+        connect: { id: clients[0].id }
+      },
+      city: {
+        connect: { id: cityMap['San Diego'] }
+      }
+    },
+    {
+      name: 'Wedding Anniversary',
+      date: new Date('2024-07-20'),
+      startTime: '18:00',
+      duration: 5,
+      guestCount: 60,
+      status: 'DRAFT',
+      client: {
+        connect: { id: clients[0].id }
+      },
+      city: {
+        connect: { id: cityMap['Los Angeles'] }
+      }
+    }
   ];
 
   return Promise.all(
