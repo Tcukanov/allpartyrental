@@ -34,7 +34,6 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
   const [cardError, setCardError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   
-  // Custom styling for the CardElement
   const cardStyle = {
     style: {
       base: {
@@ -53,7 +52,6 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
     },
   };
   
-  // Initialize payment intent when component mounts
   useEffect(() => {
     const initializePayment = async () => {
       try {
@@ -62,7 +60,7 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ paymentMethodId: null }), // We'll attach the payment method after collecting card details
+          body: JSON.stringify({ paymentMethodId: null }),
         });
         
         const data = await response.json();
@@ -81,12 +79,10 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
     initializePayment();
   }, [transaction.id]);
   
-  // Handle form submission for payment
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!stripe || !elements) {
-      // Stripe.js has not loaded yet
       return;
     }
     
@@ -94,10 +90,8 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
     setCardError('');
     
     try {
-      // Get card element
       const cardElement = elements.getElement(CardElement);
       
-      // Confirm payment
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: cardElement,
@@ -121,12 +115,10 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
           isClosable: true,
         });
         
-        // Notify parent component of successful payment
         if (onSuccess) {
           onSuccess(paymentIntent);
         }
         
-        // Redirect to party details page
         setTimeout(() => {
           router.push(`/client/my-party`);
         }, 2000);
@@ -206,14 +198,6 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
                     {cardError}
                   </Alert>
                 )}
-        </VStack>
-      </CardBody>
-    </Card>
-  );
-};
-
-export default PaymentComponent;
-
                 
                 <Button
                   type="submit"
@@ -232,3 +216,10 @@ export default PaymentComponent;
               </VStack>
             </form>
           )}
+        </VStack>
+      </CardBody>
+    </Card>
+  );
+};
+
+export default PaymentComponent; 

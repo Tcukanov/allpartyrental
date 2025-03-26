@@ -28,7 +28,8 @@ import {
   DrawerContent,
   DrawerCloseButton,
   VStack,
-  Divider
+  Divider,
+  Spinner
 } from '@chakra-ui/react';
 import { HamburgerIcon, CloseIcon, ChevronDownIcon, MoonIcon, SunIcon } from '@chakra-ui/icons';
 import { usePathname, useRouter } from 'next/navigation';
@@ -69,6 +70,17 @@ export default function MainLayout({ children }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Handle route change
+  useEffect(() => {
+    setIsLoading(true);
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500); // Show loading for at least 500ms
+
+    return () => clearTimeout(timer);
+  }, [pathname]);
   
   // Determine which navigation links to show based on user role
   const navLinks = session?.user?.role === 'CLIENT' 
@@ -107,12 +119,11 @@ export default function MainLayout({ children }) {
             />
             
             <HStack spacing={8} alignItems="center">
-              <Box as={Link} href="/">
+              <Box as={Link} href="#">
                 <Image 
                   src="/images/logo.png" 
                   alt="Party Marketplace" 
-                  h="40px" 
-                  fallbackSrc="https://fakeimg.pl/150x150/ff426e/ffffff?text=All+Party+Rental&font=noto-serif&font_size=20"
+                  h="65px" 
                 />
               </Box>
               
@@ -225,7 +236,6 @@ export default function MainLayout({ children }) {
               src="/images/logo.png" 
               alt="Party Marketplace" 
               h="40px" 
-              fallbackSrc="https://fakeimg.pl/150x150/ff426e/ffffff?text=All+Party+Rental&font=noto-serif&font_size=20"
             />
           </DrawerHeader>
 
@@ -313,7 +323,23 @@ export default function MainLayout({ children }) {
       </Drawer>
 
       {/* Main Content */}
-      <Box>
+      <Box position="relative">
+        {isLoading && (
+          <Box
+            position="fixed"
+            top={0}
+            left={0}
+            right={0}
+            bottom={0}
+            bg="rgba(255, 255, 255, 0.8)"
+            zIndex={9999}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Spinner size="xl" color="brand.500" thickness="4px" />
+          </Box>
+        )}
         {children}
       </Box>
       
@@ -332,7 +358,6 @@ export default function MainLayout({ children }) {
                 alt="Party Marketplace" 
                 h="50px" 
                 mb={4}
-                fallbackSrc="https://fakeimg.pl/150x150/ff426e/ffffff?text=All+Party+Rental&font=noto-serif&font_size=20"
               />
               <Text>
                 Connecting clients with the best service providers for all your party and event needs.

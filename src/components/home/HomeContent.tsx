@@ -28,7 +28,7 @@ export default function HomeContent() {
             <Card bg={bgColor} borderWidth="1px" borderColor={borderColor}>
               <CardBody>
                 <Image
-                  src="/images/bounce-house.jpg"
+                  src="https://www.deluxebouncehouse.com/cdn/shop/products/white-bounce-house.jpg?v=1725278985"
                   alt="Bounce House"
                   borderRadius="md"
                   mb={4}
@@ -39,7 +39,7 @@ export default function HomeContent() {
                 <Text color="gray.600" mb={4}>
                   Find the perfect bounce house for your party. We offer a wide selection of sizes and themes.
                 </Text>
-                <Button as={Link} href="/new-york/bounce-house" colorScheme="brand">
+                <Button as={Link} href="/new-york/bounce-houses" colorScheme="brand">
                   View in New York
                 </Button>
               </CardBody>
@@ -48,7 +48,7 @@ export default function HomeContent() {
             <Card bg={bgColor} borderWidth="1px" borderColor={borderColor}>
               <CardBody>
                 <Image
-                  src="/images/catering.jpg"
+                  src="https://images.unsplash.com/photo-1555244162-803834f70033?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80"
                   alt="Catering"
                   borderRadius="md"
                   mb={4}
@@ -68,7 +68,7 @@ export default function HomeContent() {
             <Card bg={bgColor} borderWidth="1px" borderColor={borderColor}>
               <CardBody>
                 <Image
-                  src="/images/decoration.jpg"
+                  src="https://res.cloudinary.com/luxuryp/images/f_auto,q_auto/ror2cjrfqay5lcozhk71/untitled-design-6"
                   alt="Decoration"
                   borderRadius="md"
                   mb={4}
@@ -84,6 +84,41 @@ export default function HomeContent() {
                 </Button>
               </CardBody>
             </Card>
+          </SimpleGrid>
+
+          {/* Custom Vision Section */}
+          <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={10} alignItems="center" w="full">
+            <Box>
+              <Heading as="h2" size="xl" mb={4}>
+                Have a Special Vision in Mind?
+              </Heading>
+              <Text fontSize="lg" color="gray.600" mb={8}>
+                Looking for something unique and personalized? Upload your own pictures and let our service providers bring your vision to life.
+              </Text>
+              <Button
+                as={Link}
+                href="/client/create-party"
+                size="lg"
+                colorScheme="brand"
+                px={8}
+                py={7}
+              >
+                Create Your Custom Party
+              </Button>
+            </Box>
+            <Box>
+              <Image
+                src="/images/girl.png"
+                alt="Girl with party vision"
+                borderRadius="lg"
+                shadow="xl"
+                objectFit="contain"
+                maxH="500px"
+                width="100%"
+                mx="auto"
+                display="block"
+              />
+            </Box>
           </SimpleGrid>
         </VStack>
       </Container>

@@ -1,95 +1,176 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session || !session.user) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Get user's chats
     const chats = await prisma.chat.findMany({
       where: {
-        OR: [
-          {
-            offer: {
-              providerId: session.user.id as string,
-            },
-          },
-          {
-            offer: {
-              clientId: session.user.id as string,
-            },
-          },
-        ],
+        offer: {
+          OR: [
+            { clientId: session.user.id },
+            { providerId: session.user.id }
+          ]
+        }
       },
       include: {
         offer: {
           include: {
-            provider: {
-              select: {
-                id: true,
-                name: true,
-                profile: {
-                  select: {
-                    avatar: true,
-                  },
-                },
-              },
-            },
             client: {
               select: {
                 id: true,
                 name: true,
                 profile: {
                   select: {
-                    avatar: true,
-                  },
-                },
-              },
+                    avatar: true
+                  }
+                }
+              }
             },
-            service: {
+            provider: {
               select: {
                 id: true,
                 name: true,
-              },
-            },
-            partyService: {
-              include: {
-                party: {
+                profile: {
                   select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
+                    avatar: true
+                  }
+                }
+              }
+            }
+          }
         },
         messages: {
           orderBy: {
-            createdAt: 'desc',
+            createdAt: 'desc'
           },
-          take: 1,
-        },
+          take: 1
+        }
       },
       orderBy: {
-        updatedAt: 'desc',
-      },
+        updatedAt: 'desc'
+      }
     });
 
-    return NextResponse.json({ success: true, data: chats }, { status: 200 });
+    return NextResponse.json({ chats });
   } catch (error) {
-    console.error('Get chats error:', error);
+    console.error('Error fetching chats:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { error: 'Failed to fetch chats' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const { offerId } = await request.json();
+
+    if (!offerId) {
+      return NextResponse.json(
+        { error: 'Offer ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if chat already exists
+    const existingChat = await prisma.chat.findUnique({
+      where: {
+        offerId
+      },
+      include: {
+        offer: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+                profile: {
+                  select: {
+                    avatar: true
+                  }
+                }
+              }
+            },
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                profile: {
+                  select: {
+                    avatar: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (existingChat) {
+      return NextResponse.json({ chat: existingChat });
+    }
+
+    // Create new chat
+    const chat = await prisma.chat.create({
+      data: {
+        offerId
+      },
+      include: {
+        offer: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+                profile: {
+                  select: {
+                    avatar: true
+                  }
+                }
+              }
+            },
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                profile: {
+                  select: {
+                    avatar: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return NextResponse.json({ chat });
+  } catch (error) {
+    console.error('Error creating chat:', error);
+    return NextResponse.json(
+      { error: 'Failed to create chat' },
       { status: 500 }
     );
   }

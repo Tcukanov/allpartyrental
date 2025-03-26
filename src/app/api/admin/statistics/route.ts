@@ -1,145 +1,101 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '../../../auth/[...nextauth]/route';
+import { Session } from 'next-auth';
+import { SessionStrategy } from 'next-auth';
 
-export async function GET(request: NextRequest) {
+interface CustomSession extends Session {
+  user?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    image?: string;
+    role?: string;
+  };
+}
+
+export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user) {
+    const session = await getServerSession(authOptions as { session: { strategy: SessionStrategy } }) as CustomSession;
+
+    // Check if user is authenticated and is an admin
+    if (!session?.user || session.user.role !== 'ADMIN') {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Check if user is admin
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } },
-        { status: 403 }
-      );
-    }
-
-    // Get site-wide statistics
-    const userCount = await prisma.user.count();
-    const clientCount = await prisma.user.count({ where: { role: 'CLIENT' } });
-    const providerCount = await prisma.user.count({ where: { role: 'PROVIDER' } });
-    
-    const activePartyCount = await prisma.party.count({ 
-      where: { 
-        status: { in: ['PUBLISHED', 'IN_PROGRESS'] } 
-      } 
-    });
-    
-    const completedPartyCount = await prisma.party.count({ 
-      where: { 
-        status: 'COMPLETED' 
-      } 
-    });
-    
-    const totalTransactionAmount = await prisma.transaction.aggregate({
-      _sum: {
-        amount: true,
-      },
-      where: {
-        status: 'COMPLETED',
-      },
-    });
-    
-    const pendingDisputeCount = await prisma.dispute.count({
-      where: {
-        isResolved: false,
-      },
-    });
-    
-    const advertisementCount = await prisma.advertisement.count({
-      where: {
-        isActive: true,
-      },
-    });
-    
-    const advertisementRevenue = await prisma.advertisement.aggregate({
-      _count: {
-        id: true,
-      },
-      where: {
-        endDate: {
-          gte: new Date(),
+    // Get statistics
+    const [
+      totalUsers,
+      totalProviders,
+      totalClients,
+      totalServices,
+      totalParties,
+      totalRevenue
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { role: 'PROVIDER' } }),
+      prisma.user.count({ where: { role: 'CLIENT' } }),
+      prisma.service.count(),
+      prisma.party.count(),
+      prisma.transaction.aggregate({
+        _sum: {
+          amount: true
         },
-      },
-    });
+        where: {
+          status: 'COMPLETED'
+        }
+      })
+    ]);
 
-    // Get recent activity
+    // Get recent parties
     const recentParties = await prisma.party.findMany({
       take: 5,
       orderBy: {
-        createdAt: 'desc',
+        createdAt: 'desc'
       },
       include: {
-        client: {
-          select: {
-            name: true,
-          },
-        },
-      },
+        client: true,
+        partyServices: {
+          include: {
+            service: true
+          }
+        }
+      }
     });
-    
-    const recentTransactions = await prisma.transaction.findMany({
+
+    // Get popular services
+    const popularServices = await prisma.service.findMany({
       take: 5,
       orderBy: {
-        createdAt: 'desc',
+        offers: {
+          _count: 'desc'
+        }
       },
       include: {
-        party: {
-          select: {
-            name: true,
-          },
-        },
-        offer: {
-          include: {
-            provider: {
-              select: {
-                name: true,
-              },
-            },
-            service: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-      },
+        _count: {
+          select: { offers: true }
+        }
+      }
     });
 
     return NextResponse.json({
-      success: true,
-      data: {
-        counts: {
-          users: userCount,
-          clients: clientCount,
-          providers: providerCount,
-          activeParties: activePartyCount,
-          completedParties: completedPartyCount,
-          pendingDisputes: pendingDisputeCount,
-          activeAdvertisements: advertisementCount,
-        },
-        financials: {
-          totalTransactionAmount: totalTransactionAmount._sum.amount || 0,
-          advertisementRevenue: advertisementRevenue._count.id || 0,
-        },
-        recent: {
-          parties: recentParties,
-          transactions: recentTransactions,
-        },
-      },
-    }, { status: 200 });
+      totalUsers,
+      totalProviders,
+      totalClients,
+      totalServices,
+      totalParties,
+      totalRevenue: totalRevenue._sum.amount || 0,
+      recentParties,
+      popularServices
+    });
   } catch (error) {
-    console.error('Get admin statistics error:', error);
+    console.error('Error fetching admin statistics:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }
