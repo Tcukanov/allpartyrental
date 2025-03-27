@@ -1,144 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma/client';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
-    if (!session || !session.user) {
+    if (!session?.user || session.user.role !== 'PROVIDER') {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Check if user is a provider
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email as string },
-      select: { id: true, role: true }
-    });
-
-    if (!user || user.role !== 'PROVIDER') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Only providers can access this endpoint' } },
-        { status: 403 }
-      );
-    }
-
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-    const category = searchParams.get('category');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const page = parseInt(searchParams.get('page') || '1');
-    const skip = (page - 1) * limit;
-
-    // Build the where clause
-    const where: any = {
-      providerId: user.id
-    };
-
-    if (status) {
-      where.status = status;
-    }
-
-    if (category) {
-      where.category = category;
-    }
-
-    // Get services
     const services = await prisma.service.findMany({
-      where,
-      orderBy: {
-        createdAt: 'desc'
+      where: {
+        providerId: session.user.id
       },
-      skip,
-      take: limit
-    });
-
-    // Count total services matching the criteria
-    const totalCount = await prisma.service.count({
-      where
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: services,
-      meta: {
-        total: totalCount,
-        page,
-        limit,
-        pages: Math.ceil(totalCount / limit)
+      include: {
+        category: true,
+        city: true
       }
-    }, { status: 200 });
+    });
+
+    return NextResponse.json(services);
   } catch (error) {
-    console.error('Get provider services error:', error);
+    console.error('Error fetching services:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
-    if (!session || !session.user) {
+    if (!session?.user || session.user.role !== 'PROVIDER') {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Check if user is a provider
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email as string },
-      select: { id: true, role: true }
-    });
-
-    if (!user || user.role !== 'PROVIDER') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Only providers can access this endpoint' } },
-        { status: 403 }
-      );
-    }
-
-    const body = await request.json();
+    const data = await request.json();
     
-    // Validate required fields
-    const requiredFields = ['name', 'description', 'price', 'category'];
-    for (const field of requiredFields) {
-      if (!body[field]) {
-        return NextResponse.json(
-          { success: false, error: { code: 'BAD_REQUEST', message: `Field '${field}' is required` } },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Create service
     const service = await prisma.service.create({
       data: {
-        providerId: user.id,
-        name: body.name,
-        description: body.description,
-        price: parseFloat(body.price),
-        category: body.category,
-        status: 'PENDING', // New services start as pending for admin approval
-        // Include additional fields as needed
+        ...data,
+        providerId: session.user.id
+      },
+      include: {
+        category: true,
+        city: true
       }
     });
 
-    return NextResponse.json({
-      success: true,
-      data: service
-    }, { status: 201 });
+    return NextResponse.json(service);
   } catch (error) {
-    console.error('Create service error:', error);
+    console.error('Error creating service:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

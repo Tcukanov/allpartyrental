@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Box, Container, Heading, Text, VStack, Tabs, TabList, TabPanels, Tab, TabPanel, SimpleGrid, Card, CardBody, Flex, Badge, Button, useToast, FormControl, FormLabel, Input, Textarea, Switch, HStack, Image, Select } from '@chakra-ui/react';
-import MainLayout from '@/components/layout/MainLayout';
 import { useRouter } from 'next/navigation';
 import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon } from '@chakra-ui/icons';
+import { useSession } from 'next-auth/react';
 
 // Mock data for service provider dashboard
 const mockServices = [
@@ -160,6 +160,7 @@ const daysOfWeek = [
 export default function ProviderCabinetPage() {
   const router = useRouter();
   const toast = useToast();
+  const { data: session } = useSession();
   const [services, setServices] = useState(mockServices);
   const [requests, setRequests] = useState(mockRequests);
   const [chats, setChats] = useState(mockChats);
@@ -168,6 +169,40 @@ export default function ProviderCabinetPage() {
   const [currentService, setCurrentService] = useState(null);
   const [filteredRequests, setFilteredRequests] = useState(mockRequests);
   const [requestFilter, setRequestFilter] = useState('All');
+
+  // Fetch services when component mounts
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await fetch('/api/services');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch services');
+        }
+        
+        const result = await response.json();
+        if (result.success && Array.isArray(result.data)) {
+          setServices(result.data);
+        } else {
+          setServices([]);
+        }
+      } catch (error) {
+        console.error('Error fetching services:', error);
+        toast({
+          title: "Error",
+          description: error.message || 'Failed to load services',
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+        setServices([]);
+      }
+    };
+
+    if (session?.user?.role === 'PROVIDER') {
+      fetchServices();
+    }
+  }, [session, toast]);
 
   // Filter requests based on status
   useEffect(() => {
@@ -179,40 +214,78 @@ export default function ProviderCabinetPage() {
   }, [requestFilter, requests]);
 
   // Handle service form submission
-  const handleServiceSubmit = (e) => {
+  const handleServiceSubmit = async (e) => {
     e.preventDefault();
     
+    try {
     if (isEditing && currentService) {
       // Update existing service
+        const response = await fetch(`/api/services/${currentService.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(currentService),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update service');
+        }
+
+        const result = await response.json();
+        if (result.success) {
       setServices(services.map(service => 
-        service.id === currentService.id ? currentService : service
+            service.id === result.data.id ? result.data : service
       ));
+          
       toast({
         title: "Service updated",
-        description: `${currentService.name} has been updated successfully.`,
+            description: `${result.data.name} has been updated successfully.`,
         status: "success",
         duration: 3000,
         isClosable: true,
       });
+        }
     } else {
       // Add new service
-      const newService = {
-        ...currentService,
-        id: services.length + 1,
-        isActive: true
-      };
-      setServices([...services, newService]);
+        const response = await fetch('/api/services', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(currentService),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create service');
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          setServices([...services, result.data]);
+          
       toast({
         title: "Service added",
-        description: `${newService.name} has been added successfully.`,
+            description: `${result.data.name} has been added successfully.`,
         status: "success",
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+      }
+      
+      setIsEditing(false);
+      setCurrentService(null);
+    } catch (error) {
+      console.error('Error saving service:', error);
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to save service',
+        status: "error",
         duration: 3000,
         isClosable: true,
       });
     }
-    
-    setIsEditing(false);
-    setCurrentService(null);
   };
 
   // Handle service edit
@@ -222,7 +295,18 @@ export default function ProviderCabinetPage() {
   };
 
   // Handle service delete
-  const handleDeleteService = (serviceId) => {
+  const handleDeleteService = async (serviceId) => {
+    try {
+      const response = await fetch(`/api/services/${serviceId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete service');
+      }
+
+      const result = await response.json();
+      if (result.success) {
     setServices(services.filter(service => service.id !== serviceId));
     toast({
       title: "Service deleted",
@@ -231,13 +315,54 @@ export default function ProviderCabinetPage() {
       duration: 3000,
       isClosable: true,
     });
+      }
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to delete service',
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   };
 
   // Handle service activation toggle
-  const handleToggleActive = (serviceId) => {
+  const handleToggleActive = async (serviceId) => {
+    try {
+      const service = services.find(s => s.id === serviceId);
+      const response = await fetch(`/api/services/${serviceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...service,
+          status: service.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update service status');
+      }
+
+      const result = await response.json();
+      if (result.success) {
     setServices(services.map(service => 
-      service.id === serviceId ? {...service, isActive: !service.isActive} : service
-    ));
+          service.id === result.data.id ? result.data : service
+        ));
+      }
+    } catch (error) {
+      console.error('Error toggling service status:', error);
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to update service status',
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   };
 
   // Handle input change for service form
@@ -290,8 +415,8 @@ export default function ProviderCabinetPage() {
   };
 
   return (
-    <MainLayout>
       <Container maxW="container.xl" py={8}>
+      <VStack spacing={8} align="stretch">
         <Heading as="h1" size="xl" mb={6}>Service Provider Dashboard</Heading>
         
         <Tabs variant="enclosed" colorScheme="brand">
@@ -364,7 +489,14 @@ export default function ProviderCabinetPage() {
                       </FormControl>
                     </SimpleGrid>
                     
-                    <Button mt={6} colorScheme="brand">Save Profile</Button>
+                    <Button 
+                      mt={6} 
+                      colorScheme="brand"
+                      _hover={{ bg: '#ffcba5' }}
+                      _active={{ bg: '#ffcba5' }}
+                    >
+                      Save Profile
+                    </Button>
                   </CardBody>
                 </Card>
               </VStack>
@@ -426,10 +558,17 @@ export default function ProviderCabinetPage() {
                               leftIcon={<AddIcon />}
                               isDisabled={request.status === 'Offer Sent' || request.status === 'Approved'}
                               onClick={() => handleSendOffer(request.id)}
+                              _hover={{ bg: '#ffcba5' }}
+                              _active={{ bg: '#ffcba5' }}
                             >
                               Send Offer
                             </Button>
-                            <Button leftIcon={<EditIcon />} variant="outline">
+                            <Button 
+                              leftIcon={<EditIcon />} 
+                              variant="outline"
+                              _hover={{ bg: '#ffcba5' }}
+                              _active={{ bg: '#ffcba5' }}
+                            >
                               View Details
                             </Button>
                           </VStack>
@@ -503,10 +642,21 @@ export default function ProviderCabinetPage() {
                               </Text>
                             </Box>
                             <VStack align="stretch" spacing={2} minW="150px">
-                              <Button leftIcon={<EditIcon />} variant="outline">
+                              <Button 
+                                leftIcon={<EditIcon />} 
+                                variant="outline"
+                                _hover={{ bg: '#ffcba5' }}
+                                _active={{ bg: '#ffcba5' }}
+                              >
                                 View Details
                               </Button>
-                              <Button leftIcon={<DeleteIcon />} variant="outline" colorScheme="red">
+                              <Button 
+                                leftIcon={<DeleteIcon />} 
+                                variant="outline" 
+                                colorScheme="red"
+                                _hover={{ bg: '#ffcba5' }}
+                                _active={{ bg: '#ffcba5' }}
+                              >
                                 Delete
                               </Button>
                             </VStack>
@@ -543,6 +693,8 @@ export default function ProviderCabinetPage() {
                           <Button
                             colorScheme="brand"
                             onClick={() => handlePurchaseAd(pkg.id)}
+                            _hover={{ bg: '#ffcba5' }}
+                            _active={{ bg: '#ffcba5' }}
                           >
                             Purchase
                           </Button>
@@ -555,7 +707,7 @@ export default function ProviderCabinetPage() {
             </TabPanel>
           </TabPanels>
         </Tabs>
-      </Container>
-    </MainLayout>
+      </VStack>
+    </Container>
   );
 }

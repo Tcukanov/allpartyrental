@@ -1,44 +1,33 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Box, 
   Button, 
+  Card,
+  CardBody,
   VStack, 
-  Heading, 
-  Text, 
   FormControl, 
   FormLabel, 
   Input, 
-  Flex, 
-  Divider, 
-  Card, 
-  CardBody, 
+  Text,
+  useToast,
   Alert, 
   AlertIcon, 
   AlertTitle, 
   AlertDescription,
-  useToast
+  HStack,
+  Divider,
+  Heading,
+  Spinner,
 } from '@chakra-ui/react';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { useRouter } from 'next/navigation';
 
-const PaymentComponent = ({ transaction, offer, onSuccess }) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const router = useRouter();
-  const toast = useToast();
-  
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [clientSecret, setClientSecret] = useState('');
-  const [cardError, setCardError] = useState('');
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  
-  const cardStyle = {
+const CARD_ELEMENT_OPTIONS = {
     style: {
       base: {
         color: '#32325d',
-        fontFamily: 'Arial, sans-serif',
+      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
         fontSmoothing: 'antialiased',
         fontSize: '16px',
         '::placeholder': {
@@ -52,33 +41,51 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
     },
   };
   
-  useEffect(() => {
-    const initializePayment = async () => {
-      try {
-        const response = await fetch(`/api/transactions/${transaction.id}/pay`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ paymentMethodId: null }),
-        });
-        
-        const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.error.message || 'Failed to initialize payment');
-        }
-        
-        setClientSecret(data.data.clientSecret);
-      } catch (error) {
-        console.error('Payment initialization error:', error);
-        setCardError('Failed to initialize payment. Please try again.');
-      }
-    };
-    
-    initializePayment();
-  }, [transaction.id]);
+export default function PaymentComponent({ offer, onClose }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const toast = useToast();
   
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const [cardError, setCardError] = useState(null);
+  const [billingDetails, setBillingDetails] = useState({
+    name: '',
+    email: '',
+    address: {
+      line1: '',
+      city: '',
+      postal_code: '',
+      country: 'US',
+    },
+  });
+  
+  // Handle card input changes
+  const handleCardChange = (event) => {
+    setCardError(event.error ? event.error.message : '');
+  };
+  
+  // Handle billing details changes
+  const handleBillingChange = (e) => {
+    const { name, value } = e.target;
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      setBillingDetails((prev) => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value,
+        },
+      }));
+    } else {
+      setBillingDetails((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  };
+  
+  // Handle payment submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -87,47 +94,77 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
     }
     
     setIsProcessing(true);
-    setCardError('');
     
     try {
-      const cardElement = elements.getElement(CardElement);
-      
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: cardElement,
-          billing_details: {
-            name: e.target.name.value,
-            email: e.target.email.value,
-          },
+      // Create payment intent
+      const response = await fetch('/api/payment/create-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          amount: offer.amount,
+          offerId: offer.id,
+        }),
       });
-      
-      if (error) {
-        setCardError(error.message);
-      } else if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing') {
-        setPaymentSuccess(true);
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error.message || 'Failed to create payment intent');
+      }
+
+      // Confirm card payment
+      const { error: paymentError, paymentIntent } = await stripe.confirmCardPayment(
+        data.clientSecret,
+        {
+        payment_method: {
+            card: elements.getElement(CardElement),
+          },
+        }
+      );
+
+      if (paymentError) {
+        throw new Error(paymentError.message);
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        // Update offer status
+        const updateResponse = await fetch(`/api/offers/${offer.id}/payment-complete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            transactionId: paymentIntent.id,
+          }),
+        });
+
+        const updateData = await updateResponse.json();
+
+        if (!updateData.success) {
+          throw new Error(updateData.error.message || 'Failed to update offer status');
+        }
         
         toast({
-          title: "Payment successful",
-          description: "Your payment has been processed and is being held in escrow.",
-          status: "success",
+          title: 'Payment Successful',
+          description: 'Your payment has been processed successfully.',
+          status: 'success',
           duration: 5000,
           isClosable: true,
         });
         
-        if (onSuccess) {
-          onSuccess(paymentIntent);
-        }
-        
-        setTimeout(() => {
-          router.push(`/client/my-party`);
-        }, 2000);
-      } else {
-        setCardError(`Payment failed. Status: ${paymentIntent.status}`);
+        onClose();
       }
     } catch (error) {
       console.error('Payment error:', error);
-      setCardError('An unexpected error occurred. Please try again.');
+      toast({
+        title: 'Payment Failed',
+        description: error.message || 'Failed to process payment',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -137,81 +174,92 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
     <Card>
       <CardBody>
         <VStack spacing={6} align="stretch">
-          <Heading size="md">Payment for {offer.service.name}</Heading>
-          
-          <Box>
-            <Text fontWeight="bold">Service Provider:</Text>
-            <Text>{offer.provider.name}</Text>
-          </Box>
-          
-          <Box>
-            <Text fontWeight="bold">Description:</Text>
-            <Text>{offer.description}</Text>
-          </Box>
-          
-          <Flex justify="space-between">
-            <Box>
-              <Text fontWeight="bold">Amount:</Text>
-              <Text fontSize="xl" fontWeight="bold" color="brand.600">
-                ${Number(transaction.amount).toFixed(2)}
-              </Text>
-            </Box>
-            <Box>
-              <Text fontWeight="bold">Status:</Text>
-              <Text>{transaction.status}</Text>
-            </Box>
-          </Flex>
-          
-          <Divider />
-          
-          {paymentSuccess ? (
-            <Alert status="success" variant="subtle" flexDirection="column" alignItems="center" justifyContent="center" textAlign="center" borderRadius="md" p={6}>
+          {isComplete ? (
+            <Alert
+              status="success"
+              variant="subtle"
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
+              textAlign="center"
+              height="200px"
+              borderRadius="md"
+            >
               <AlertIcon boxSize="40px" mr={0} />
-              <AlertTitle mt={4} mb={2} fontSize="lg">Payment Successful!</AlertTitle>
-              <AlertDescription>
-                Your payment has been processed and is being held in escrow until the service is completed.
+              <AlertTitle mt={4} mb={1} fontSize="lg">
+                Payment Successful!
+              </AlertTitle>
+              <AlertDescription maxWidth="sm">
+                Your payment has been processed successfully. Your advertisement will be activated shortly.
               </AlertDescription>
             </Alert>
           ) : (
             <form onSubmit={handleSubmit}>
-              <VStack spacing={4} align="stretch">
-                <FormControl isRequired>
-                  <FormLabel>Name on Card</FormLabel>
-                  <Input name="name" placeholder="John Doe" />
-                </FormControl>
+              <VStack spacing={6} align="stretch">
+                <Heading size="md">Payment Details</Heading>
                 
-                <FormControl isRequired>
-                  <FormLabel>Email</FormLabel>
-                  <Input name="email" type="email" placeholder="your@email.com" />
-                </FormControl>
+                <Box bg="gray.50" p={4} borderRadius="md">
+                  <HStack justify="space-between" mb={1}>
+                    <Text>Service:</Text>
+                    <Text fontWeight="bold">{offer.service.name}</Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text>Provider:</Text>
+                    <Text fontWeight="bold">{offer.serviceProvider.name}</Text>
+                  </HStack>
+                  <Divider />
+                  <HStack justify="space-between">
+                    <Text fontSize="lg">Total Amount:</Text>
+                    <Text fontSize="xl" fontWeight="bold" color="brand.500">
+                      ${offer.amount.toFixed(2)}
+                    </Text>
+                  </HStack>
+                </Box>
                 
                 <FormControl isRequired>
                   <FormLabel>Card Information</FormLabel>
-                  <Box borderWidth="1px" borderRadius="md" p={3}>
-                    <CardElement options={cardStyle} />
+                  <Box 
+                    borderWidth="1px" 
+                    borderRadius="md" 
+                    p={3}
+                    borderColor={cardError ? "red.300" : "gray.200"}
+                  >
+                    <CardElement 
+                      options={{
+                        style: {
+                          base: {
+                            fontSize: '16px',
+                            color: '#424770',
+                            '::placeholder': {
+                              color: '#aab7c4',
+                            },
+                          },
+                          invalid: {
+                            color: '#9e2146',
+                          },
+                        },
+                      }} 
+                      onChange={handleCardChange}
+                    />
                   </Box>
+                  {cardError && (
+                    <Text color="red.500" fontSize="sm" mt={1}>{cardError}</Text>
+                  )}
                 </FormControl>
-                
-                {cardError && (
-                  <Alert status="error">
-                    <AlertIcon />
-                    {cardError}
-                  </Alert>
-                )}
                 
                 <Button
                   type="submit"
                   colorScheme="brand"
                   size="lg"
                   isLoading={isProcessing}
-                  loadingText="Processing"
-                  isDisabled={!clientSecret || isProcessing}
+                  loadingText="Processing..."
+                  isDisabled={!stripe || isProcessing}
                 >
-                  Pay ${Number(transaction.amount).toFixed(2)}
+                  Pay ${offer.amount.toFixed(2)}
                 </Button>
                 
-                <Text fontSize="sm" color="gray.600" textAlign="center">
-                  Your payment will be held in escrow until you confirm the service has been completed.
+                <Text fontSize="xs" color="gray.500" textAlign="center">
+                  Your payment information is processed securely via Stripe. We do not store your card details.
                 </Text>
               </VStack>
             </form>
@@ -220,6 +268,4 @@ const PaymentComponent = ({ transaction, offer, onSuccess }) => {
       </CardBody>
     </Card>
   );
-};
-
-export default PaymentComponent; 
+} 

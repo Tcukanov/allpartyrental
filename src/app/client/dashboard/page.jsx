@@ -34,11 +34,13 @@ import {
   StarIcon, 
   CheckCircleIcon, 
   TimeIcon, 
-  RepeatIcon 
+  RepeatIcon,
+  PartyIcon,
+  HistoryIcon,
+  SettingsIcon
 } from '@chakra-ui/icons';
 import { MdCelebration, MdPending, MdHistory, MdEvent } from 'react-icons/md';
 import { format } from 'date-fns';
-import MainLayout from '@/components/layout/MainLayout';
 import Link from 'next/link';
 
 // Mock data for calendar events
@@ -187,13 +189,11 @@ export default function ClientDashboardPage() {
   
   if (sessionStatus === 'loading' || isLoading) {
     return (
-      <MainLayout>
         <Container maxW="container.xl" py={8}>
           <Flex justify="center" align="center" h="60vh">
             <Spinner size="xl" color="brand.500" />
           </Flex>
         </Container>
-      </MainLayout>
     );
   }
   
@@ -203,332 +203,90 @@ export default function ClientDashboardPage() {
   }
   
   return (
-    <MainLayout>
       <Container maxW="container.xl" py={8}>
-        <Flex justify="space-between" align="center" mb={8}>
-          <Box>
-            <Heading size="lg">Welcome, {session.user.name}!</Heading>
-            <Text color="gray.600">Manage your parties and events in one place.</Text>
-          </Box>
-          
-          <Button 
-            leftIcon={<AddIcon />} 
-            colorScheme="brand" 
-            onClick={() => router.push('/client/create-party')}
-          >
-            Create New Party
-          </Button>
-        </Flex>
+      <VStack spacing={8} align="stretch">
+        <Heading as="h1" size="xl">Client Dashboard</Heading>
         
-        {/* Statistics */}
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={8}>
-          <Card>
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
+          <Card cursor="pointer" onClick={() => router.push('/client/create-party')}>
             <CardBody>
-              <Stat>
-                <StatLabel>Parties Organized</StatLabel>
-                <StatNumber>{statistics.totalPartiesOrganized || 0}</StatNumber>
-                <StatHelpText>
-                  <Icon as={MdHistory} mr={1} />
-                  Total parties
-                </StatHelpText>
-              </Stat>
+              <VStack spacing={4} align="center">
+                <Icon as={PartyIcon} w={8} h={8} color="brand.500" />
+                <Text fontWeight="bold">Create New Party</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  Start planning your next event
+                </Text>
+              </VStack>
             </CardBody>
           </Card>
           
-          <Card>
+          <Card cursor="pointer" onClick={() => router.push('/client/my-party')}>
             <CardBody>
-              <Stat>
-                <StatLabel>Total Spent</StatLabel>
-                <StatNumber>${statistics.totalSpent?.toFixed(2) || '0.00'}</StatNumber>
-                <StatHelpText>
-                  <Icon as={MdEvent} mr={1} />
-                  All-time spending
-                </StatHelpText>
-              </Stat>
+              <VStack spacing={4} align="center">
+                <Icon as={CalendarIcon} w={8} h={8} color="brand.500" />
+                <Text fontWeight="bold">My Parties</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  View and manage your parties
+                </Text>
+              </VStack>
             </CardBody>
           </Card>
           
-          <Card>
+          <Card cursor="pointer" onClick={() => router.push('/client/party-history')}>
             <CardBody>
-              <Stat>
-                <StatLabel>Upcoming Parties</StatLabel>
-                <StatNumber>{statistics.upcomingParties || 0}</StatNumber>
-                <StatHelpText>
-                  <CalendarIcon mr={1} />
-                  Next 3 months
-                </StatHelpText>
-              </Stat>
+              <VStack spacing={4} align="center">
+                <Icon as={HistoryIcon} w={8} h={8} color="brand.500" />
+                <Text fontWeight="bold">Party History</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  View your past events
+                </Text>
+              </VStack>
             </CardBody>
           </Card>
           
-          <Card>
+          <Card cursor="pointer" onClick={() => router.push('/client/profile')}>
             <CardBody>
-              <Stat>
-                <StatLabel>Favorite Category</StatLabel>
-                <StatNumber>{statistics.favoriteServiceCategory || 'N/A'}</StatNumber>
-                <StatHelpText>
-                  <StarIcon mr={1} />
-                  Most booked service
-                </StatHelpText>
-              </Stat>
+              <VStack spacing={4} align="center">
+                <Icon as={SettingsIcon} w={8} h={8} color="brand.500" />
+                <Text fontWeight="bold">Profile Settings</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  Manage your account
+                </Text>
+              </VStack>
             </CardBody>
           </Card>
         </SimpleGrid>
         
-        {/* Active Parties */}
-        <Box mb={8}>
-          <Flex justify="space-between" align="center" mb={4}>
-            <Heading size="md" display="flex" alignItems="center">
-              <Icon as={MdCelebration} mr={2} color="brand.500" />
-              Your Active Parties
-            </Heading>
-            
-            <Button 
-              variant="link" 
-              colorScheme="brand" 
-              rightIcon={<RepeatIcon />}
-              onClick={() => router.push('/client/my-parties')}
-            >
-              View All
-            </Button>
-          </Flex>
-          
-          {activeParties.length === 0 ? (
-            <Card>
-              <CardBody textAlign="center" py={8}>
-                <VStack spacing={4}>
-                  <Icon as={MdCelebration} boxSize={12} color="gray.300" />
-                  <Heading size="md">No Active Parties</Heading>
-                  <Text color="gray.600">
-                    You don't have any active parties yet. Create your first party to get started!
-                  </Text>
-                  <Button 
-                    colorScheme="brand" 
-                    leftIcon={<AddIcon />}
-                    onClick={() => router.push('/client/create-party')}
-                  >
-                    Create New Party
-                  </Button>
-                </VStack>
-              </CardBody>
-            </Card>
-          ) : (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-              {activeParties.map(party => (
-                <Card key={party.id}>
-                  <CardHeader pb={0}>
-                    <Flex justify="space-between" align="start">
-                      <Heading size="md" noOfLines={1}>{party.name}</Heading>
-                      <Badge colorScheme={getStatusColor(party.status)}>
-                        {party.status.replace('_', ' ')}
-                      </Badge>
-                    </Flex>
-                  </CardHeader>
-                  
-                  <CardBody>
-                    <VStack spacing={2} align="start">
-                      <HStack>
-                        <CalendarIcon color="brand.500" />
-                        <Text>{formatDate(party.date)}</Text>
-                      </HStack>
-                      
-                      <HStack>
-                        <Icon as={MdPending} color="brand.500" />
-                        <Text>
-                          {party.confirmedServices} of {party.servicesCount} services confirmed
-                        </Text>
-                      </HStack>
-                      
-                      <HStack>
-                        <CheckCircleIcon color={
-                          party.servicesCount > 0 && party.confirmedServices === party.servicesCount 
-                            ? 'green.500' 
-                            : 'gray.500'
-                        } />
-                        <Text>
-                          {party.servicesCount > 0 && party.confirmedServices === party.servicesCount 
-                            ? 'All set!' 
-                            : 'Waiting for confirmations'
-                          }
-                        </Text>
-                      </HStack>
-                    </VStack>
-                  </CardBody>
-                  
-                  <Divider />
-                  
-                  <CardFooter>
-                    <Button 
-                      colorScheme="brand" 
-                      variant="outline" 
-                      width="full"
-                      onClick={() => router.push(`/client/my-party?id=${party.id}`)}
-                    >
-                      Manage Party
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </SimpleGrid>
-          )}
-        </Box>
-        
-        {/* Calendar */}
-        <Box mb={8}>
-          <Flex justify="space-between" align="center" mb={4}>
-            <Heading size="md" display="flex" alignItems="center">
-              <CalendarIcon mr={2} color="brand.500" />
-              Upcoming Celebrations
-            </Heading>
-            
-            <Button 
-              variant="link" 
-              colorScheme="brand" 
-              rightIcon={<AddIcon />}
-              onClick={() => router.push('/client/calendar')}
-            >
-              Manage Calendar
-            </Button>
-          </Flex>
-          
-          {calendarEvents.length === 0 ? (
-            <Card>
-              <CardBody textAlign="center" py={8}>
-                <VStack spacing={4}>
-                  <CalendarIcon boxSize={12} color="gray.300" />
-                  <Heading size="md">No Upcoming Events</Heading>
-                  <Text color="gray.600">
-                    You don't have any saved celebrations yet. Add birthdays and other special dates to your calendar.
-                  </Text>
-                  <Button 
-                    colorScheme="brand" 
-                    leftIcon={<AddIcon />}
-                    onClick={() => router.push('/client/calendar')}
-                  >
-                    Add to Calendar
-                  </Button>
-                </VStack>
-              </CardBody>
-            </Card>
-          ) : (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-              {calendarEvents.map(event => {
-                const daysUntil = getDaysUntil(event.birthDate);
-                
-                return (
-                  <Card key={event.id}>
-                    <CardBody>
-                      <VStack spacing={3} align="start">
-                        <Heading size="md">{event.childName}'s Birthday</Heading>
-                        
-                        <HStack>
-                          <CalendarIcon color="brand.500" />
-                          <Text>{formatDate(event.birthDate)}</Text>
-                        </HStack>
-                        
-                        <HStack>
-                          <TimeIcon color="brand.500" />
-                          <Text>
-                            {daysUntil} day{daysUntil !== 1 ? 's' : ''} away
-                          </Text>
-                        </HStack>
-                      </VStack>
-                    </CardBody>
-                    
-                    <Divider />
-                    
-                    <CardFooter>
-                      <Button 
-                        colorScheme="brand" 
-                        width="full"
-                        leftIcon={<AddIcon />}
-                        onClick={() => router.push('/client/create-party')}
-                      >
-                        Plan a Party
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                );
-              })}
-            </SimpleGrid>
-          )}
-        </Box>
-        
-        {/* Past Parties */}
+        {/* Recent Activity Section */}
         <Box>
-          <Flex justify="space-between" align="center" mb={4}>
-            <Heading size="md" display="flex" alignItems="center">
-              <Icon as={MdHistory} mr={2} color="brand.500" />
-              Party History
-            </Heading>
-            
-            <Button 
-              variant="link" 
-              colorScheme="brand" 
-              rightIcon={<RepeatIcon />}
-              onClick={() => router.push('/client/party-history')}
-            >
-              View All
-            </Button>
-          </Flex>
-          
-          {pastParties.length === 0 ? (
+          <Heading as="h2" size="lg" mb={6}>Recent Activity</Heading>
+          <VStack spacing={4} align="stretch">
             <Card>
-              <CardBody textAlign="center" py={8}>
-                <VStack spacing={4}>
-                  <Icon as={MdHistory} boxSize={12} color="gray.300" />
-                  <Heading size="md">No Past Parties</Heading>
-                  <Text color="gray.600">
-                    Your party history will appear here once you've completed events.
-                  </Text>
-                </VStack>
+              <CardBody>
+                <Flex justify="space-between" align="center">
+                  <Box>
+                    <Text fontWeight="bold">Birthday Party</Text>
+                    <Text fontSize="sm" color="gray.600">Created on March 15, 2024</Text>
+                  </Box>
+                  <Badge colorScheme="brand">In Progress</Badge>
+                </Flex>
               </CardBody>
             </Card>
-          ) : (
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-              {pastParties.map(party => (
-                <Card key={party.id}>
-                  <CardBody>
-                    <Flex justify="space-between">
-                      <VStack spacing={2} align="start">
-                        <Heading size="md" noOfLines={1}>{party.name}</Heading>
-                        
-                        <HStack>
-                          <CalendarIcon color="brand.500" />
-                          <Text>{formatDate(party.date)}</Text>
-                        </HStack>
-                        
-                        <HStack>
-                          <Icon as={MdCelebration} color="brand.500" />
-                          <Text>{party.servicesCount} services</Text>
-                        </HStack>
-                      </VStack>
-                      
-                      <VStack align="end">
-                        <Badge colorScheme="green">Completed</Badge>
-                        <Heading size="md" color="brand.600">${party.totalCost.toFixed(2)}</Heading>
-                      </VStack>
-                    </Flex>
-                  </CardBody>
-                  
-                  <Divider />
-                  
-                  <CardFooter>
-                    <Button 
-                      colorScheme="brand" 
-                      variant="outline" 
-                      width="full"
-                      onClick={() => router.push(`/client/party-details?id=${party.id}`)}
-                    >
-                      View Details
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </SimpleGrid>
-          )}
+            
+            <Card>
+                    <CardBody>
+                <Flex justify="space-between" align="center">
+                  <Box>
+                    <Text fontWeight="bold">Wedding Reception</Text>
+                    <Text fontSize="sm" color="gray.600">Created on March 10, 2024</Text>
         </Box>
+                  <Badge colorScheme="green">Completed</Badge>
+          </Flex>
+              </CardBody>
+            </Card>
+                      </VStack>
+        </Box>
+      </VStack>
       </Container>
-    </MainLayout>
   );
 }

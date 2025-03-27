@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
       return NextResponse.json(
@@ -33,11 +34,8 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
 
-    // Build the where clause for requests
-    const where: any = {};
-
-    // Only get requests for services owned by this provider
-    where.service = {
+    // Build the where clause for offers
+    const where: any = {
       providerId: user.id
     };
 
@@ -45,8 +43,8 @@ export async function GET(request: NextRequest) {
       where.status = status;
     }
 
-    // Get requests with related data
-    const requests = await prisma.serviceRequest.findMany({
+    // Get offers with related data
+    const offers = await prisma.offer.findMany({
       where,
       include: {
         client: {
@@ -63,6 +61,17 @@ export async function GET(request: NextRequest) {
             description: true,
             price: true,
           }
+        },
+        partyService: {
+          include: {
+            party: {
+              select: {
+                name: true,
+                date: true,
+                startTime: true,
+              }
+            }
+          }
         }
       },
       orderBy: {
@@ -72,14 +81,14 @@ export async function GET(request: NextRequest) {
       take: limit
     });
 
-    // Count total requests matching the criteria
-    const totalCount = await prisma.serviceRequest.count({
+    // Count total offers matching the criteria
+    const totalCount = await prisma.offer.count({
       where
     });
 
     return NextResponse.json({
       success: true,
-      data: requests,
+      data: offers,
       meta: {
         total: totalCount,
         page,

@@ -25,15 +25,20 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
-  useDisclosure
+  useDisclosure,
+  VStack,
 } from '@chakra-ui/react';
 import { formatDistanceToNow } from 'date-fns';
+import { OfferStatus } from '@prisma/client';
 
-interface Request {
+interface Offer {
   id: string;
   clientId: string;
   serviceId: string;
-  status: string;
+  partyServiceId: string;
+  status: OfferStatus;
+  price: number;
+  description: string;
   client: {
     name: string;
     email: string;
@@ -43,7 +48,13 @@ interface Request {
     description: string;
     price: number;
   };
-  message: string;
+  partyService: {
+    party: {
+      name: string;
+      date: string;
+      startTime: string;
+    }
+  };
   createdAt: string;
 }
 
@@ -51,11 +62,11 @@ export default function ProviderRequestsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const toast = useToast();
-  const [requests, setRequests] = useState<Request[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
+  const [selectedOffer, setSelectedOffer] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
 
   // Check if user is authenticated and a provider
@@ -72,11 +83,11 @@ export default function ProviderRequestsPage() {
         isClosable: true,
       });
     } else {
-      fetchRequests();
+      fetchOffers();
     }
   }, [session, status, router]);
 
-  const fetchRequests = async () => {
+  const fetchOffers = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/provider/requests');
@@ -88,16 +99,16 @@ export default function ProviderRequestsPage() {
       const data = await response.json();
       
       if (data.success) {
-        setRequests(data.data || []);
+        setOffers(data.data || []);
       } else {
-        throw new Error(data.error?.message || 'Failed to fetch requests');
+        throw new Error(data.error?.message || 'Failed to fetch offers');
       }
     } catch (err) {
-      console.error('Error fetching requests:', err);
+      console.error('Error fetching offers:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       toast({
         title: 'Error',
-        description: 'Failed to load requests',
+        description: 'Failed to load offers',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -107,9 +118,9 @@ export default function ProviderRequestsPage() {
     }
   };
 
-  const handleApprove = async (requestId: string) => {
+  const handleApprove = async (offerId: string) => {
     try {
-      const response = await fetch(`/api/provider/requests/${requestId}/approve`, {
+      const response = await fetch(`/api/provider/requests/${offerId}/approve`, {
         method: 'POST',
       });
       
@@ -120,40 +131,40 @@ export default function ProviderRequestsPage() {
       const data = await response.json();
       
       if (data.success) {
-        // Update the request status in the local state
-        setRequests(requests.map(req => 
-          req.id === requestId ? { ...req, status: 'APPROVED' } : req
+        // Update the offer status in the local state
+        setOffers(offers.map(offer => 
+          offer.id === offerId ? { ...offer, status: 'APPROVED' } : offer
         ));
         
         toast({
           title: 'Success',
-          description: 'Request approved successfully',
+          description: 'Offer approved successfully',
           status: 'success',
           duration: 3000,
           isClosable: true,
         });
       } else {
-        throw new Error(data.error?.message || 'Failed to approve request');
+        throw new Error(data.error?.message || 'Failed to approve offer');
       }
     } catch (err) {
-      console.error('Error approving request:', err);
+      console.error('Error approving offer:', err);
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to approve request',
+        description: err instanceof Error ? err.message : 'Failed to approve offer',
         status: 'error',
         duration: 3000,
         isClosable: true,
       });
     } finally {
       onClose();
-      setSelectedRequest(null);
+      setSelectedOffer(null);
       setActionType(null);
     }
   };
 
-  const handleReject = async (requestId: string) => {
+  const handleReject = async (offerId: string) => {
     try {
-      const response = await fetch(`/api/provider/requests/${requestId}/reject`, {
+      const response = await fetch(`/api/provider/requests/${offerId}/reject`, {
         method: 'POST',
       });
       
@@ -164,168 +175,156 @@ export default function ProviderRequestsPage() {
       const data = await response.json();
       
       if (data.success) {
-        // Update the request status in the local state
-        setRequests(requests.map(req => 
-          req.id === requestId ? { ...req, status: 'REJECTED' } : req
+        // Update the offer status in the local state
+        setOffers(offers.map(offer => 
+          offer.id === offerId ? { ...offer, status: 'REJECTED' } : offer
         ));
         
         toast({
           title: 'Success',
-          description: 'Request rejected successfully',
+          description: 'Offer rejected successfully',
           status: 'success',
           duration: 3000,
           isClosable: true,
         });
       } else {
-        throw new Error(data.error?.message || 'Failed to reject request');
+        throw new Error(data.error?.message || 'Failed to reject offer');
       }
     } catch (err) {
-      console.error('Error rejecting request:', err);
+      console.error('Error rejecting offer:', err);
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to reject request',
+        description: err instanceof Error ? err.message : 'Failed to reject offer',
         status: 'error',
         duration: 3000,
         isClosable: true,
       });
     } finally {
       onClose();
-      setSelectedRequest(null);
+      setSelectedOffer(null);
       setActionType(null);
     }
   };
 
-  const confirmAction = (requestId: string, action: 'approve' | 'reject') => {
-    setSelectedRequest(requestId);
+  const confirmAction = (offerId: string, action: 'approve' | 'reject') => {
+    setSelectedOffer(offerId);
     setActionType(action);
     onOpen();
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'PENDING':
-        return <Badge colorScheme="yellow">Pending</Badge>;
-      case 'APPROVED':
-        return <Badge colorScheme="green">Approved</Badge>;
-      case 'REJECTED':
-        return <Badge colorScheme="red">Rejected</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
-    }
+  const getStatusBadge = (status: OfferStatus) => {
+    const colorScheme = {
+      PENDING: 'yellow',
+      APPROVED: 'green',
+      REJECTED: 'red',
+      CANCELLED: 'gray'
+    }[status];
+
+    return (
+      <Badge colorScheme={colorScheme}>
+        {status}
+      </Badge>
+    );
   };
 
   if (loading) {
     return (
-      <Flex justify="center" align="center" height="100vh">
-        <Spinner size="xl" />
-      </Flex>
+      <Container maxW="container.xl" py={8}>
+        <Flex justify="center" align="center" minH="400px">
+          <Spinner size="xl" />
+        </Flex>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxW="container.xl" py={8}>
+        <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
+          <Text color="red.500">{error}</Text>
+        </Box>
+      </Container>
     );
   }
 
   return (
     <Container maxW="container.xl" py={8}>
-      <Heading as="h1" size="xl" mb={6}>Service Requests</Heading>
-      
-      {error && (
-        <Box mb={6} p={4} bg="red.100" color="red.800" borderRadius="md">
-          <Text>{error}</Text>
-        </Box>
-      )}
-
-      {requests.length === 0 ? (
-        <Box p={8} textAlign="center" bg="gray.50" borderRadius="md">
-          <Text fontSize="lg">You don't have any service requests yet</Text>
-        </Box>
-      ) : (
-        <Box overflowX="auto">
+      <VStack spacing={8} align="stretch">
+        <Heading as="h1" size="xl">Service Requests</Heading>
+        
+        {offers.length === 0 ? (
+          <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
+            <Text>No service requests found.</Text>
+          </Box>
+        ) : (
           <Table variant="simple">
             <Thead>
               <Tr>
-                <Th>Service</Th>
                 <Th>Client</Th>
-                <Th>Message</Th>
+                <Th>Service</Th>
+                <Th>Party</Th>
+                <Th>Price</Th>
                 <Th>Status</Th>
                 <Th>Date</Th>
                 <Th>Actions</Th>
               </Tr>
             </Thead>
             <Tbody>
-              {requests.map((request) => (
-                <Tr key={request.id}>
+              {offers.map((offer) => (
+                <Tr key={offer.id}>
+                  <Td>{offer.client.name}</Td>
+                  <Td>{offer.service.name}</Td>
+                  <Td>{offer.partyService.party.name}</Td>
+                  <Td>${offer.price}</Td>
+                  <Td>{getStatusBadge(offer.status)}</Td>
+                  <Td>{formatDistanceToNow(new Date(offer.createdAt), { addSuffix: true })}</Td>
                   <Td>
-                    <Text fontWeight="bold">{request.service.name}</Text>
-                    <Text fontSize="sm" color="gray.500">
-                      ${request.service.price.toFixed(2)}
-                    </Text>
-                  </Td>
-                  <Td>
-                    <Text>{request.client.name}</Text>
-                    <Text fontSize="sm" color="gray.500">{request.client.email}</Text>
-                  </Td>
-                  <Td maxW="200px">
-                    <Text noOfLines={2}>{request.message}</Text>
-                  </Td>
-                  <Td>{getStatusBadge(request.status)}</Td>
-                  <Td>
-                    {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
-                  </Td>
-                  <Td>
-                    {request.status === 'PENDING' && (
-                      <Flex>
-                        <Button
-                          size="sm"
-                          colorScheme="green"
-                          mr={2}
-                          onClick={() => confirmAction(request.id, 'approve')}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          colorScheme="red"
-                          onClick={() => confirmAction(request.id, 'reject')}
-                        >
-                          Reject
-                        </Button>
-                      </Flex>
-                    )}
+                    <Flex gap={2}>
+                      {offer.status === 'PENDING' && (
+                        <>
+                          <Button
+                            size="sm"
+                            colorScheme="green"
+                            onClick={() => confirmAction(offer.id, 'approve')}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            colorScheme="red"
+                            onClick={() => confirmAction(offer.id, 'reject')}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                    </Flex>
                   </Td>
                 </Tr>
               ))}
             </Tbody>
           </Table>
-        </Box>
-      )}
+        )}
+      </VStack>
 
-      {/* Confirmation Dialog */}
-      <AlertDialog
-        isOpen={isOpen}
-        leastDestructiveRef={undefined}
-        onClose={onClose}
-      >
+      <AlertDialog isOpen={isOpen} onClose={onClose}>
         <AlertDialogOverlay>
           <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              {actionType === 'approve' ? 'Approve Request' : 'Reject Request'}
+            <AlertDialogHeader>
+              {actionType === 'approve' ? 'Approve Offer' : 'Reject Offer'}
             </AlertDialogHeader>
-
             <AlertDialogBody>
-              Are you sure? You {actionType === 'approve' ? 'will provide this service to the client' : 'cannot undo this action afterwards'}.
+              Are you sure you want to {actionType} this offer?
             </AlertDialogBody>
-
             <AlertDialogFooter>
-              <Button onClick={onClose}>
-                Cancel
-              </Button>
-              <Button 
+              <Button onClick={onClose}>Cancel</Button>
+              <Button
                 colorScheme={actionType === 'approve' ? 'green' : 'red'}
                 onClick={() => {
-                  if (selectedRequest) {
-                    if (actionType === 'approve') {
-                      handleApprove(selectedRequest);
-                    } else if (actionType === 'reject') {
-                      handleReject(selectedRequest);
-                    }
+                  if (actionType === 'approve' && selectedOffer) {
+                    handleApprove(selectedOffer);
+                  } else if (actionType === 'reject' && selectedOffer) {
+                    handleReject(selectedOffer);
                   }
                 }}
                 ml={3}

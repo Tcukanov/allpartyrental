@@ -1,4 +1,6 @@
-import { Providers } from './providers';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SessionProvider } from '@/components/providers/SessionProvider';
+import MainLayout from '@/components/layout/MainLayout';
 import '@/styles/globals.css';
 
 export const metadata = {
@@ -10,7 +12,13 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <SessionProvider>
+          <ThemeProvider>
+            <MainLayout>
+              {children}
+            </MainLayout>
+          </ThemeProvider>
+        </SessionProvider>
       </body>
     </html>
   );

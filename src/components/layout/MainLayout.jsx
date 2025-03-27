@@ -137,6 +137,8 @@ export default function MainLayout({ children }) {
                     <Button
                       variant={pathname === link.href ? 'solid' : 'ghost'}
                       colorScheme={pathname === link.href ? 'brand' : undefined}
+                      color={pathname === link.href ? 'white' : 'black'}
+                      _hover={{ color: 'brand.500' }}
                     >
                       {link.name}
                     </Button>
@@ -242,18 +244,23 @@ export default function MainLayout({ children }) {
           <DrawerBody>
             <VStack spacing={4} align="stretch">
               {navLinks.map((link) => (
-                <Button
-                  key={link.name}
-                  as={Link}
+                <Link 
+                  key={link.name} 
                   href={link.href}
-                  variant={pathname === link.href ? 'solid' : 'ghost'}
-                  colorScheme={pathname === link.href ? 'brand' : undefined}
-                  w="full"
-                  justifyContent="flex-start"
+                  passHref
                   onClick={onMobileNavClose}
                 >
-                  {link.name}
-                </Button>
+                  <Button
+                    variant={pathname === link.href ? 'solid' : 'ghost'}
+                    colorScheme={pathname === link.href ? 'brand' : undefined}
+                    color={pathname === link.href ? 'white' : 'black'}
+                    _hover={{ color: 'brand.500' }}
+                    w="full"
+                    justifyContent="flex-start"
+                  >
+                    {link.name}
+                  </Button>
+                </Link>
               ))}
               
               <Divider />

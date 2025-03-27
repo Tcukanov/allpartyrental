@@ -38,7 +38,8 @@ import {
   AccordionItem,
   AccordionButton,
   AccordionPanel,
-  AccordionIcon
+  AccordionIcon,
+  Icon
 } from '@chakra-ui/react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -49,7 +50,9 @@ import {
   ChatIcon, 
   CalendarIcon, 
   TimeIcon, 
-  StarIcon 
+  StarIcon,
+  CheckCircleIcon,
+  RepeatIcon
 } from '@chakra-ui/icons';
 import { format } from 'date-fns';
 import MainLayout from '@/components/layout/MainLayout';
@@ -386,345 +389,72 @@ export default function MyPartyPage() {
   return (
     <MainLayout>
       <Container maxW="container.xl" py={8}>
-        <Box mb={8}>
-          <Flex justify="space-between" align="center" mb={4}>
+        <VStack spacing={8} align="stretch">
             <Box>
-              <Heading size="xl">{party.name}</Heading>
-              <HStack mt={2}>
-                <Badge colorScheme={getStatusColor(party.status)} fontSize="md" px={2} py={1}>
-                  {party.status.replace('_', ' ')}
-                </Badge>
-                <Text color="gray.600">
-                  <CalendarIcon mr={1} />
-                  {format(new Date(party.date), 'MMMM d, yyyy')}
+            <Heading as="h1" size="xl">{party.name}</Heading>
+            <Text color="gray.600" mt={2}>
+              Manage your party details and services
                 </Text>
-                <Text color="gray.600">
-                  <TimeIcon mr={1} />
-                  {party.startTime}
-                </Text>
-              </HStack>
             </Box>
             
+            <Card>
+              <CardBody>
+              <VStack spacing={6} align="stretch">
+                <Flex justify="space-between" align="center">
             <HStack>
-              <Button 
-                leftIcon={<EditIcon />}
-                variant="outline"
-                onClick={() => router.push(`/client/create-party?edit=${party.id}`)}
-                isDisabled={party.status !== 'DRAFT'}
-              >
-                Edit Party
-              </Button>
-            </HStack>
-          </Flex>
-          
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6} mt={4}>
-            <Card>
-              <CardBody>
-                <VStack align="start" spacing={2}>
-                  <Text fontWeight="bold">Location</Text>
-                  <Text>{party.city?.name}</Text>
-                </VStack>
-              </CardBody>
-            </Card>
-            
-            <Card>
-              <CardBody>
-                <VStack align="start" spacing={2}>
-                  <Text fontWeight="bold">Duration</Text>
-                  <Text>{party.duration} hours</Text>
-                </VStack>
-              </CardBody>
-            </Card>
-            
-            <Card>
-              <CardBody>
-                <VStack align="start" spacing={2}>
-                  <Text fontWeight="bold">Guests</Text>
-                  <Text>{party.guestCount} people</Text>
-                </VStack>
-              </CardBody>
-            </Card>
-          </SimpleGrid>
-        </Box>
-        
-        <Box mb={8}>
-          <Flex justify="space-between" align="center" mb={4}>
-            <Heading size="lg">Services & Offers</Heading>
-            
-            <HStack>
-              <Badge colorScheme="blue">
-                {countApprovedOffers()} of {party.partyServices.length} services confirmed
+                    <Icon as={CalendarIcon} color="brand.500" />
+                    <Text fontWeight="bold">Date & Time</Text>
+                  </HStack>
+                  <Badge colorScheme={getStatusColor(party.status)} fontSize="md" px={2} py={1}>
+                    {party.status.replace('_', ' ')}
               </Badge>
-              
-              {allServicesApproved() && (
-                <Badge colorScheme="green">All Set!</Badge>
-              )}
-            </HStack>
           </Flex>
           
-          <Accordion allowMultiple defaultIndex={[0]}>
-            {party.partyServices.map((service, serviceIndex) => {
-              const hasApprovedOffer = service.offers.some(offer => offer.status === 'APPROVED');
-              
-              return (
-                <AccordionItem key={service.id}>
-                  <AccordionButton>
-                    <Box flex="1" textAlign="left">
-                      <HStack>
-                        <Text fontWeight="bold">{service.service.name}</Text>
-                        {hasApprovedOffer ? (
-                          <Badge colorScheme="green">Confirmed</Badge>
-                        ) : (
-                          <Badge colorScheme="blue">
-                            {service.offers.length} offer{service.offers.length !== 1 ? 's' : ''}
-                          </Badge>
-                        )}
-                      </HStack>
+                <HStack spacing={4}>
+                  <Box>
+                    <Text color="gray.600">Date</Text>
+                    <Text fontWeight="medium">{format(new Date(party.date), 'MMMM d, yyyy')}</Text>
+                  </Box>
+                  <Box>
+                    <Text color="gray.600">Time</Text>
+                    <Text fontWeight="medium">{party.startTime}</Text>
                     </Box>
-                    <AccordionIcon />
-                  </AccordionButton>
-                  
-                  <AccordionPanel pb={4}>
-                    {service.offers.length === 0 ? (
-                      <Box p={4} borderWidth="1px" borderRadius="md" textAlign="center">
-                        <Text color="gray.600">No offers yet. Providers will respond soon.</Text>
+                  <Box>
+                    <Text color="gray.600">Location</Text>
+                    <Text fontWeight="medium">{party.city?.name}</Text>
                       </Box>
-                    ) : (
-                      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                        {service.offers.map((offer, offerIndex) => (
-                          <Card key={offer.id} borderWidth="1px" variant="outline">
-                            <CardHeader pb={0}>
-                              <Flex justify="space-between" align="center">
-                                <HStack>
-                                  <Avatar 
-                                    size="sm" 
-                                    name={offer.provider.name} 
-                                    src={offer.provider.profile?.avatar} 
-                                  />
-                                  <VStack align="start" spacing={0}>
-                                    <Text fontWeight="bold">{offer.provider.name}</Text>
-                                    <Badge colorScheme={
-                                      offer.status === 'APPROVED' ? 'green' :
-                                      offer.status === 'REJECTED' ? 'red' :
-                                      'gray'
-                                    }>
-                                      {offer.status}
-                                    </Badge>
-                                  </VStack>
                                 </HStack>
                                 
-                                <Text fontWeight="bold" fontSize="lg" color="brand.600">
-                                  ${Number(offer.price).toFixed(2)}
-                                </Text>
-                              </Flex>
-                            </CardHeader>
-                            
-                            <CardBody>
-                              <Text noOfLines={2}>{offer.description}</Text>
-                              
-                              {offer.photos && offer.photos.length > 0 && (
-                                <Box mt={2} h="100px" overflow="hidden" borderRadius="md">
-                                  <Image 
-                                    src={offer.photos[0]} 
-                                    alt={`${offer.provider.name}'s offer`} 
-                                    objectFit="cover"
-                                    w="100%"
-                                    h="100%"
-                                  />
-                                </Box>
-                              )}
-                            </CardBody>
-                            
-                            <CardFooter pt={0}>
-                              <Flex width="100%" justify="space-between">
-                                <Button 
-                                  leftIcon={<ChatIcon />} 
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleOpenChat(offer)}
-                                >
-                                  Chat
-                                </Button>
-                                
-                                <HStack>
-                                  {offer.status === 'PENDING' && (
-                                    <>
-                                      <Button 
-                                        leftIcon={<CloseIcon />} 
-                                        colorScheme="red" 
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleRejectOffer(offer.id)}
-                                      >
-                                        Reject
-                                      </Button>
-                                      
-                                      <Button 
-                                        leftIcon={<CheckIcon />} 
-                                        colorScheme="green" 
-                                        size="sm"
-                                        onClick={() => handleApproveOffer(offer.id)}
-                                      >
-                                        Approve
-                                      </Button>
-                                    </>
-                                  )}
-                                  
-                                  {offer.status === 'APPROVED' && offer.transaction?.status === 'PENDING' && (
-                                    <Button 
-                                      colorScheme="brand" 
-                                      size="sm"
-                                      onClick={() => {
-                                        setActiveOffer(offer);
-                                        onPaymentModalOpen();
-                                      }}
-                                    >
-                                      Pay Now
-                                    </Button>
-                                  )}
-                                  
-                                  {offer.status === 'APPROVED' && 
-                                   offer.transaction?.status === 'ESCROW' && (
-                                    <Button 
-                                      colorScheme="green" 
-                                      size="sm"
-                                      onClick={() => handleConfirmArrival(offer.transaction.id)}
-                                    >
-                                      Confirm Delivery
-                                    </Button>
-                                  )}
-                                </HStack>
-                              </Flex>
-                            </CardFooter>
-                          </Card>
-                        ))}
-                      </SimpleGrid>
-                    )}
-                  </AccordionPanel>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-        </Box>
-        
-        {/* Offer Details Modal */}
-        <Modal isOpen={isOfferModalOpen} onClose={onOfferModalClose} size="xl">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Offer Details</ModalHeader>
-            <ModalCloseButton />
-            
-            <ModalBody>
-              {activeOffer && (
-                <VStack spacing={4} align="stretch">
-                  <Flex justify="space-between" align="center">
-                    <HStack>
-                      <Avatar 
-                        size="md" 
-                        name={activeOffer.provider.name} 
-                        src={activeOffer.provider.profile?.avatar} 
-                      />
-                      <VStack align="start" spacing={0}>
-                        <Text fontWeight="bold" fontSize="lg">{activeOffer.provider.name}</Text>
-                        <Badge colorScheme={
-                          activeOffer.status === 'APPROVED' ? 'green' :
-                          activeOffer.status === 'REJECTED' ? 'red' :
-                          'gray'
-                        }>
-                          {activeOffer.status}
+                <Divider />
+
+                <Box>
+                  <Text fontWeight="bold" mb={4}>Services</Text>
+                  <VStack spacing={3} align="stretch">
+                    {party.partyServices.map(service => (
+                      <Flex key={service.id} justify="space-between" align="center">
+                        <Text>{service.service.name}</Text>
+                        <Badge colorScheme={getStatusColor(service.status)}>
+                          {service.status}
                         </Badge>
+                      </Flex>
+                    ))}
                       </VStack>
-                    </HStack>
-                    
-                    <Text fontWeight="bold" fontSize="xl" color="brand.600">
-                      ${Number(activeOffer.price).toFixed(2)}
-                    </Text>
-                  </Flex>
+                </Box>
                   
                   <Divider />
                   
-                  <Box>
-                    <Text fontWeight="bold" mb={2}>Description</Text>
-                    <Text>{activeOffer.description}</Text>
-                  </Box>
-                  
-                  {activeOffer.photos && activeOffer.photos.length > 0 && (
-                    <Box>
-                      <Text fontWeight="bold" mb={2}>Photos</Text>
-                      <SimpleGrid columns={2} spacing={2}>
-                        {activeOffer.photos.map((photo, index) => (
-                          <Box key={index} h="150px" overflow="hidden" borderRadius="md">
-                            <Image 
-                              src={photo} 
-                              alt={`Photo ${index + 1}`} 
-                              objectFit="cover"
-                              w="100%"
-                              h="100%"
-                            />
-                          </Box>
-                        ))}
-                      </SimpleGrid>
-                    </Box>
-                  )}
+                <Flex justify="space-between">
+                  <Button variant="outline" onClick={() => router.push('/client/dashboard')}>
+                    Back to Dashboard
+                  </Button>
+                  <Button colorScheme="brand" onClick={() => router.push(`/client/edit-party?id=${party.id}`)}>
+                    Edit Party
+                  </Button>
+                </Flex>
+              </VStack>
+            </CardBody>
+          </Card>
                 </VStack>
-              )}
-            </ModalBody>
-            
-            <ModalFooter>
-              <Button colorScheme="brand" mr={3} onClick={onOfferModalClose}>
-                Close
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-        
-        {/* Chat Modal */}
-        <Modal isOpen={isChatModalOpen} onClose={onChatModalClose} size="xl">
-          <ModalOverlay />
-          <ModalContent h="80vh">
-            <ModalHeader>
-              Chat with {activeOffer?.provider.name}
-            </ModalHeader>
-            <ModalCloseButton />
-            
-            <ModalBody overflowY="hidden" display="flex" flexDirection="column">
-              {activeOffer && activeOffer.chat && (
-                <ChatComponent chatId={activeOffer.chat.id} offerId={activeOffer.id} />
-              )}
-            </ModalBody>
-          </ModalContent>
-        </Modal>
-        
-        {/* Payment Modal */}
-        <Modal isOpen={isPaymentModalOpen} onClose={onPaymentModalClose} size="xl">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Payment</ModalHeader>
-            <ModalCloseButton />
-            
-            <ModalBody>
-              {activeOffer && activeOffer.transaction && (
-                <Elements stripe={stripePromise}>
-                  <PaymentComponent 
-                    transaction={activeOffer.transaction} 
-                    offer={activeOffer}
-                    onSuccess={() => {
-                      onPaymentModalClose();
-                      // Refresh party data
-                      fetch(`/api/parties/${party.id}`)
-                        .then(res => res.json())
-                        .then(data => {
-                          if (data.success) {
-                            setParty(data.data);
-                          }
-                        });
-                    }}
-                  />
-                </Elements>
-              )}
-            </ModalBody>
-          </ModalContent>
-        </Modal>
       </Container>
     </MainLayout>
   );

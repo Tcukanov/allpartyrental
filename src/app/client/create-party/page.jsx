@@ -39,7 +39,6 @@ import {
 } from '@chakra-ui/react';
 import { useDrag, useDrop } from 'react-dnd';
 import { CloseIcon, AddIcon, DragHandleIcon } from '@chakra-ui/icons';
-import MainLayout from '@/components/layout/MainLayout';
 import { useRouter } from 'next/navigation';
 
 // Mock data for service categories
@@ -555,111 +554,69 @@ export default function PartyConfiguratorPage() {
   ];
   
   return (
-    <MainLayout>
-      <Container maxW="container.xl" py={8}>
-        <Heading as="h1" size="xl" mb={2}>Party Configurator</Heading>
-        <Text mb={8} color="gray.600">
-          Design your perfect party by selecting services and providing details
-        </Text>
-        
-        <Stepper size="lg" index={activeStep} mb={8} colorScheme="brand">
-          {steps.map((step, index) => (
-            <Step key={index}>
-              <StepIndicator>
-                <StepStatus
-                  complete={<Badge colorScheme="green">✓</Badge>}
-                  incomplete={index + 1}
-                  active={index + 1}
-                />
-              </StepIndicator>
-              <Box flexShrink="0">
-                <StepTitle>{step.title}</StepTitle>
-                <StepDescription>{step.description}</StepDescription>
-              </Box>
-              <StepSeparator />
-            </Step>
-          ))}
-        </Stepper>
-        
-        {activeStep === 0 && (
-          <Box mb={8}>
-            <Heading as="h2" size="md" mb={4}>Select Services for Your Party</Heading>
-            <Text mb={4} color="gray.600">
-              Drag service categories into the center area to add them to your party.
+    <Container maxW="container.md" py={8}>
+      <VStack spacing={8} align="stretch">
+        <Box>
+          <Heading as="h1" size="xl">Create New Party</Heading>
+          <Text color="gray.600" mt={2}>
+            Fill in the details below to start planning your party
             </Text>
-            
-            <Flex direction={{ base: "column", md: "row" }} gap={6}>
-              <Box w={{ base: "100%", md: "250px" }}>
-                <Text fontWeight="bold" mb={2}>Available Services</Text>
-                <VStack spacing={3} align="stretch">
-                  {serviceCategories.map(category => (
-                    <DraggableCategory key={category.id} category={category} />
-                  ))}
-                </VStack>
               </Box>
               
-              <Box flex={1}>
-                <Text fontWeight="bold" mb={2}>Your Party Services</Text>
-                <DroppableArea
-                  services={services}
-                  addService={addService}
-                  moveService={moveService}
-                  removeService={removeService}
-                />
-              </Box>
-            </Flex>
-          </Box>
-        )}
-        
-        {activeStep === 1 && (
-          <Box mb={8}>
-            <Heading as="h2" size="md" mb={4}>Event Details</Heading>
-            <Text mb={4} color="gray.600">
-              Provide information about your event
-            </Text>
-            
-            <EventDetailsForm 
-              eventDetails={eventDetails} 
-              setEventDetails={setEventDetails} 
-            />
-          </Box>
-        )}
-        
-        {activeStep === 2 && (
-          <Box mb={8}>
-            <Heading as="h2" size="md" mb={4}>Service-Specific Options</Heading>
-            <Text mb={4} color="gray.600">
-              Customize each service with specific details
-            </Text>
-            
-            <ServiceOptionsForm 
-              services={services}
-              serviceOptions={serviceOptions}
-              setServiceOptions={setServiceSpecificOptions}
-            />
-          </Box>
-        )}
-        
-        <Flex justify="space-between" mt={8}>
-          {activeStep > 0 ? (
-            <Button onClick={handlePrevious} colorScheme="gray">
-              Previous
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={6} align="stretch">
+            <FormControl isRequired>
+              <FormLabel>Party Name</FormLabel>
+              <Input placeholder="Enter party name" />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel>Party Type</FormLabel>
+              <Select placeholder="Select party type">
+                <option value="birthday">Birthday Party</option>
+                <option value="wedding">Wedding Reception</option>
+                <option value="corporate">Corporate Event</option>
+                <option value="other">Other</option>
+              </Select>
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel>Date</FormLabel>
+              <Input type="date" />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel>Time</FormLabel>
+              <Input type="time" />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel>Number of Guests</FormLabel>
+              <NumberInput min={1} max={1000}>
+                <NumberInputField />
+                <NumberInputStepper>
+                  <NumberIncrementStepper />
+                  <NumberDecrementStepper />
+                </NumberInputStepper>
+              </NumberInput>
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Location</FormLabel>
+              <Input placeholder="Enter party location" />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Theme</FormLabel>
+              <Input placeholder="Enter party theme (optional)" />
+            </FormControl>
+
+            <Button type="submit" colorScheme="brand" size="lg">
+              Create Party
             </Button>
-          ) : (
-            <Box />
-          )}
-          
-          {activeStep < steps.length - 1 ? (
-            <Button onClick={handleNext} colorScheme="brand">
-              Next
-            </Button>
-          ) : (
-            <Button onClick={handleSubmit} colorScheme="brand">
-              Submit Party Request
-            </Button>
-          )}
-        </Flex>
+          </VStack>
+        </form>
+      </VStack>
       </Container>
-    </MainLayout>
   );
 }

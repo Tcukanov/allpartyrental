@@ -4,66 +4,51 @@ import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const chat = await prisma.chat.findUnique({
+    const chat = await prisma.chat.findFirst({
       where: {
-        id: params.id
+        id: params.id,
+        offer: {
+          OR: [
+            { partyService: { party: { clientId: session.user.id } } },
+            { providerId: session.user.id }
+          ]
+        }
       },
       include: {
         offer: {
           include: {
-            client: {
-              select: {
-                id: true,
-                name: true,
-                profile: {
-                  select: {
-                    avatar: true
+            partyService: {
+              include: {
+                party: {
+                  include: {
+                    client: true
                   }
                 }
               }
             },
-            provider: {
-              select: {
-                id: true,
-                name: true,
-                profile: {
-                  select: {
-                    avatar: true
-                  }
-                }
-              }
-            }
+            provider: true
           }
         },
         messages: {
+          include: {
+            sender: true,
+            receiver: true
+          },
           orderBy: {
             createdAt: 'asc'
-          },
-          include: {
-            sender: {
-              select: {
-                id: true,
-                name: true,
-                profile: {
-                  select: {
-                    avatar: true
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -76,19 +61,11 @@ export async function GET(
       );
     }
 
-    // Check if user is authorized to view this chat
-    if (chat.offer.clientId !== session.user.id && chat.offer.providerId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
-    }
-
-    return NextResponse.json({ chat });
+    return NextResponse.json(chat);
   } catch (error) {
     console.error('Error fetching chat:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch chat' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { Box, Container, Heading, Text, VStack, HStack, FormControl, FormLabel, Input, Select, Textarea, Button, useToast, SimpleGrid, Card, CardBody, Flex, Badge } from '@chakra-ui/react';
-import MainLayout from '@/components/layout/MainLayout';
+import { Box, Container, Heading, Text, VStack, HStack, FormControl, FormLabel, Input, Select, Textarea, Button, useToast, SimpleGrid, Card, CardBody, Flex, Badge, Grid, GridItem, Tooltip } from '@chakra-ui/react';
+import { ChevronLeftIcon, ChevronRightIcon, AddIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -116,6 +116,7 @@ export default function PartyConfiguratorPage() {
     location: '',
     notes: ''
   });
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   // Handle dropping a service into the droppable area
   const handleDrop = (service, isRemove = false) => {
@@ -180,157 +181,274 @@ export default function PartyConfiguratorPage() {
     }
   };
 
+  const handlePreviousMonth = () => {
+    setCurrentDate(subMonths(currentDate, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(addMonths(currentDate, 1));
+  };
+
+  const handleAddEvent = () => {
+    router.push('/client/create-party');
+  };
+
   return (
-    <MainLayout>
-      <Container maxW="container.xl" py={8}>
-        <VStack spacing={8} align="stretch">
-          <Box>
-            <Heading as="h1" size="xl" mb={2}>Party Configurator</Heading>
-            <Text color="gray.600">
-              Drag and drop services to create your custom party package
-            </Text>
-          </Box>
-          
-          <Flex justify="space-between" align="center">
-            <Badge colorScheme="brand" p={2} borderRadius="md" fontSize="md">
-              Step {step} of 2: {step === 1 ? 'Select Services' : 'Party Details'}
-            </Badge>
-          </Flex>
-          
-          {step === 1 ? (
-            <DndProvider backend={HTML5Backend}>
-              <Flex direction={{ base: 'column', md: 'row' }} gap={6}>
-                <Box flex="1">
-                  <Heading as="h3" size="md" mb={4}>Available Services</Heading>
-                  <VStack align="stretch" spacing={3} maxH="600px" overflowY="auto" pr={2}>
-                    {serviceTypes.map(service => (
-                      <DraggableServiceItem key={service.id} service={service} />
-                    ))}
-                  </VStack>
-                </Box>
-                
-                <Box flex="2">
-                  <Heading as="h3" size="md" mb={4}>Your Party Configuration</Heading>
-                  <DroppableArea onDrop={handleDrop} selectedServices={selectedServices} />
-                </Box>
-              </Flex>
-            </DndProvider>
-          ) : (
-            <Box as="form" onSubmit={handleSubmit}>
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                <FormControl isRequired>
-                  <FormLabel>Party Name</FormLabel>
-                  <Input 
-                    name="name" 
-                    value={partyDetails.name} 
-                    onChange={handleInputChange} 
-                    placeholder="e.g., Sarah's 7th Birthday"
-                  />
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel>Date</FormLabel>
-                  <Input 
-                    name="date" 
-                    type="date" 
-                    value={partyDetails.date} 
-                    onChange={handleInputChange}
-                  />
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel>Start Time</FormLabel>
-                  <Input 
-                    name="startTime" 
-                    type="time" 
-                    value={partyDetails.startTime} 
-                    onChange={handleInputChange}
-                  />
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel>Duration (hours)</FormLabel>
-                  <Select 
-                    name="duration" 
-                    value={partyDetails.duration} 
-                    onChange={handleInputChange}
-                  >
-                    <option value={2}>2 hours</option>
-                    <option value={3}>3 hours</option>
-                    <option value={4}>4 hours</option>
-                    <option value={5}>5 hours</option>
-                    <option value={6}>6 hours</option>
-                  </Select>
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel>Number of Guests</FormLabel>
-                  <Input 
-                    name="guests" 
-                    type="number" 
-                    min={1}
-                    value={partyDetails.guests} 
-                    onChange={handleInputChange}
-                  />
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel>Location</FormLabel>
-                  <Input 
-                    name="location" 
-                    value={partyDetails.location} 
-                    onChange={handleInputChange} 
-                    placeholder="Address where the party will be held"
-                  />
-                </FormControl>
-                
-                <FormControl gridColumn={{ md: "span 2" }}>
-                  <FormLabel>Additional Notes</FormLabel>
-                  <Textarea 
-                    name="notes" 
-                    value={partyDetails.notes} 
-                    onChange={handleInputChange} 
-                    placeholder="Any special requirements or information for service providers"
-                    rows={4}
-                  />
-                </FormControl>
-              </SimpleGrid>
-              
-              <Box mt={6}>
-                <Text fontWeight="bold" mb={2}>Selected Services:</Text>
-                <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={3}>
-                  {selectedServices.map((service, index) => (
-                    <Card key={`${service.id}-${index}`} size="sm">
-                      <CardBody>
-                        <HStack>
-                          <Text fontSize="xl">{service.icon}</Text>
-                          <Text>{service.name}</Text>
-                        </HStack>
-                      </CardBody>
-                    </Card>
-                  ))}
-                </SimpleGrid>
-              </Box>
-            </Box>
-          )}
-          
-          <Flex justify="space-between" mt={6}>
-            {step === 2 && (
-              <Button onClick={() => setStep(1)} colorScheme="gray">
-                Back to Services
-              </Button>
-            )}
-            <Button 
-              onClick={handleSubmit} 
-              colorScheme="brand" 
-              size="lg" 
-              ml={step === 1 ? 'auto' : 0}
+    <Container maxW="container.xl" py={8}>
+      <VStack spacing={8} align="stretch">
+        <Box>
+          <Heading as="h1" size="xl">Party Configurator</Heading>
+          <Text color="gray.600" mt={2}>
+            Design your perfect party by selecting services and providing details
+          </Text>
+        </Box>
+
+        <Box>
+          <HStack justify="space-between" mb={6}>
+            <HStack>
+              <IconButton
+                icon={<ChevronLeftIcon />}
+                onClick={handlePreviousMonth}
+                aria-label="Previous month"
+              />
+              <Heading size="md">{format(currentDate, 'MMMM yyyy')}</Heading>
+              <IconButton
+                icon={<ChevronRightIcon />}
+                onClick={handleNextMonth}
+                aria-label="Next month"
+              />
+            </HStack>
+            <Button
+              leftIcon={<AddIcon />}
+              colorScheme="brand"
+              onClick={handleAddEvent}
             >
-              {step === 1 ? 'Continue to Party Details' : 'Submit Party Configuration'}
+              Add Event
             </Button>
-          </Flex>
-        </VStack>
-      </Container>
-    </MainLayout>
+          </HStack>
+
+          <Grid templateColumns="repeat(7, 1fr)" gap={1}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <GridItem key={day} textAlign="center" fontWeight="bold" py={2}>
+                {day}
+              </GridItem>
+            ))}
+            {daysInMonth.map((day, index) => {
+              const isCurrentMonth = isSameMonth(day, currentDate);
+              const isCurrentDay = isToday(day);
+              const isSameMonthDay = isSameDay(day, currentDate);
+
+              return (
+                <GridItem
+                  key={index}
+                  p={2}
+                  minH="100px"
+                  borderWidth="1px"
+                  borderColor="gray.200"
+                  bg={!isCurrentMonth ? 'gray.50' : 'white'}
+                  position="relative"
+                >
+                  <Text
+                    fontSize="sm"
+                    color={!isCurrentMonth ? 'gray.400' : 'gray.700'}
+                    fontWeight={isCurrentDay ? 'bold' : 'normal'}
+                  >
+                    {format(day, 'd')}
+                  </Text>
+                  {isSameMonthDay && (
+                    <Badge
+                      colorScheme="brand"
+                      position="absolute"
+                      top={1}
+                      right={1}
+                    >
+                      Today
+                    </Badge>
+                  )}
+                </GridItem>
+              );
+            })}
+          </Grid>
+        </Box>
+
+        <Box>
+          <Heading size="md" mb={4}>Upcoming Events</Heading>
+          <VStack spacing={4} align="stretch">
+            <Box
+              p={4}
+              borderWidth="1px"
+              borderColor="gray.200"
+              borderRadius="md"
+              _hover={{ borderColor: 'brand.500' }}
+              cursor="pointer"
+            >
+              <HStack justify="space-between">
+                <Box>
+                  <Text fontWeight="bold">Birthday Party</Text>
+                  <Text fontSize="sm" color="gray.600">March 25, 2024</Text>
+                </Box>
+                <Badge colorScheme="brand">Upcoming</Badge>
+              </HStack>
+            </Box>
+
+            <Box
+              p={4}
+              borderWidth="1px"
+              borderColor="gray.200"
+              borderRadius="md"
+              _hover={{ borderColor: 'brand.500' }}
+              cursor="pointer"
+            >
+              <HStack justify="space-between">
+                <Box>
+                  <Text fontWeight="bold">Wedding Reception</Text>
+                  <Text fontSize="sm" color="gray.600">April 15, 2024</Text>
+                </Box>
+                <Badge colorScheme="brand">Upcoming</Badge>
+              </HStack>
+            </Box>
+          </VStack>
+        </Box>
+
+        <Flex justify="space-between" align="center">
+          <Badge colorScheme="brand" p={2} borderRadius="md" fontSize="md">
+            Step {step} of 2: {step === 1 ? 'Select Services' : 'Party Details'}
+          </Badge>
+        </Flex>
+        
+        {step === 1 ? (
+          <DndProvider backend={HTML5Backend}>
+            <Flex direction={{ base: 'column', md: 'row' }} gap={6}>
+              <Box flex="1">
+                <Heading as="h3" size="md" mb={4}>Available Services</Heading>
+                <VStack align="stretch" spacing={3} maxH="600px" overflowY="auto" pr={2}>
+                  {serviceTypes.map(service => (
+                    <DraggableServiceItem key={service.id} service={service} />
+                  ))}
+                </VStack>
+              </Box>
+              
+              <Box flex="2">
+                <Heading as="h3" size="md" mb={4}>Your Party Configuration</Heading>
+                <DroppableArea onDrop={handleDrop} selectedServices={selectedServices} />
+              </Box>
+            </Flex>
+          </DndProvider>
+        ) : (
+          <Box as="form" onSubmit={handleSubmit}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+              <FormControl isRequired>
+                <FormLabel>Party Name</FormLabel>
+                <Input 
+                  name="name" 
+                  value={partyDetails.name} 
+                  onChange={handleInputChange} 
+                  placeholder="e.g., Sarah's 7th Birthday"
+                />
+              </FormControl>
+              
+              <FormControl isRequired>
+                <FormLabel>Date</FormLabel>
+                <Input 
+                  name="date" 
+                  type="date" 
+                  value={partyDetails.date} 
+                  onChange={handleInputChange}
+                />
+              </FormControl>
+              
+              <FormControl isRequired>
+                <FormLabel>Start Time</FormLabel>
+                <Input 
+                  name="startTime" 
+                  type="time" 
+                  value={partyDetails.startTime} 
+                  onChange={handleInputChange}
+                />
+              </FormControl>
+              
+              <FormControl isRequired>
+                <FormLabel>Duration (hours)</FormLabel>
+                <Select 
+                  name="duration" 
+                  value={partyDetails.duration} 
+                  onChange={handleInputChange}
+                >
+                  <option value={2}>2 hours</option>
+                  <option value={3}>3 hours</option>
+                  <option value={4}>4 hours</option>
+                  <option value={5}>5 hours</option>
+                  <option value={6}>6 hours</option>
+                </Select>
+              </FormControl>
+              
+              <FormControl isRequired>
+                <FormLabel>Number of Guests</FormLabel>
+                <Input 
+                  name="guests" 
+                  type="number" 
+                  min={1}
+                  value={partyDetails.guests} 
+                  onChange={handleInputChange}
+                />
+              </FormControl>
+              
+              <FormControl isRequired>
+                <FormLabel>Location</FormLabel>
+                <Input 
+                  name="location" 
+                  value={partyDetails.location} 
+                  onChange={handleInputChange} 
+                  placeholder="Address where the party will be held"
+                />
+              </FormControl>
+              
+              <FormControl gridColumn={{ md: "span 2" }}>
+                <FormLabel>Additional Notes</FormLabel>
+                <Textarea 
+                  name="notes" 
+                  value={partyDetails.notes} 
+                  onChange={handleInputChange} 
+                  placeholder="Any special requirements or information for service providers"
+                  rows={4}
+                />
+              </FormControl>
+            </SimpleGrid>
+            
+            <Box mt={6}>
+              <Text fontWeight="bold" mb={2}>Selected Services:</Text>
+              <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={3}>
+                {selectedServices.map((service, index) => (
+                  <Card key={`${service.id}-${index}`} size="sm">
+                    <CardBody>
+                      <HStack>
+                        <Text fontSize="xl">{service.icon}</Text>
+                        <Text>{service.name}</Text>
+                      </HStack>
+                    </CardBody>
+                  </Card>
+                ))}
+              </SimpleGrid>
+            </Box>
+          </Box>
+        )}
+        
+        <Flex justify="space-between" mt={6}>
+          {step === 2 && (
+            <Button onClick={() => setStep(1)} colorScheme="gray">
+              Back to Services
+            </Button>
+          )}
+          <Button 
+            onClick={handleSubmit} 
+            colorScheme="brand" 
+            size="lg" 
+            ml={step === 1 ? 'auto' : 0}
+          >
+            {step === 1 ? 'Continue to Party Details' : 'Submit Party Configuration'}
+          </Button>
+        </Flex>
+      </VStack>
+    </Container>
   );
 }

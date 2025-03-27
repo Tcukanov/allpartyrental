@@ -1,290 +1,191 @@
 'use client'
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Elements } from '@stripe/stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
+import PaymentComponent from '@/components/payment/PaymentComponent';
 import {
+  Box,
+  Container,
+  Heading,
+  Text,
+  VStack,
+  SimpleGrid,
   Card,
   CardBody,
-  Heading,
-  VStack,
-  FormControl,
-  FormLabel,
-  Input,
   Button,
-  Text,
-  Box,
-  Divider,
-  HStack,
   useToast,
   Badge,
-  Spinner,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
+  HStack,
+  Divider,
+  List,
+  ListItem,
+  ListIcon,
+  CheckIcon,
 } from '@chakra-ui/react';
-import { CheckIcon, InfoIcon } from '@chakra-ui/icons';
-import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const CARD_ELEMENT_OPTIONS = {
-  style: {
-    base: {
-      color: '#32325d',
-      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-      fontSmoothing: 'antialiased',
-      fontSize: '16px',
-      '::placeholder': {
-        color: '#aab7c4',
-      },
-    },
-    invalid: {
-      color: '#fa755a',
-      iconColor: '#fa755a',
-    },
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+
+// Mock data for ad packages
+const adPackages = [
+  {
+    id: 1,
+    name: '1 Day Spotlight',
+    description: 'Your service featured in the "Best in Your Location" section for 1 day',
+    price: 19.99,
+    duration: '1 day',
+    features: [
+      'Featured in "Best in Your Location" section',
+      'Increased visibility for 24 hours',
+      'Priority placement in search results',
+      'Highlighted listing with special badge'
+    ]
   },
-};
+  {
+    id: 2,
+    name: '7 Day Spotlight',
+    description: 'Your service featured in the "Best in Your Location" section for 7 days',
+    price: 99.99,
+    duration: '7 days',
+    features: [
+      'Featured in "Best in Your Location" section',
+      'Increased visibility for 7 days',
+      'Priority placement in search results',
+      'Highlighted listing with special badge',
+      'Weekly performance report'
+    ]
+  },
+  {
+    id: 3,
+    name: 'First Wave Weekly',
+    description: 'Get early access to new client requests for 7 days',
+    price: 49.99,
+    duration: '7 days',
+    features: [
+      'Early access to new client requests',
+      'Priority notification system',
+      'Exclusive client contact information',
+      'Weekly request summary report'
+    ]
+  },
+  {
+    id: 4,
+    name: 'First Wave Monthly',
+    description: 'Get early access to new client requests for 30 days',
+    price: 149.99,
+    duration: '30 days',
+    features: [
+      'Early access to new client requests',
+      'Priority notification system',
+      'Exclusive client contact information',
+      'Monthly request summary report',
+      'Priority support'
+    ]
+  },
+  {
+    id: 5,
+    name: 'Premium Bundle',
+    description: '7 Day Spotlight + First Wave Weekly',
+    price: 129.99,
+    duration: '7 days',
+    features: [
+      'Featured in "Best in Your Location" section',
+      'Early access to new client requests',
+      'Priority placement in search results',
+      'Highlighted listing with special badge',
+      'Weekly performance report',
+      'Priority support'
+    ]
+  }
+];
 
-export default function PaymentComponent({ amount, description, onSuccess }) {
-  const stripe = useStripe();
-  const elements = useElements();
+export default function ProviderAdvertisingPage() {
+  const router = useRouter();
   const toast = useToast();
-  
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
-  const [cardError, setCardError] = useState(null);
-  const [billingDetails, setBillingDetails] = useState({
-    name: '',
-    email: '',
-    address: {
-      line1: '',
-      city: '',
-      postal_code: '',
-      country: 'US',
-    },
-  });
-  
-  // Handle card input changes
-  const handleCardChange = (event) => {
-    setCardError(event.error ? event.error.message : '');
+  const [selectedPackage, setSelectedPackage] = useState(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
+  const handlePackageSelect = (pkg) => {
+    setSelectedPackage(pkg);
+    setIsPaymentModalOpen(true);
   };
-  
-  // Handle billing details changes
-  const handleBillingChange = (e) => {
-    const { name, value } = e.target;
-    if (name.includes('.')) {
-      const [parent, child] = name.split('.');
-      setBillingDetails((prev) => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value,
-        },
-      }));
-    } else {
-      setBillingDetails((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
-  };
-  
-  // Handle payment submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!stripe || !elements) {
-      // Stripe.js has not yet loaded.
-      return;
-    }
-    
-    if (!billingDetails.name || !billingDetails.email || !billingDetails.address.line1) {
+
+  const handlePaymentSuccess = () => {
+    setIsPaymentModalOpen(false);
+    setSelectedPackage(null);
       toast({
-        title: 'Missing Information',
-        description: 'Please fill in all required fields',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-    
-    setIsProcessing(true);
-    
-    try {
-      const cardElement = elements.getElement(CardElement);
-      
-      // Use Stripe.js to confirm the payment
-      const { error, paymentIntent } = await stripe.confirmCardPayment('client_secret_placeholder', {
-        payment_method: {
-          card: cardElement,
-          billing_details: billingDetails,
-        },
-      });
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      // Process successful result
-      if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing') {
-        // In a real app, we would make an API call to our backend to confirm payment was processed
-        setIsComplete(true);
-        
-        toast({
-          title: 'Payment Successful',
-          description: 'Your payment has been processed successfully',
+      title: 'Success',
+      description: 'Your advertisement has been activated successfully!',
           status: 'success',
           duration: 5000,
           isClosable: true,
         });
-        
-        // Call the success callback (may redirect or update UI in parent)
-        if (onSuccess) {
-          setTimeout(() => {
-            onSuccess(paymentIntent);
-          }, 2000);
-        }
-      } else {
-        throw new Error(`Payment status: ${paymentIntent.status}`);
-      }
-    } catch (error) {
-      console.error('Payment error:', error);
-      
-      toast({
-        title: 'Payment Failed',
-        description: error.message || 'There was an issue processing your payment',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+    // Refresh the page or update the UI as needed
   };
   
   return (
-    <Card>
-      <CardBody>
-        <VStack spacing={6} align="stretch">
-          {isComplete ? (
-            <Alert
-              status="success"
-              variant="subtle"
-              flexDirection="column"
-              alignItems="center"
-              justifyContent="center"
-              textAlign="center"
-              height="200px"
-              borderRadius="md"
-            >
-              <AlertIcon boxSize="40px" mr={0} />
-              <AlertTitle mt={4} mb={1} fontSize="lg">
-                Payment Successful!
-              </AlertTitle>
-              <AlertDescription maxWidth="sm">
-                Your payment has been processed successfully. Your advertisement will be activated shortly.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <VStack spacing={6} align="stretch">
-                <Heading size="md">Payment Details</Heading>
-                
-                <Box bg="gray.50" p={4} borderRadius="md">
-                  <HStack justify="space-between" mb={1}>
-                    <Text>Amount:</Text>
-                    <Text fontWeight="bold">${amount.toFixed(2)}</Text>
-                  </HStack>
-                  <HStack justify="space-between">
-                    <Text>Description:</Text>
-                    <Text>{description}</Text>
-                  </HStack>
+    <Container maxW="container.xl" py={8}>
+      <VStack spacing={8} align="stretch">
+        <Box textAlign="center">
+          <Heading as="h1" size="xl" mb={4}>Boost Your Visibility</Heading>
+          <Text fontSize="lg" color="gray.600">
+            Choose an advertising package to increase your visibility and get more clients
+          </Text>
                 </Box>
                 
-                <FormControl isRequired>
-                  <FormLabel>Name on Card</FormLabel>
-                  <Input 
-                    name="name"
-                    value={billingDetails.name}
-                    onChange={handleBillingChange}
-                    placeholder="John Smith"
-                  />
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel>Email</FormLabel>
-                  <Input 
-                    name="email"
-                    type="email"
-                    value={billingDetails.email}
-                    onChange={handleBillingChange}
-                    placeholder="john@example.com"
-                  />
-                </FormControl>
-                
-                <FormControl isRequired>
-                  <FormLabel>Address</FormLabel>
-                  <Input 
-                    name="address.line1"
-                    value={billingDetails.address.line1}
-                    onChange={handleBillingChange}
-                    placeholder="123 Main St"
-                    mb={2}
-                  />
-                  
-                  <HStack spacing={2}>
-                    <Input 
-                      name="address.city"
-                      value={billingDetails.address.city}
-                      onChange={handleBillingChange}
-                      placeholder="City"
-                    />
-                    <Input 
-                      name="address.postal_code"
-                      value={billingDetails.address.postal_code}
-                      onChange={handleBillingChange}
-                      placeholder="Zip Code"
-                    />
-                  </HStack>
-                </FormControl>
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+          {adPackages.map((pkg) => (
+            <Card key={pkg.id} size="lg">
+              <CardBody>
+                <VStack spacing={4} align="stretch">
+                  <Box>
+                    <Heading size="md" mb={2}>{pkg.name}</Heading>
+                    <Text color="gray.600">{pkg.description}</Text>
+                    <Badge colorScheme="blue" mt={2}>{pkg.duration}</Badge>
+                  </Box>
                 
                 <Divider />
                 
-                <FormControl isRequired>
-                  <FormLabel>Card Information</FormLabel>
-                  <Box 
-                    borderWidth="1px" 
-                    borderRadius="md" 
-                    p={3}
-                    borderColor={cardError ? "red.300" : "gray.200"}
-                  >
-                    <CardElement 
-                      options={CARD_ELEMENT_OPTIONS} 
-                      onChange={handleCardChange}
-                    />
+                  <List spacing={3}>
+                    {pkg.features.map((feature, index) => (
+                      <ListItem key={index}>
+                        <HStack>
+                          <ListIcon as={CheckIcon} color="green.500" />
+                          <Text>{feature}</Text>
+                        </HStack>
+                      </ListItem>
+                    ))}
+                  </List>
+
+                  <Box pt={4}>
+                    <Text fontSize="2xl" fontWeight="bold" mb={2}>
+                      ${pkg.price}
+                    </Text>
+                    <Button
+                      colorScheme="blue"
+                      width="full"
+                      onClick={() => handlePackageSelect(pkg)}
+                    >
+                      Select Package
+                    </Button>
                   </Box>
-                  {cardError && (
-                    <Text color="red.500" fontSize="sm" mt={1}>{cardError}</Text>
-                  )}
-                </FormControl>
-                
-                <Button
-                  type="submit"
-                  colorScheme="brand"
-                  size="lg"
-                  isLoading={isProcessing}
-                  loadingText="Processing"
-                  isDisabled={!stripe}
-                >
-                  Pay ${amount.toFixed(2)}
-                </Button>
-                
-                <Text fontSize="xs" color="gray.500" textAlign="center">
-                  Your payment information is processed securely via Stripe. We do not store your card details.
-                </Text>
-              </VStack>
-            </form>
-          )}
         </VStack>
       </CardBody>
     </Card>
+          ))}
+        </SimpleGrid>
+      </VStack>
+
+      {selectedPackage && (
+        <Elements stripe={stripePromise}>
+          <PaymentComponent
+            amount={selectedPackage.price * 100} // Convert to cents
+            description={`${selectedPackage.name} - ${selectedPackage.duration}`}
+            onSuccess={handlePaymentSuccess}
+          />
+        </Elements>
+      )}
+    </Container>
   );
 }

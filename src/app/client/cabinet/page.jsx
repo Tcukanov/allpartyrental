@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Box, Container, Heading, Text, VStack, Tabs, TabList, TabPanels, Tab, TabPanel, SimpleGrid, Card, CardBody, Flex, Avatar, Badge, Button, Stat, StatLabel, StatNumber, StatHelpText, useToast } from '@chakra-ui/react';
-import MainLayout from '@/components/layout/MainLayout';
+import { Box, Container, Heading, Text, VStack, Tabs, TabList, TabPanels, Tab, TabPanel, SimpleGrid, Card, CardBody, Flex, Avatar, Badge, Button, Stat, StatLabel, StatNumber, StatHelpText, useToast, HStack, Icon } from '@chakra-ui/react';
+import { CalendarIcon, PartyIcon, HistoryIcon, SettingsIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -228,231 +228,95 @@ export default function ClientCabinetPage() {
   };
   
   return (
-    <MainLayout>
-      <Container maxW="1200px" py={8}>
-        <VStack spacing={8} align="stretch">
-          <Flex justify="space-between" align="center" wrap="wrap">
-            <Box>
-              <Heading as="h1" size="xl" mb={2}>
-                Client Cabinet
-              </Heading>
-              <Text color="gray.600">
-                Manage your parties, view your calendar, and track your history
-              </Text>
-            </Box>
-            
-            <Button 
-              colorScheme="brand" 
-              size="lg"
-              onClick={handleCreateParty}
-              mt={{ base: 4, md: 0 }}
-            >
-              Create New Party
-            </Button>
-          </Flex>
+    <Container maxW="container.xl" py={8}>
+      <VStack spacing={8} align="stretch">
+        <Box>
+          <Heading as="h1" size="xl">Client Cabinet</Heading>
+          <Text color="gray.600" mt={2}>
+            Manage your account and party services
+          </Text>
+        </Box>
+
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
+          <Card cursor="pointer" onClick={() => router.push('/client/create-party')}>
+            <CardBody>
+              <VStack spacing={4} align="center">
+                <Icon as={PartyIcon} w={8} h={8} color="brand.500" />
+                <Text fontWeight="bold">Create New Party</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  Start planning your next event
+                </Text>
+              </VStack>
+            </CardBody>
+          </Card>
           
-          <Tabs colorScheme="brand" isLazy>
-            <TabList>
-              <Tab>Dashboard</Tab>
-              <Tab>My Parties</Tab>
-              <Tab>Calendar</Tab>
-              <Tab>History</Tab>
-              <Tab>Profile</Tab>
-            </TabList>
+          <Card cursor="pointer" onClick={() => router.push('/client/my-party')}>
+            <CardBody>
+              <VStack spacing={4} align="center">
+                <Icon as={CalendarIcon} w={8} h={8} color="brand.500" />
+                <Text fontWeight="bold">My Parties</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  View and manage your parties
+                </Text>
+              </VStack>
+            </CardBody>
+          </Card>
+          
+          <Card cursor="pointer" onClick={() => router.push('/client/party-history')}>
+            <CardBody>
+              <VStack spacing={4} align="center">
+                <Icon as={HistoryIcon} w={8} h={8} color="brand.500" />
+                <Text fontWeight="bold">Party History</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  View your past events
+                </Text>
+              </VStack>
+            </CardBody>
+          </Card>
+          
+          <Card cursor="pointer" onClick={() => router.push('/client/profile')}>
+            <CardBody>
+              <VStack spacing={4} align="center">
+                <Icon as={SettingsIcon} w={8} h={8} color="brand.500" />
+                <Text fontWeight="bold">Profile Settings</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  Manage your account
+                </Text>
+              </VStack>
+            </CardBody>
+          </Card>
+        </SimpleGrid>
+        
+        {/* Recent Activity Section */}
+        <Box>
+          <Heading as="h2" size="lg" mb={6}>Recent Activity</Heading>
+          <VStack spacing={4} align="stretch">
+            <Card>
+              <CardBody>
+                <Flex justify="space-between" align="center">
+                  <Box>
+                    <Text fontWeight="bold">Birthday Party</Text>
+                    <Text fontSize="sm" color="gray.600">Created on March 15, 2024</Text>
+                  </Box>
+                  <Badge colorScheme="brand">In Progress</Badge>
+                </Flex>
+              </CardBody>
+            </Card>
             
-            <TabPanels>
-              {/* Dashboard Tab */}
-              <TabPanel>
-                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={8}>
-                  <Card>
-                    <CardBody>
-                      <Stat>
-                        <StatLabel>Active Parties</StatLabel>
-                        <StatNumber>{activeParties.length}</StatNumber>
-                        <StatHelpText>
-                          {activeParties.filter(p => p.status === 'IN_PROGRESS').length} in progress
-                        </StatHelpText>
-                      </Stat>
-                    </CardBody>
-                  </Card>
-                  
-                  <Card>
-                    <CardBody>
-                      <Stat>
-                        <StatLabel>Completed Parties</StatLabel>
-                        <StatNumber>{pastParties.length}</StatNumber>
-                        <StatHelpText>
-                          Total events organized
-                        </StatHelpText>
-                      </Stat>
-                    </CardBody>
-                  </Card>
-                  
-                  <Card>
-                    <CardBody>
-                      <Stat>
-                        <StatLabel>Total Spent</StatLabel>
-                        <StatNumber>
-                          ${pastParties.reduce((sum, party) => sum + party.totalCost, 0)}
-                        </StatNumber>
-                        <StatHelpText>
-                          Across all parties
-                        </StatHelpText>
-                      </Stat>
-                    </CardBody>
-                  </Card>
-                </SimpleGrid>
-                
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
+            <Card>
+              <CardBody>
+                <Flex justify="space-between" align="center">
                   <Box>
-                    <Heading as="h3" size="md" mb={4}>
-                      Upcoming Parties
-                    </Heading>
-                    
-                    {activeParties.length > 0 ? (
-                      <VStack spacing={4} align="stretch">
-                        {activeParties.map(party => (
-                          <Card key={party.id}>
-                            <CardBody>
-                              <Flex justify="space-between" align="center" wrap="wrap">
-                                <Box>
-                                  <Heading as="h4" size="sm" mb={1}>
-                                    {party.name}
-                                  </Heading>
-                                  <Text fontSize="sm" color="gray.600">
-                                    {formatDate(party.date)} • {party.location}
-                                  </Text>
-                                  <Badge colorScheme={getStatusColor(party.status)} mt={2}>
-                                    {party.status.replace('_', ' ')}
-                                  </Badge>
-                                </Box>
-                                
-                                <Link href={`/client/parties/${party.id}`} passHref>
-                                  <Button size="sm" colorScheme="brand" variant="outline">
-                                    View Details
-                                  </Button>
-                                </Link>
-                              </Flex>
-                            </CardBody>
-                          </Card>
-                        ))}
-                      </VStack>
-                    ) : (
-                      <Card>
-                        <CardBody>
-                          <Text color="gray.600" textAlign="center">
-                            No upcoming parties. Create one now!
-                          </Text>
-                        </CardBody>
-                      </Card>
-                    )}
+                    <Text fontWeight="bold">Wedding Reception</Text>
+                    <Text fontSize="sm" color="gray.600">Created on March 10, 2024</Text>
                   </Box>
-                  
-                  <Box>
-                    <Heading as="h3" size="md" mb={4}>
-                      Upcoming Birthdays
-                    </Heading>
-                    
-                    {birthdays.length > 0 ? (
-                      <VStack spacing={4} align="stretch">
-                        {birthdays.map(child => {
-                          const daysUntil = calculateDaysUntilBirthday(child.birthdate);
-                          return (
-                            <Card key={child.id}>
-                              <CardBody>
-                                <Flex justify="space-between" align="center" wrap="wrap">
-                                  <Flex align="center">
-                                    <Avatar size="sm" name={child.name} mr={3} />
-                                    <Box>
-                                      <Heading as="h4" size="sm" mb={1}>
-                                        {child.name}
-                                      </Heading>
-                                      <Text fontSize="sm" color="gray.600">
-                                        Turning {child.age + 1} in {daysUntil} days
-                                      </Text>
-                                    </Box>
-                                  </Flex>
-                                  
-                                  <Button 
-                                    size="sm" 
-                                    colorScheme="brand"
-                                    onClick={() => handleOrganizePartyForChild(child.id)}
-                                  >
-                                    Organize Party
-                                  </Button>
-                                </Flex>
-                              </CardBody>
-                            </Card>
-                          );
-                        })}
-                      </VStack>
-                    ) : (
-                      <Card>
-                        <CardBody>
-                          <Text color="gray.600" textAlign="center">
-                            No birthdays added yet. Add them in your profile.
-                          </Text>
-                        </CardBody>
-                      </Card>
-                    )}
-                  </Box>
-                </SimpleGrid>
-              </TabPanel>
-              
-              {/* My Parties Tab */}
-              <TabPanel>
-                <VStack spacing={6} align="stretch">
-                  <Heading as="h3" size="md">
-                    Active Parties
-                  </Heading>
-                  
-                  {activeParties.length > 0 ? (
-                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                      {activeParties.map(party => (
-                        <Card key={party.id}>
-                          <CardBody>
-                            <VStack align="start" spacing={3}>
-                              <Flex w="100%" justify="space-between" align="center">
-                                <Heading as="h4" size="md">
-                                  {party.name}
-                                </Heading>
-                                <Badge colorScheme={getStatusColor(party.status)}>
-                                  {party.status.replace('_', ' ')}
-                                </Badge>
-                              </Flex>
-                              
-                              <Text color="gray.600">
-                                {formatDate(party.date)} • {party.location}
-                              </Text>
-                              
-                              <SimpleGrid columns={3} w="100%" spacing={4}>
-                                <Box>
-                                  <Text fontWeight="bold">{party.servicesCount}</Text>
-                                  <Text fontSize="sm" color="gray.600">Services</Text>
-                                </Box>
-                                <Box>
-                                  <Text fontWeight="bold">{party.offersCount}</Text>
-                                  <Text fontSize="sm" color="gray.600">Offers</Text>
-                                </Box>
-                                <Box>
-                                  <Text fontWeight="bold">{party.approvedOffersCount}</Text>
-                                  <Text fontSize="sm" color="gray.600">Approved</Text>
-                                </Box>
-                              </SimpleGrid>
-                              
-                              <Flex w="100%" justify="flex-end" pt={2}>
-                                <Link href={`/client/parties/${party.id}`} passHref>
-                                  <Button colorScheme="brand">
-                                    Manage Party
-                                  </Button>
-                                </Link>
-                              </Flex>
-                            </VStack>
-                          </CardBody>
-                        </Card>
-                      ))}
-                    </SimpleGrid>
-                  ) : (
-                    <Card>
-                      <CardBody>
-                  <response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>
+                  <Badge colorScheme="green">Completed</Badge>
+                </Flex>
+              </CardBody>
+            </Card>
+          </VStack>
+        </Box>
+      </VStack>
+    </Container>
+  );
+}
