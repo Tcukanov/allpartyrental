@@ -18,26 +18,46 @@ export const paymentService = {
    * @param {string} params.providerId - Provider ID
    * @param {number} params.amount - Payment amount in cents
    * @param {string} params.description - Payment description
+   * @param {number} params.clientFeePercent - Fee percentage charged to client
+   * @param {number} params.providerFeePercent - Fee percentage charged to provider
    * @returns {Promise<Object>} - Stripe payment intent data
    */
-  createPaymentIntent: async ({ offerId, clientId, providerId, amount, description }) => {
+  createPaymentIntent: async ({ 
+    offerId, 
+    clientId, 
+    providerId, 
+    amount, 
+    description,
+    clientFeePercent = 5.0,
+    providerFeePercent = 10.0
+  }) => {
     try {
       // Create transfer group ID
       const transferGroup = `offer_${offerId}`;
 
+      // Calculate the client fee amount
+      const clientFeeAmount = Math.round(amount * (clientFeePercent / 100));
+      
+      // Total amount to charge (service amount + client fee)
+      const totalAmount = amount + clientFeeAmount;
+
       // Create payment intent with application fee
       const paymentIntent = await stripe.paymentIntents.create({
-        amount,
+        amount: totalAmount,
         currency: 'usd',
         description,
         metadata: {
           offerId,
           clientId,
           providerId,
+          baseAmount: amount,
+          clientFee: clientFeeAmount,
+          clientFeePercent,
+          providerFeePercent,
           type: 'escrow'
         },
         transfer_group: transferGroup,
-        application_fee_amount: Math.round(amount * 0.05), // 5% platform fee
+        capture_method: 'manual', // This allows us to authorize now and capture later
       });
 
       return {
@@ -45,7 +65,9 @@ export const paymentService = {
         data: {
           clientSecret: paymentIntent.client_secret,
           paymentIntentId: paymentIntent.id,
-          transferGroup
+          transferGroup,
+          totalAmount,
+          clientFeeAmount
         }
       };
     } catch (error) {
@@ -91,10 +113,17 @@ export const paymentService = {
    * @param {string} params.paymentIntentId - Payment intent ID
    * @param {string} params.providerId - Provider ID
    * @param {string} params.transferGroup - Transfer group
-   * @param {number} params.amount - Amount to transfer
+   * @param {number} params.amount - Original amount to transfer
+   * @param {number} params.providerFeePercent - Fee percentage charged to provider
    * @returns {Promise<Object>} - Transfer data
    */
-  releaseFundsToProvider: async ({ paymentIntentId, providerId, transferGroup, amount }) => {
+  releaseFundsToProvider: async ({ 
+    paymentIntentId, 
+    providerId, 
+    transferGroup, 
+    amount,
+    providerFeePercent = 10.0
+  }) => {
     try {
       // Get provider's Stripe account ID
       const provider = await getProviderStripeAccount(providerId);
@@ -109,22 +138,35 @@ export const paymentService = {
         };
       }
 
+      // Calculate provider fee
+      const providerFeeAmount = Math.round(amount * (providerFeePercent / 100));
+      
+      // Amount to transfer to provider (original amount minus provider fee)
+      const transferAmount = amount - providerFeeAmount;
+
       // Create a transfer to the provider's account
       const transfer = await stripe.transfers.create({
-        amount,
+        amount: transferAmount,
         currency: 'usd',
         destination: provider.stripeAccountId,
         transfer_group: transferGroup,
         metadata: {
           paymentIntentId,
           providerId,
+          originalAmount: amount,
+          providerFee: providerFeeAmount,
+          providerFeePercent,
           type: 'escrow_release'
         }
       });
 
       return {
         success: true,
-        data: transfer
+        data: {
+          transfer,
+          transferAmount,
+          providerFeeAmount
+        }
       };
     } catch (error) {
       console.error('Error releasing funds to provider:', error);
@@ -149,7 +191,7 @@ export const paymentService = {
       const refundParams = {
         payment_intent: paymentIntentId,
         metadata: {
-          type: 'dispute_resolution'
+          type: 'transaction_refund'
         }
       };
 
@@ -250,27 +292,25 @@ export const paymentService = {
 
 /**
  * Get provider's Stripe account ID
- * @param {string} providerId - Provider ID
- * @returns {Promise<Object>} - Provider data with Stripe account ID
+ * @param {string} providerId - Provider's user ID
+ * @returns {Promise<Object>} - Provider with Stripe account ID
  */
 async function getProviderStripeAccount(providerId) {
-  // In a real implementation, this would fetch the provider from the database
-  // For now, we'll return a mock value
+  // In a real app, retrieve the provider's Stripe account from your database
+  // For now, we'll return a mock account
   return {
     id: providerId,
-    stripeAccountId: 'acct_mock123456' // This would be a real Stripe account ID in production
+    stripeAccountId: process.env.STRIPE_TEST_ACCOUNT || 'acct_test',
   };
 }
 
 /**
- * Update transaction status when payment succeeds
+ * Update transaction status based on Stripe event
  * @param {Object} paymentIntent - Stripe payment intent object
  */
 async function updateTransactionStatus(paymentIntent) {
-  const { offerId } = paymentIntent.metadata;
-  
-  // In a real implementation, this would update the transaction in the database
-  console.log(`Transaction for offer ${offerId} updated to ESCROW status`);
+  // In a real app, update the transaction status in your database
+  console.log('Payment captured:', paymentIntent.id);
 }
 
 /**
@@ -278,10 +318,8 @@ async function updateTransactionStatus(paymentIntent) {
  * @param {Object} transfer - Stripe transfer object
  */
 async function handleProviderTransfer(transfer) {
-  const { paymentIntentId, providerId } = transfer.metadata;
-  
-  // In a real implementation, this would update the transaction in the database
-  console.log(`Funds transferred to provider ${providerId} for payment ${paymentIntentId}`);
+  // In a real app, update the transaction in your database
+  console.log('Transfer to provider:', transfer.id);
 }
 
 /**
@@ -289,8 +327,6 @@ async function handleProviderTransfer(transfer) {
  * @param {Object} charge - Stripe charge object
  */
 async function handleClientRefund(charge) {
-  const paymentIntentId = charge.payment_intent;
-  
-  // In a real implementation, this would update the transaction in the database
-  console.log(`Refund issued for payment ${paymentIntentId}`);
+  // In a real app, update the transaction in your database
+  console.log('Refund to client:', charge.id);
 }

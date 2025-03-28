@@ -1,10 +1,40 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Box, Container, Heading, Text, VStack, Tabs, TabList, TabPanels, Tab, TabPanel, SimpleGrid, Card, CardBody, Flex, Badge, Button, useToast, FormControl, FormLabel, Input, Textarea, Switch, HStack, Image, Select } from '@chakra-ui/react';
+import { 
+  Box, 
+  Container, 
+  Heading, 
+  Text, 
+  VStack, 
+  Tabs, 
+  TabList, 
+  TabPanels, 
+  Tab, 
+  TabPanel, 
+  SimpleGrid, 
+  Card, 
+  CardBody, 
+  Flex, 
+  Badge, 
+  Button, 
+  useToast, 
+  FormControl, 
+  FormLabel, 
+  Input, 
+  Textarea, 
+  Switch, 
+  HStack, 
+  Image, 
+  Select,
+  Avatar,
+  Spinner,
+  Icon
+} from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon } from '@chakra-ui/icons';
 import { useSession } from 'next-auth/react';
+import { FaComment } from 'react-icons/fa';
 
 // Mock data for service provider dashboard
 const mockServices = [
@@ -583,24 +613,55 @@ export default function ProviderCabinetPage() {
             {/* Chats Tab */}
             <TabPanel>
               <VStack spacing={6} align="stretch">
+                <Flex justify="space-between" align="center">
                 <Heading as="h2" size="lg">Chats with Clients</Heading>
+                  <Button 
+                    colorScheme="brand" 
+                    size="sm" 
+                    leftIcon={<Icon as={FaComment} />}
+                    onClick={() => router.push('/chats')}
+                  >
+                    View All Chats
+                  </Button>
+                </Flex>
                 
-                {chats.length === 0 ? (
+                {isLoading ? (
+                  <Flex justify="center" p={6}>
+                    <Spinner size="xl" />
+                  </Flex>
+                ) : chats.length === 0 ? (
                   <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
-                    <Text>No active chats.</Text>
+                    <Text mb={4}>No active chats.</Text>
+                    <Button 
+                      colorScheme="brand" 
+                      onClick={() => router.push('/chats')}
+                    >
+                      Go to Messages
+                    </Button>
                   </Box>
                 ) : (
                   <VStack spacing={4} align="stretch">
-                    {chats.map(chat => (
-                      <Card key={chat.id} cursor="pointer" onClick={() => router.push(`/chats/${chat.id}`)}>
+                    {chats.slice(0, 3).map(chat => (
+                      <Card key={chat.id} cursor="pointer" onClick={() => router.push(`/chats/${chat.id}`)} _hover={{ shadow: 'md' }} transition="all 0.2s">
                         <CardBody>
                           <Flex justify="space-between" align="center">
-                            <Box>
-                              <Text fontWeight="bold">{chat.clientName}</Text>
-                              <Text noOfLines={1} fontSize="sm" color="gray.600">
-                                {chat.lastMessage}
-                              </Text>
-                            </Box>
+                            <Flex align="center">
+                              <Avatar 
+                                name={chat.clientName} 
+                                src={chat.clientAvatar} 
+                                size="md" 
+                                mr={3}
+                              />
+                              <Box>
+                                <Text fontWeight="bold">{chat.clientName}</Text>
+                                <Text fontSize="xs" color="gray.600">
+                                  Re: {chat.serviceName || 'Service request'}
+                                </Text>
+                                <Text noOfLines={1} fontSize="sm" color="gray.600">
+                                  {chat.lastMessage}
+                                </Text>
+                              </Box>
+                            </Flex>
                             <Box textAlign="right">
                               <Text fontSize="xs" color="gray.500">
                                 {new Date(chat.timestamp).toLocaleDateString()}
@@ -615,6 +676,15 @@ export default function ProviderCabinetPage() {
                         </CardBody>
                       </Card>
                     ))}
+                    {chats.length > 3 && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => router.push('/chats')}
+                        alignSelf="center"
+                      >
+                        See All ({chats.length}) Conversations
+                      </Button>
+                    )}
                   </VStack>
                 )}
               </VStack>

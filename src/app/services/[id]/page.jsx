@@ -23,13 +23,25 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   useToast,
-  Spinner
+  Spinner,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  Collapse,
+  useDisclosure,
+  Stack,
+  Skeleton
 } from '@chakra-ui/react';
-import { StarIcon, CheckIcon, ChevronRightIcon } from '@chakra-ui/icons';
-import { FaMapMarkerAlt, FaCalendarAlt, FaUser, FaPhoneAlt, FaEnvelope, FaGlobe, FaClock } from 'react-icons/fa';
+import { StarIcon, CheckIcon, ChevronRightIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
+import { FaMapMarkerAlt, FaCalendarAlt, FaUser, FaPhoneAlt, FaEnvelope, FaGlobe } from 'react-icons/fa';
+import { FiClock, FiCalendar, FiDollarSign, FiMapPin } from 'react-icons/fi';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
+import { useSession } from 'next-auth/react';
+import ServiceRequestButton from '@/components/services/ServiceRequestButton';
+import { getSession } from 'next-auth/react';
 
 // Fallback service data in case API isn't ready
 const fallbackService = {
@@ -76,7 +88,6 @@ const fallbackService = {
     'Safety-certified construction',
     'Perfect for ages 3-12',
     "Requires 18' x 18' space"
-
   ],
   availability: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 };
@@ -109,16 +120,22 @@ const fallbackSimilarServices = [
   }
 ];
 
-export default function ServiceDetailsPage() {
-  const params = useParams();
+export default function ServiceDetailPage({ params }) {
   const router = useRouter();
   const toast = useToast();
+  const { data: session } = useSession();
+  const { isOpen, onToggle } = useDisclosure();
   
   const [service, setService] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [similarServices, setSimilarServices] = useState([]);
   const [fetchError, setFetchError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requestMessage, setRequestMessage] = useState('');
+  const [requestDate, setRequestDate] = useState('');
+  const [userRole, setUserRole] = useState(null);
+  const [isOwner, setIsOwner] = useState(false);
   
   // Fetch service data from database or use fallback
   useEffect(() => {
@@ -183,6 +200,12 @@ export default function ServiceDetailsPage() {
             setSimilarServices(fallbackSimilarServices.filter(s => s.id !== params.id));
           }
         }
+        
+        // Check if current user is the service owner
+        if (session) {
+          setUserRole(session.user.role);
+          setIsOwner(session.user.id === data.data.providerUserId);
+        }
       } catch (error) {
         console.error('Error fetching service:', error);
         setFetchError(true);
@@ -201,11 +224,93 @@ export default function ServiceDetailsPage() {
     if (params.id) {
       fetchServiceData();
     }
-  }, [params.id, toast]);
+  }, [params.id, toast, session]);
   
   // Handle booking request
-  const handleBookNow = () => {
-    router.push(`/client/create-party?service=${service.id}`);
+  const handleSendRequest = async (e) => {
+    e.preventDefault();
+    
+    try {
+      if (!session?.user) {
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to request this service",
+          status: "error",
+          duration: 3000,
+          isClosable: true
+        });
+        router.push(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/services/${service.id}`)}`);
+        return;
+      }
+
+      setIsSubmitting(true);
+      
+      // Format the message using the form input or default message
+      const messageToSend = requestMessage || `I'm interested in booking ${service.name}. Can we discuss details?`;
+      
+      console.log("Sending service request:", {
+        serviceId: service.id,
+        message: messageToSend,
+        requestDate: requestDate || undefined
+      });
+      
+      const response = await fetch('/api/provider/service-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          serviceId: service.id,
+          message: messageToSend,
+          requestDate: requestDate || undefined
+        })
+      });
+      
+      const result = await response.json();
+      console.log("Service request response:", result);
+      
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to send request');
+      }
+      
+      toast({
+        title: "Request sent!",
+        description: "We've notified the provider. Check your messages for their response.",
+        status: "success",
+        duration: 5000,
+        isClosable: true
+      });
+      
+      // Navigate to the chats page with the created chat
+      if (result.data && result.data.chat && result.data.chat.id) {
+        console.log("Redirecting to chat:", `/chats/${result.data.chat.id}`);
+        
+        // Small delay to ensure toast is shown before navigation
+        setTimeout(() => {
+          router.push(`/chats/${result.data.chat.id}`);
+        }, 500);
+      } else {
+        console.error('Chat ID not found in response', result);
+        toast({
+          title: "Navigation error",
+          description: "Chat created but couldn't navigate to it. Please check your messages.",
+          status: "warning",
+          duration: 5000,
+          isClosable: true
+        });
+      }
+    } catch (error) {
+      console.error('Error sending service request:', error);
+      toast({
+        title: "Request failed",
+        description: error.message || "Failed to send request. Please try again.",
+        status: "error",
+        duration: 5000,
+        isClosable: true
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   // Set SEO metadata
@@ -236,367 +341,170 @@ export default function ServiceDetailsPage() {
   
   if (isLoading) {
     return (
-      <MainLayout>
-        <Container maxW="container.xl" py={8}>
-          <Flex justify="center" align="center" h="60vh">
-            <Spinner size="xl" color="brand.500" />
-          </Flex>
+      <Container maxW="container.lg" py={10}>
+        <Stack spacing={8}>
+          <Skeleton height="300px" />
+          <Skeleton height="40px" />
+          <Skeleton height="20px" />
+          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10}>
+            <Skeleton height="100px" />
+            <Skeleton height="100px" />
+            <Skeleton height="100px" />
+          </SimpleGrid>
+          <Skeleton height="200px" />
+        </Stack>
         </Container>
-      </MainLayout>
     );
   }
   
   if (fetchError || !service) {
     return (
-      <MainLayout>
-        <Container maxW="container.xl" py={8}>
-          <Flex direction="column" justify="center" align="center" h="60vh">
-            <Heading size="lg" mb={4}>Service Not Found</Heading>
-            <Text mb={6}>The service you're looking for doesn't exist or has been removed.</Text>
-            <Button colorScheme="brand" onClick={() => router.push('/services')}>
-              Browse All Services
-            </Button>
-          </Flex>
+      <Container maxW="container.lg" py={10} textAlign="center">
+        <Heading>Service not found</Heading>
+        <Text mt={4}>The service you're looking for doesn't exist or has been removed.</Text>
         </Container>
-      </MainLayout>
     );
   }
   
   return (
-    <MainLayout>
-      <Container maxW="container.xl" py={8}>
-        {/* Breadcrumbs */}
-        <Breadcrumb separator={<ChevronRightIcon color="gray.500" />} mb={4}>
-          <BreadcrumbItem>
-            <BreadcrumbLink as={Link} href="/">Home</BreadcrumbLink>
-          </BreadcrumbItem>
-          
-          <BreadcrumbItem>
-            <BreadcrumbLink as={Link} href="/services">Services</BreadcrumbLink>
-          </BreadcrumbItem>
-          
-          <BreadcrumbItem>
-            <BreadcrumbLink as={Link} href={`/services/categories/${service.category.slug}`}>
-              {service.category.name}
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          
-          <BreadcrumbItem>
-            <BreadcrumbLink as={Link} href={`/services/categories/${service.category.slug}/${service.city.slug}`}>
-              {service.category.name} in {service.city.name}
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          
-          <BreadcrumbItem isCurrentPage>
-            <BreadcrumbLink href="#">{service.name}</BreadcrumbLink>
-          </BreadcrumbItem>
-        </Breadcrumb>
-        
-        {/* Service Details */}
-        <Grid templateColumns={{ base: "1fr", lg: "2fr 1fr" }} gap={8}>
-          {/* Left Column - Service Info */}
-          <GridItem>
-            {/* Image Gallery */}
-            <Box mb={6}>
-              <Box 
-                position="relative" 
-                borderRadius="lg" 
-                overflow="hidden" 
-                height={{ base: "300px", md: "400px" }}
-                mb={4}
-              >
+    <Container maxW="container.lg" py={10}>
+      <Box mb={8}>
+        {service.imageUrl ? (
                 <Image 
-                  src={service.photos[selectedImage]} 
+            src={service.imageUrl}
                   alt={service.name} 
                   w="100%" 
-                  h="100%" 
+            h={{ base: "200px", md: "400px" }}
                   objectFit="cover"
-                />
-              </Box>
-              
-              <Flex gap={2} overflowX="auto" pb={2}>
-                {service.photos.map((photo, index) => (
-                  <Box 
-                    key={index} 
-                    borderWidth="2px" 
-                    borderColor={selectedImage === index ? "brand.500" : "transparent"} 
+            borderRadius="md"
+          />
+        ) : (
+          <Box
+            bg="gray.200"
+            w="100%"
+            h={{ base: "200px", md: "400px" }}
                     borderRadius="md" 
-                    overflow="hidden" 
-                    cursor="pointer"
-                    onClick={() => setSelectedImage(index)}
-                    flexShrink={0}
-                    transition="border-color 0.2s"
-                    _hover={{ borderColor: "brand.200" }}
-                  >
-                    <Image 
-                      src={photo} 
-                      alt={`${service.name} - Image ${index + 1}`} 
-                      width="100px" 
-                      height="75px" 
-                      objectFit="cover"
-                    />
-                  </Box>
-                ))}
-              </Flex>
-            </Box>
-            
-            {/* Service Description */}
-            <Box mb={8}>
-              <Heading as="h2" size="lg" mb={4}>Description</Heading>
-              <Text mb={4}>{service.description}</Text>
-              
-              {service.longDescription && (
-                <Box mt={6}>
-                  {service.longDescription.split('\n\n').map((paragraph, index) => {
-                    // Handle Markdown-style headings
-                    if (paragraph.startsWith('# ')) {
-                      return (
-                        <Heading as="h2" size="md" mt={6} mb={3} key={index}>
-                          {paragraph.substring(2)}
-                        </Heading>
-                      );
-                    } else if (paragraph.startsWith('## ')) {
-                      return (
-                        <Heading as="h3" size="sm" mt={5} mb={2} key={index}>
-                          {paragraph.substring(3)}
-                        </Heading>
-                      );
-                    } else {
-                      return (
-                        <Text mb={4} key={index}>
-                          {paragraph}
-                        </Text>
-                      );
-                    }
-                  })}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Text color="gray.500">No image available</Text>
                 </Box>
               )}
             </Box>
             
-            {/* Features */}
-            {service.features && service.features.length > 0 && (
-              <Box mb={8}>
-                <Heading as="h2" size="lg" mb={4}>Features</Heading>
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                  {service.features.map((feature, index) => (
-                    <HStack key={index} alignItems="center">
-                      <CheckIcon color="green.500" />
-                      <Text>{feature}</Text>
-                    </HStack>
-                  ))}
-                </SimpleGrid>
-              </Box>
-            )}
+      <Stack spacing={6}>
+        <Flex justify="space-between" align="flex-start" wrap="wrap">
+          <Box flex="1" mr={4} mb={4}>
+            <Heading as="h1" size="xl" mb={2}>
+              {service.name}
+            </Heading>
             
-            {/* Availability */}
-            {service.availability && service.availability.length > 0 && (
-              <Box mb={8}>
-                <Heading as="h2" size="lg" mb={4}>Availability</Heading>
-                <Flex wrap="wrap" gap={2}>
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                    <Badge 
-                      key={day} 
-                      py={2} 
-                      px={4}
-                      borderRadius="full"
-                      colorScheme={service.availability.includes(day) ? "green" : "gray"}
-                    >
-                      {day}
+            <Flex align="center" mb={2}>
+              <Icon as={FaUser} mr={2} color="blue.500" />
+              <Text fontWeight="medium">
+                {service.provider?.name || 'Service Provider'}
+              </Text>
+            </Flex>
+            
+            <Flex wrap="wrap" mb={4}>
+              {service.category && (
+                <Badge colorScheme="blue" mr={2} mb={2}>
+                  {service.category.name}
+                </Badge>
+              )}
+              {service.tags && service.tags.map(tag => (
+                <Badge key={tag} colorScheme="gray" mr={2} mb={2}>
+                  {tag}
                     </Badge>
                   ))}
                 </Flex>
               </Box>
-            )}
-            
-            {/* Reviews */}
-            {service.reviews && service.reviews.length > 0 && (
-              <Box mb={8}>
-                <Heading as="h2" size="lg" mb={4}>Customer Reviews</Heading>
-                
-                <VStack spacing={4} align="stretch">
-                  {service.reviews.map((review) => (
-                    <Card key={review.id}>
-                      <CardBody>
-                        <VStack align="start" spacing={2}>
-                          <Flex justify="space-between" w="100%">
-                            <HStack>
-                              <Heading size="sm">{review.userName}</Heading>
-                              <Text color="gray.500" fontSize="sm">{review.date}</Text>
-                            </HStack>
-                            <HStack>
-                              {Array(5).fill('').map((_, i) => (
-                                <StarIcon
-                                  key={i}
-                                  color={i < review.rating ? 'yellow.400' : 'gray.300'}
-                                />
-                              ))}
-                            </HStack>
-                          </Flex>
-                          <Text>{review.content}</Text>
-                        </VStack>
-                      </CardBody>
-                    </Card>
-                  ))}
-                </VStack>
-              </Box>
-            )}
-          </GridItem>
           
-          {/* Right Column - Booking & Provider */}
-          <GridItem>
-            {/* Price Card */}
-            <Card mb={6}>
-              <CardBody>
-                <VStack spacing={4} align="stretch">
-                  <Heading size="xl" color="brand.600">${parseFloat(service.price).toFixed(2)}</Heading>
-                  <Button colorScheme="brand" size="lg" onClick={handleBookNow}>
-                    Book Now
-                  </Button>
-                  
-                  <Divider />
-                  
-                  <VStack align="start" spacing={3}>
-                    <HStack>
-                      <Icon as={FaMapMarkerAlt} color="brand.500" />
-                      <Text>{service.city.name}, {service.city.state}</Text>
-                    </HStack>
-                    {service.availability && (
-                      <HStack>
-                        <Icon as={FaCalendarAlt} color="brand.500" />
-                        <Text>Available {service.availability.length} days/week</Text>
-                      </HStack>
-                    )}
-                  </VStack>
-                </VStack>
-              </CardBody>
-            </Card>
-            
-            {/* Provider Card */}
-            {service.provider && (
-              <Card mb={6}>
-                <CardBody>
-                  <VStack spacing={4} align="stretch">
+          <Box width={{ base: "100%", md: "auto" }} mb={4}>
+            <Stack spacing={4} bg="gray.50" p={4} borderRadius="md" width={{ base: "100%", md: "300px" }}>
                     <Flex align="center">
-                      <Image 
-                        src={service.provider.profile?.avatar || 'https://via.placeholder.com/60'} 
-                        alt={service.provider.name} 
-                        borderRadius="full" 
-                        boxSize="60px" 
-                        mr={4}
-                      />
-                      <Box>
-                        <Heading size="md">{service.provider.name}</Heading>
-                        {service.provider.rating && (
-                          <HStack>
-                            <HStack>
-                              <StarIcon color="yellow.400" />
-                              <Text>{service.provider.rating}</Text>
-                            </HStack>
-                            {service.provider.reviewCount && (
-                              <Text color="gray.500">({service.provider.reviewCount} reviews)</Text>
-                            )}
-                          </HStack>
-                        )}
-                      </Box>
+                <Icon as={FiDollarSign} fontSize="xl" mr={2} color="green.500" />
+                <Heading size="md">${service.price.toFixed(2)}</Heading>
+                <Text fontSize="sm" ml={1} color="gray.600">
+                  {service.priceType === 'HOURLY' ? '/ hour' : service.priceType === 'DAILY' ? '/ day' : ''}
+                </Text>
                     </Flex>
                     
-                    {(service.provider.isVerified || service.provider.isPro || service.provider.since) && (
-                      <Flex wrap="wrap" gap={2}>
-                        {service.provider.isVerified && (
-                          <Badge colorScheme="green">Verified</Badge>
-                        )}
-                        {service.provider.isPro && (
-                          <Badge colorScheme="purple">PRO</Badge>
-                        )}
-                        {service.provider.since && (
-                          <Badge>Member since {service.provider.since}</Badge>
-                        )}
+              {service.location && (
+                <Flex align="center">
+                  <Icon as={FiMapPin} mr={2} color="red.500" />
+                  <Text>{service.location}</Text>
+                </Flex>
+              )}
+              
+              {service.availability && (
+                <Flex align="center">
+                  <Icon as={FiCalendar} mr={2} color="purple.500" />
+                  <Text>{service.availability}</Text>
+                </Flex>
+              )}
+              
+              {service.duration && (
+                <Flex align="center">
+                  <Icon as={FiClock} mr={2} color="orange.500" />
+                  <Text>{service.duration}</Text>
                       </Flex>
                     )}
                     
-                    <Divider />
-                    
-                    <VStack align="start" spacing={3}>
-                      <HStack>
-                        <Icon as={FaUser} color="brand.500" />
-                        <Text fontWeight="bold">Contact Information</Text>
-                      </HStack>
-                      {service.provider.profile?.phone && (
-                        <HStack>
-                          <Icon as={FaPhoneAlt} color="brand.500" />
-                          <Text>{service.provider.profile.phone}</Text>
-                        </HStack>
-                      )}
-                      <HStack>
-                        <Icon as={FaEnvelope} color="brand.500" />
-                        <Text>{service.provider.email}</Text>
-                      </HStack>
-                      {service.provider.profile?.website && (
-                        <HStack>
-                          <Icon as={FaGlobe} color="brand.500" />
-                          <Text>{service.provider.profile.website}</Text>
-                        </HStack>
-                      )}
-                    </VStack>
-                    
-                    <Button 
-                      variant="outline" 
-                      colorScheme="brand" 
-                      w="100%"
-                      as={Link}
-                      href={`/providers/${service.provider.id}`}
-                    >
-                      View Profile
+              {!isOwner && userRole === 'CLIENT' && (
+                <ServiceRequestButton service={service} />
+              )}
+              
+              {isOwner && (
+                <Button colorScheme="teal" width="full">
+                  Edit Service
                     </Button>
-                  </VStack>
-                </CardBody>
-              </Card>
-            )}
-            
-            {/* Similar Services */}
-            {similarServices.length > 0 && (
-              <Box>
-                <Heading as="h3" size="md" mb={4}>Similar Services</Heading>
-                <VStack spacing={4} align="stretch">
-                  {similarServices.map((similarService) => (
-                    <Card key={similarService.id} 
-                      as={Link} 
-                      href={`/services/${similarService.id}`}
-                      _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
-                      transition="all 0.2s"
-                    >
-                      <Flex>
-                        <Image 
-                          src={(similarService.photos && similarService.photos[0]) || 'https://via.placeholder.com/80'} 
-                          alt={similarService.name} 
-                          w="80px" 
-                          h="80px" 
-                          objectFit="cover"
-                          borderLeftRadius="md"
-                        />
-                        <Box p={3} flex="1">
-                          <Heading size="sm" mb={1}>{similarService.name}</Heading>
-                          <HStack justify="space-between">
-                            <Text fontWeight="bold" color="brand.600">
-                              ${parseFloat(similarService.price).toFixed(2)}
-                            </Text>
-                            {similarService.rating && (
-                              <HStack>
-                                <StarIcon color="yellow.400" boxSize="12px" />
-                                <Text fontSize="sm">{similarService.rating}</Text>
-                              </HStack>
-                            )}
-                          </HStack>
+              )}
+              
+              {!userRole && (
+                <Button colorScheme="blue" width="full" as="a" href="/login">
+                  Login to Request
+                </Button>
+              )}
+            </Stack>
                         </Box>
                       </Flex>
-                    </Card>
-                  ))}
-                </VStack>
+
+        <Divider />
+        
+        <Box>
+          <Heading as="h2" size="md" mb={4}>
+            Description
+          </Heading>
+          <Text whiteSpace="pre-wrap">{service.description}</Text>
+        </Box>
+        
+        {service.features && service.features.length > 0 && (
+          <Box>
+            <Heading as="h2" size="md" mb={4}>
+              What's Included
+            </Heading>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+              {service.features.map((feature, index) => (
+                <Flex key={index} align="center">
+                  <Box as="span" w={2} h={2} bg="blue.500" borderRadius="full" mr={2}></Box>
+                  <Text>{feature}</Text>
+                </Flex>
+              ))}
+            </SimpleGrid>
+          </Box>
+        )}
+        
+        {service.policies && (
+          <Box>
+            <Heading as="h2" size="md" mb={4}>
+              Policies and Requirements
+            </Heading>
+            <Text whiteSpace="pre-wrap">{service.policies}</Text>
               </Box>
             )}
-          </GridItem>
-        </Grid>
+      </Stack>
       </Container>
-    </MainLayout>
   );
 }

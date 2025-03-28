@@ -12,7 +12,7 @@ export async function GET(
     
     if (!session?.user) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { success: false, error: { message: 'Unauthorized' } },
         { status: 401 }
       );
     }
@@ -34,18 +34,52 @@ export async function GET(
               include: {
                 party: {
                   include: {
-                    client: true
+                    client: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        profile: true
+                      }
+                    }
                   }
                 }
               }
             },
-            provider: true
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                profile: true
+              }
+            },
+            client: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                profile: true
+              }
+            }
           }
         },
         messages: {
-          include: {
-            sender: true,
-            receiver: true
+              include: {
+            sender: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            receiver: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
           },
           orderBy: {
             createdAt: 'asc'
@@ -56,16 +90,31 @@ export async function GET(
 
     if (!chat) {
       return NextResponse.json(
-        { error: 'Chat not found' },
+        { success: false, error: { message: 'Chat not found' } },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(chat);
+    // Format the response to match what the chat page component expects
+    const formattedChat = {
+      id: chat.id,
+      clientId: chat.offer.clientId,
+      providerId: chat.offer.providerId,
+      client: chat.offer.client,
+      provider: chat.offer.provider,
+      messages: chat.messages,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt
+    };
+
+    return NextResponse.json({ 
+      success: true, 
+      data: formattedChat
+    });
   } catch (error) {
     console.error('Error fetching chat:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: { message: 'Failed to load chat' } },
       { status: 500 }
     );
   }

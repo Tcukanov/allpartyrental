@@ -79,6 +79,19 @@ export async function generateStaticParams() {
 
 export default async function LocationServicePage({ params }: { params: { location: string; service: string } }) {
   try {
+    // Make sure we're not trying to render an API route as a location page
+    if (params.location.toLowerCase() === 'api' || params.location.startsWith('api/')) {
+      console.error(`Invalid location slug: ${params.location}`);
+      notFound();
+    }
+
+    // Validate params to ensure they're not empty or invalid
+    if (!params.location || !params.service || 
+        params.location.trim() === '' || params.service.trim() === '') {
+      console.error(`Invalid params: location=${params.location}, service=${params.service}`);
+      notFound();
+    }
+
     // Convert slugs to lowercase for consistent matching
     const locationSlug = params.location.toLowerCase();
     const serviceSlug = params.service.toLowerCase();

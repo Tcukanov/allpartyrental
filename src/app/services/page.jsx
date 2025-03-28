@@ -42,13 +42,13 @@ export default function ServicesPage() {
   }, [toast]);
   
   return (
-    <Container maxW="container.xl" py={8}>
+      <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
         <Box>
           <Heading as="h1" size="xl">Our Services</Heading>
           <Text color="gray.600" mt={2}>
             Discover our range of party and event services
-          </Text>
+        </Text>
         </Box>
 
         <Box bg="white" p={6} borderRadius="lg" boxShadow="md">
@@ -73,11 +73,11 @@ export default function ServicesPage() {
                 <CardBody>
                   <VStack spacing={4} align="stretch">
                     <Box position="relative" h="200px">
-                      <Image
+                  <Image 
                         src={service.photos?.[0] || '/images/placeholder.jpg'}
-                        alt={service.name}
+                    alt={service.name} 
                         objectFit="cover"
-                        w="100%"
+                    w="100%" 
                         h="100%"
                         borderRadius="md"
                       />
@@ -89,7 +89,7 @@ export default function ServicesPage() {
                       >
                         Starting from ${Number(service.price).toFixed(2)}
                       </Badge>
-                    </Box>
+                </Box>
                     
                     <Box>
                       <Heading size="md">{service.name}</Heading>
@@ -119,6 +119,6 @@ export default function ServicesPage() {
           </SimpleGrid>
         )}
       </VStack>
-    </Container>
+      </Container>
   );
 }

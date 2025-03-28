@@ -16,6 +16,7 @@ import {
   Spinner,
   Divider,
   Flex,
+  Heading,
 } from '@chakra-ui/react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -65,34 +66,43 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth/login');
-    } else {
+    } else if (status === 'authenticated') {
       fetchChat();
     }
-  }, [status, router]);
+  }, [status, router, params.id]);
 
   // Fetch chat data
   const fetchChat = async () => {
     try {
       setLoading(true);
+      console.log('Fetching chat with ID:', params.id);
+      
       const response = await fetch(`/api/chats/${params.id}`);
+      const responseData = await response.json();
+      
+      console.log('Chat API response:', responseData);
       
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+        throw new Error(`Error: ${response.status} - ${responseData.error?.message || 'Failed to fetch chat'}`);
       }
       
-      const data = await response.json();
-      
-      if (data.success) {
-        setChat(data.data);
-      } else {
-        throw new Error(data.error?.message || 'Failed to fetch chat');
+      if (responseData.success === false) {
+        throw new Error(responseData.error?.message || 'Failed to fetch chat');
       }
+      
+      const chatData = responseData.success ? responseData.data : responseData;
+      
+      if (!chatData || !chatData.id) {
+        throw new Error('Invalid chat data received');
+      }
+      
+      setChat(chatData);
     } catch (err) {
       console.error('Error fetching chat:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       toast({
         title: 'Error',
-        description: 'Failed to load chat',
+        description: err instanceof Error ? err.message : 'Failed to load chat',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -127,31 +137,33 @@ export default function ChatPage({ params }: { params: { id: string } }) {
         }),
       });
       
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
-      
       const data = await response.json();
       
-      if (data.success) {
-        // Update the chat with the new message
-        setChat(prev => prev ? {
-          ...prev,
-          messages: [...prev.messages, data.data],
-        } : null);
-        
-        setNewMessage('');
-        
-        toast({
-          title: 'Success',
-          description: 'Message sent successfully',
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
-      } else {
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status} - ${data.error?.message || 'Failed to send message'}`);
+      }
+      
+      if (data.success === false) {
         throw new Error(data.error?.message || 'Failed to send message');
       }
+      
+      // Update the chat with the new message
+      const newMessageData = data.success ? data.data : data.message;
+      
+      setChat(prev => prev ? {
+        ...prev,
+        messages: [...prev.messages, newMessageData],
+      } : null);
+      
+      setNewMessage('');
+      
+      toast({
+        title: 'Success',
+        description: 'Message sent successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
     } catch (err) {
       console.error('Error sending message:', err);
       toast({
@@ -170,7 +182,10 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     return (
       <Container maxW="container.xl" py={8}>
         <Flex justify="center" align="center" minH="400px">
-          <Spinner size="xl" />
+          <VStack spacing={4}>
+            <Spinner size="xl" color="blue.500" />
+            <Text>Loading chat...</Text>
+          </VStack>
         </Flex>
       </Container>
     );
@@ -180,7 +195,11 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     return (
       <Container maxW="container.xl" py={8}>
         <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
-          <Text color="red.500">{error || 'Chat not found'}</Text>
+          <Heading size="md" mb={4} color="red.500">Failed to load chat</Heading>
+          <Text color="red.500" mb={4}>{error || 'Chat not found'}</Text>
+          <Button onClick={fetchChat} colorScheme="blue">
+            Try Again
+          </Button>
         </Box>
       </Container>
     );
@@ -193,37 +212,43 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       <VStack spacing={6} align="stretch" height="calc(100vh - 200px)">
         {/* Chat Header */}
         <HStack spacing={4} p={4} borderWidth="1px" borderRadius="md">
-          <Avatar name={otherUser.name} />
+          <Avatar name={otherUser?.name} />
           <Box>
-            <Text fontWeight="bold">{otherUser.name}</Text>
-            <Text fontSize="sm" color="gray.500">{otherUser.email}</Text>
+            <Text fontWeight="bold">{otherUser?.name}</Text>
+            <Text fontSize="sm" color="gray.500">{otherUser?.email}</Text>
           </Box>
         </HStack>
 
         {/* Messages */}
         <Box flex={1} overflowY="auto" p={4} borderWidth="1px" borderRadius="md">
-          <VStack spacing={4} align="stretch">
-            {chat.messages.map((message) => (
-              <Box
-                key={message.id}
-                alignSelf={message.senderId === session?.user?.id ? 'flex-end' : 'flex-start'}
-                maxW="70%"
-              >
+          {chat.messages && chat.messages.length > 0 ? (
+            <VStack spacing={4} align="stretch">
+              {chat.messages.map((message) => (
                 <Box
-                  bg={message.senderId === session?.user?.id ? 'blue.500' : 'gray.100'}
-                  color={message.senderId === session?.user?.id ? 'white' : 'black'}
-                  p={3}
-                  borderRadius="lg"
+                  key={message.id}
+                  alignSelf={message.senderId === session?.user?.id ? 'flex-end' : 'flex-start'}
+                  maxW="70%"
                 >
-                  <Text>{message.content}</Text>
-                  <Text fontSize="xs" mt={1} opacity={0.7}>
-                    {formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}
-                  </Text>
+                  <Box
+                    bg={message.senderId === session?.user?.id ? 'blue.500' : 'gray.100'}
+                    color={message.senderId === session?.user?.id ? 'white' : 'black'}
+                    p={3}
+                    borderRadius="lg"
+                  >
+                    <Text>{message.content}</Text>
+                    <Text fontSize="xs" mt={1} opacity={0.7}>
+                      {formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}
+                    </Text>
+                  </Box>
                 </Box>
-              </Box>
-            ))}
-            <div ref={messagesEndRef} />
-          </VStack>
+              ))}
+              <div ref={messagesEndRef} />
+            </VStack>
+          ) : (
+            <Flex justify="center" align="center" h="100%">
+              <Text color="gray.500">No messages yet. Start the conversation!</Text>
+            </Flex>
+          )}
         </Box>
 
         {/* Message Input */}

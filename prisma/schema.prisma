@@ -38,10 +38,13 @@ enum OfferStatus {
 
 enum TransactionStatus {
   PENDING
-  ESCROW
-  COMPLETED
-  REFUNDED
-  DISPUTED
+  ESCROW           // Funds held in escrow
+  PROVIDER_REVIEW  // Provider reviewing request
+  APPROVED         // Provider approved the service request
+  DECLINED         // Provider declined the service request
+  COMPLETED        // Service completed and payment released
+  REFUNDED         // Payment refunded to client
+  DISPUTED         // Transaction in dispute
 }
 
 enum NotificationType {
@@ -218,6 +221,11 @@ model Transaction {
   status            TransactionStatus @default(PENDING)
   paymentIntentId   String?
   paymentMethodId   String?
+  clientFeePercent  Float             @default(5.0)    // 5% fee charged to client
+  providerFeePercent Float            @default(10.0)   // 10% fee charged to provider
+  escrowStartTime   DateTime?         // When funds were placed in escrow
+  escrowEndTime     DateTime?         // When funds should be released or refunded
+  reviewDeadline    DateTime?         // Deadline for provider to approve/decline
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   
