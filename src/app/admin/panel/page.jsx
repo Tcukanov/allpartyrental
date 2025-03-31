@@ -5,6 +5,9 @@ import { Box, Container, Heading, Text, VStack, Tabs, TabList, TabPanels, Tab, T
 import MainLayout from '@/components/layout/MainLayout';
 import { useRouter } from 'next/navigation';
 import { AddIcon, DeleteIcon, EditIcon, WarningIcon, CheckIcon, InfoIcon } from '@chakra-ui/icons';
+import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
+import { Icon } from '@chakra-ui/react';
+import NextLink from 'next/link';
 
 // Mock data for admin dashboard
 const mockUsers = [
@@ -307,6 +310,30 @@ export default function AdminPanelPage() {
       <Container maxW="container.xl" py={8}>
         <Heading as="h1" size="xl" mb={6}>Admin Dashboard</Heading>
         
+        <Box mb={6}>
+          <Flex direction={{ base: "column", md: "row" }} gap={4}>
+            <Button 
+              as={NextLink} 
+              href="/admin/services/approval" 
+              colorScheme="orange" 
+              leftIcon={<Icon as={FiAlertCircle} />}
+              size="md"
+            >
+              View Pending Services
+            </Button>
+            
+            <Button 
+              as={NextLink} 
+              href="/admin/docs" 
+              colorScheme="blue" 
+              leftIcon={<Icon as={FiHelpCircle} />}
+              size="md"
+            >
+              Admin Documentation
+            </Button>
+          </Flex>
+        </Box>
+        
         <Tabs variant="enclosed" colorScheme="brand">
           <TabList>
             <Tab>Dashboard & Statistics</Tab>
@@ -490,4 +517,39 @@ export default function AdminPanelPage() {
                         </Thead>
                         <Tbody>
                           <Tr>
-                    <response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>
+                            <Td>Chicago</Td>
+                            <Td isNumeric>245</Td>
+                            <Td isNumeric>78</Td>
+                            <Td isNumeric>$12,543.75</Td>
+                          </Tr>
+                          <Tr>
+                            <Td>New York</Td>
+                            <Td isNumeric>198</Td>
+                            <Td isNumeric>62</Td>
+                            <Td isNumeric>$9,876.25</Td>
+                          </Tr>
+                          <Tr>
+                            <Td>Los Angeles</Td>
+                            <Td isNumeric>176</Td>
+                            <Td isNumeric>54</Td>
+                            <Td isNumeric>$8,432.00</Td>
+                          </Tr>
+                          <Tr>
+                            <Td>Miami</Td>
+                            <Td isNumeric>132</Td>
+                            <Td isNumeric>41</Td>
+                            <Td isNumeric>$6,798.50</Td>
+                          </Tr>
+                        </Tbody>
+                      </Table>
+                    </CardBody>
+                  </Card>
+                </SimpleGrid>
+              </VStack>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      </Container>
+    </MainLayout>
+  );
+}

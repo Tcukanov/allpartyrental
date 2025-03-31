@@ -211,7 +211,7 @@ export default function PaymentComponent({ offer, onClose }) {
                   <HStack justify="space-between">
                     <Text fontSize="lg">Total Amount:</Text>
                     <Text fontSize="xl" fontWeight="bold" color="brand.500">
-                      ${offer.amount.toFixed(2)}
+                      ${Number(offer.amount).toFixed(2)}
                     </Text>
                   </HStack>
                 </Box>
@@ -255,7 +255,7 @@ export default function PaymentComponent({ offer, onClose }) {
                   loadingText="Processing..."
                   isDisabled={!stripe || isProcessing}
                 >
-                  Pay ${offer.amount.toFixed(2)}
+                  Pay ${Number(offer.amount).toFixed(2)}
                 </Button>
                 
                 <Text fontSize="xs" color="gray.500" textAlign="center">

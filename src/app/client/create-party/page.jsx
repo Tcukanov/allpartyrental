@@ -40,6 +40,7 @@ import {
 import { useDrag, useDrop } from 'react-dnd';
 import { CloseIcon, AddIcon, DragHandleIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 // Mock data for service categories
 const serviceCategories = [
@@ -249,43 +250,39 @@ const EventDetailsForm = ({ eventDetails, setEventDetails }) => {
             name="cityId" 
             value={eventDetails.cityId || ''} 
             onChange={handleChange}
-            placeholder="Select city"
+            placeholder="Select a city"
           >
-            <option value="new-york">New York</option>
-            <option value="los-angeles">Los Angeles</option>
-            <option value="chicago">Chicago</option>
-            <option value="houston">Houston</option>
-            <option value="miami">Miami</option>
+            {/* Add your city options here */}
           </Select>
         </FormControl>
         
         <FormControl isRequired>
-          <FormLabel>Date</FormLabel>
+          <FormLabel>Event Date</FormLabel>
           <Input 
-            name="date" 
             type="date" 
+            name="date" 
             value={eventDetails.date || ''} 
-            onChange={handleChange} 
+            onChange={handleChange}
           />
         </FormControl>
         
         <FormControl isRequired>
-          <FormLabel>Start Time</FormLabel>
+          <FormLabel>Event Time</FormLabel>
           <Input 
-            name="startTime" 
             type="time" 
-            value={eventDetails.startTime || ''} 
-            onChange={handleChange} 
+            name="time" 
+            value={eventDetails.time || ''} 
+            onChange={handleChange}
           />
         </FormControl>
         
         <FormControl isRequired>
-          <FormLabel>Duration (hours)</FormLabel>
+          <FormLabel>Number of Guests</FormLabel>
           <NumberInput 
-            min={1} 
-            max={12} 
-            value={eventDetails.duration || 3}
-            onChange={handleDuration}
+            value={eventDetails.guestCount || 0} 
+            onChange={handleGuestCount}
+            min={1}
+            max={1000}
           >
             <NumberInputField />
             <NumberInputStepper>
@@ -296,12 +293,12 @@ const EventDetailsForm = ({ eventDetails, setEventDetails }) => {
         </FormControl>
         
         <FormControl isRequired>
-          <FormLabel>Number of Guests</FormLabel>
+          <FormLabel>Duration (hours)</FormLabel>
           <NumberInput 
-            min={1} 
-            max={500} 
-            value={eventDetails.guestCount || 20}
-            onChange={handleGuestCount}
+            value={eventDetails.duration || 2} 
+            onChange={handleDuration}
+            min={1}
+            max={12}
           >
             <NumberInputField />
             <NumberInputStepper>
@@ -313,12 +310,12 @@ const EventDetailsForm = ({ eventDetails, setEventDetails }) => {
       </SimpleGrid>
       
       <FormControl>
-        <FormLabel>Additional Notes</FormLabel>
+        <FormLabel>Description</FormLabel>
         <Textarea 
-          name="notes" 
-          value={eventDetails.notes || ''} 
-          onChange={handleChange} 
-          placeholder="Any specific requirements or information for all service providers" 
+          name="description" 
+          value={eventDetails.description || ''} 
+          onChange={handleChange}
+          placeholder="Tell us about your party..."
           rows={4}
         />
       </FormControl>
@@ -416,9 +413,24 @@ const ServiceOptionsForm = ({ services, serviceOptions, setServiceOptions }) => 
 
 // Main Party Configurator Component
 export default function PartyConfiguratorPage() {
+  const { data: session, status } = useSession();
   const router = useRouter();
   const toast = useToast();
   
+  // Check if user is signed in
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to create a party',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      router.push('/auth/signin');
+    }
+  }, [status, router, toast]);
+
   // State for selected services
   const [services, setServices] = useState([]);
   
@@ -427,10 +439,10 @@ export default function PartyConfiguratorPage() {
     name: '',
     cityId: '',
     date: '',
-    startTime: '',
+    time: '',
     duration: 3,
     guestCount: 20,
-    notes: ''
+    description: ''
   });
   
   // State for service-specific options
@@ -480,7 +492,7 @@ export default function PartyConfiguratorPage() {
         return false;
       }
     } else if (activeStep === 1) {
-      if (!eventDetails.name || !eventDetails.cityId || !eventDetails.date || !eventDetails.startTime) {
+      if (!eventDetails.name || !eventDetails.cityId || !eventDetails.date || !eventDetails.time) {
         toast({
           title: "Missing information",
           description: "Please fill out all required fields.",
@@ -510,37 +522,56 @@ export default function PartyConfiguratorPage() {
   // Handle form submission
   const handleSubmit = async () => {
     try {
-      // Prepare data for submission
-      const partyData = {
-        ...eventDetails,
-        services: services.map((service, index) => ({
-          category: service.category,
-          specificOptions: serviceSpecificOptions[index] || {}
-        }))
-      };
-      
-      // In a real app, this would be an API call
-      console.log('Party data to submit:', partyData);
+      // Validate required fields
+      if (!eventDetails.cityId) {
+        toast({
+          title: 'Location required',
+          description: 'Please select a city for your party',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      // Create FormData for image upload
+      const formData = new FormData();
+      images.forEach((image, index) => {
+        formData.append(`images[${index}]`, image);
+      });
+
+      // Add other party details
+      Object.keys(eventDetails).forEach(key => {
+        formData.append(key, eventDetails[key]);
+      });
+
+      // Submit the form
+      const response = await fetch('/api/parties', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create party');
+      }
+
+      const data = await response.json();
       
       toast({
-        title: "Party configuration submitted",
-        description: "Your request has been sent to service providers. Check 'My Party' for updates.",
-        status: "success",
+        title: 'Party created successfully',
+        description: 'Your party has been created and is pending approval',
+        status: 'success',
         duration: 5000,
         isClosable: true,
       });
-      
-      // Redirect to My Party page
-      setTimeout(() => {
-        router.push('/client/my-party');
-      }, 1500);
-      
+
+      router.push(`/client/parties/${data.id}`);
     } catch (error) {
-      console.error('Error submitting party configuration:', error);
+      console.error('Error creating party:', error);
       toast({
-        title: "Error",
-        description: "There was an error submitting your party configuration. Please try again.",
-        status: "error",
+        title: 'Error creating party',
+        description: 'There was an error creating your party. Please try again.',
+        status: 'error',
         duration: 5000,
         isClosable: true,
       });
@@ -553,6 +584,78 @@ export default function PartyConfiguratorPage() {
     { title: 'Service Options', description: 'Customize your choices' },
   ];
   
+  // Add image state
+  const [images, setImages] = useState([]);
+  const [imageUrls, setImageUrls] = useState([]);
+
+  // Handle image upload
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 5) {
+      toast({
+        title: 'Too many images',
+        description: 'Please select up to 5 images',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setImages(files);
+    const urls = files.map(file => URL.createObjectURL(file));
+    setImageUrls(urls);
+  };
+
+  // Add image preview component
+  const ImagePreview = () => (
+    <Box>
+      <FormLabel>Party Images (up to 5)</FormLabel>
+      <Input
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleImageUpload}
+        display="none"
+        id="image-upload"
+      />
+      <label htmlFor="image-upload">
+        <Button as="span" colorScheme="blue" mb={4}>
+          Upload Images
+        </Button>
+      </label>
+      {imageUrls.length > 0 && (
+        <SimpleGrid columns={{ base: 2, md: 3, lg: 5 }} spacing={4}>
+          {imageUrls.map((url, index) => (
+            <Box key={index} position="relative">
+              <Image
+                src={url}
+                alt={`Party image ${index + 1}`}
+                borderRadius="md"
+                objectFit="cover"
+                height="150px"
+                width="100%"
+              />
+              <IconButton
+                aria-label="Remove image"
+                icon={<CloseIcon />}
+                size="sm"
+                colorScheme="red"
+                position="absolute"
+                top={2}
+                right={2}
+                onClick={() => {
+                  setImages(images.filter((_, i) => i !== index));
+                  setImageUrls(imageUrls.filter((_, i) => i !== index));
+                }}
+              />
+            </Box>
+          ))}
+        </SimpleGrid>
+      )}
+    </Box>
+  );
+
   return (
     <Container maxW="container.md" py={8}>
       <VStack spacing={8} align="stretch">

@@ -199,6 +199,20 @@ export default function ProviderCabinetPage() {
   const [currentService, setCurrentService] = useState(null);
   const [filteredRequests, setFilteredRequests] = useState(mockRequests);
   const [requestFilter, setRequestFilter] = useState('All');
+  const [isLoading, setIsLoading] = useState(true);
+  const [profileData, setProfileData] = useState({
+    companyName: '',
+    contactPerson: '',
+    email: '',
+    phone: '',
+    address: '',
+    website: '',
+    googleBusinessUrl: '',
+    description: '',
+    avatar: '',
+    socialLinks: {}
+  });
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
 
   // Fetch services when component mounts
   useEffect(() => {
@@ -242,6 +256,52 @@ export default function ProviderCabinetPage() {
       setFilteredRequests(requests.filter(request => request.status === requestFilter));
     }
   }, [requestFilter, requests]);
+
+  // Add this after other useEffects
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      if (!session) return;
+      
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/provider/profile');
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            const profile = data.data;
+            const userData = session.user;
+            
+            setProfileData({
+              companyName: userData.name || '',
+              contactPerson: profile.contactPerson || '',
+              email: userData.email || '',
+              phone: profile.phone || '',
+              address: profile.address || '',
+              website: profile.website || '',
+              googleBusinessUrl: profile.googleBusinessUrl || '',
+              description: profile.description || '',
+              avatar: profile.avatar || '',
+              socialLinks: profile.socialLinks || {}
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load profile data',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchProfileData();
+  }, [session, toast]);
 
   // Handle service form submission
   const handleServiceSubmit = async (e) => {
@@ -444,6 +504,56 @@ export default function ProviderCabinetPage() {
     });
   };
 
+  const handleProfileChange = (e) => {
+    const { name, value } = e.target;
+    setProfileData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleSaveProfile = async () => {
+    try {
+      setIsProfileSaving(true);
+      
+      const response = await fetch('/api/provider/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(profileData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          toast({
+            title: 'Profile Updated',
+            description: 'Your profile has been updated successfully',
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+        } else {
+          throw new Error(result.error?.message || 'Failed to update profile');
+        }
+      } else {
+        throw new Error('Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update profile',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
+
   return (
       <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
@@ -469,38 +579,79 @@ export default function ProviderCabinetPage() {
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                       <FormControl>
                         <FormLabel>Company Name</FormLabel>
-                        <Input defaultValue="Party Decorations Pro" />
+                        <Input 
+                          name="companyName"
+                          value={profileData.companyName}
+                          onChange={handleProfileChange}
+                        />
                       </FormControl>
                       
                       <FormControl>
                         <FormLabel>Contact Person</FormLabel>
-                        <Input defaultValue="John Smith" />
+                        <Input 
+                          name="contactPerson"
+                          value={profileData.contactPerson}
+                          onChange={handleProfileChange}
+                        />
                       </FormControl>
                       
                       <FormControl>
                         <FormLabel>Email</FormLabel>
-                        <Input defaultValue="john@partydecorationspro.com" />
+                        <Input 
+                          name="email"
+                          value={profileData.email}
+                          onChange={handleProfileChange}
+                        />
                       </FormControl>
                       
                       <FormControl>
                         <FormLabel>Phone</FormLabel>
-                        <Input defaultValue="(212) 555-1234" />
+                        <Input 
+                          name="phone"
+                          value={profileData.phone}
+                          onChange={handleProfileChange}
+                        />
                       </FormControl>
                       
                       <FormControl>
                         <FormLabel>Business Address (Optional)</FormLabel>
-                        <Input placeholder="Enter your business address" />
+                        <Input 
+                          name="address"
+                          value={profileData.address}
+                          onChange={handleProfileChange}
+                          placeholder="Enter your business address"
+                        />
                       </FormControl>
                       
                       <FormControl>
                         <FormLabel>Website (Optional)</FormLabel>
-                        <Input placeholder="https://www.example.com" />
+                        <Input 
+                          name="website"
+                          value={profileData.website}
+                          onChange={handleProfileChange}
+                          placeholder="https://www.example.com"
+                        />
+                      </FormControl>
+                      
+                      <FormControl>
+                        <FormLabel>Google Business URL (Optional)</FormLabel>
+                        <Input 
+                          name="googleBusinessUrl"
+                          value={profileData.googleBusinessUrl}
+                          onChange={handleProfileChange}
+                          placeholder="https://g.page/your-business"
+                        />
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          Your Google Business rating will appear on your service listings
+                        </Text>
                       </FormControl>
                       
                       <FormControl gridColumn={{ md: "span 2" }}>
                         <FormLabel>Description</FormLabel>
                         <Textarea 
-                          defaultValue="We specialize in creating magical party decorations for all occasions. With over 10 years of experience, we bring creativity and professionalism to every event."
+                          name="description"
+                          value={profileData.description}
+                          onChange={handleProfileChange}
                           rows={4}
                         />
                       </FormControl>
@@ -514,8 +665,37 @@ export default function ProviderCabinetPage() {
                       
                       <FormControl>
                         <FormLabel>Social Links (Optional)</FormLabel>
-                        <Input placeholder="Instagram URL" mb={2} />
-                        <Input placeholder="Facebook URL" />
+                        <Input 
+                          name="instagramUrl"
+                          value={profileData.socialLinks?.instagram || ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setProfileData(prev => ({
+                              ...prev,
+                              socialLinks: {
+                                ...prev.socialLinks,
+                                instagram: value
+                              }
+                            }));
+                          }}
+                          placeholder="Instagram URL" 
+                          mb={2} 
+                        />
+                        <Input 
+                          name="facebookUrl"
+                          value={profileData.socialLinks?.facebook || ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setProfileData(prev => ({
+                              ...prev,
+                              socialLinks: {
+                                ...prev.socialLinks,
+                                facebook: value
+                              }
+                            }));
+                          }}
+                          placeholder="Facebook URL" 
+                        />
                       </FormControl>
                     </SimpleGrid>
                     
@@ -524,6 +704,8 @@ export default function ProviderCabinetPage() {
                       colorScheme="brand"
                       _hover={{ bg: '#ffcba5' }}
                       _active={{ bg: '#ffcba5' }}
+                      onClick={handleSaveProfile}
+                      isLoading={isProfileSaving}
                     >
                       Save Profile
                     </Button>
@@ -708,7 +890,9 @@ export default function ProviderCabinetPage() {
                             <Box>
                               <Text fontWeight="bold">{service.name}</Text>
                               <Text noOfLines={1} fontSize="sm" color="gray.600">
-                                {service.category}
+                                {typeof service.category === 'string' 
+                                  ? service.category 
+                                  : service.category?.name || 'Uncategorized'}
                               </Text>
                             </Box>
                             <VStack align="stretch" spacing={2} minW="150px">
@@ -758,7 +942,7 @@ export default function ProviderCabinetPage() {
                           </Badge>
                           <Text>{pkg.description}</Text>
                           <Text fontWeight="bold" fontSize="xl">
-                            ${pkg.price.toFixed(2)}
+                            ${Number(pkg.price).toFixed(2)}
                           </Text>
                           <Button
                             colorScheme="brand"

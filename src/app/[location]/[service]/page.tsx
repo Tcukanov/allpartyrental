@@ -79,9 +79,14 @@ export async function generateStaticParams() {
 
 export default async function LocationServicePage({ params }: { params: { location: string; service: string } }) {
   try {
-    // Make sure we're not trying to render an API route as a location page
-    if (params.location.toLowerCase() === 'api' || params.location.startsWith('api/')) {
-      console.error(`Invalid location slug: ${params.location}`);
+    // Make sure we're not trying to render an API route or other reserved paths as a location page
+    const reservedPaths = ['api', 'client', 'provider', 'admin', '_next', 'next', 'static', 'auth', 'socket', 'public'];
+    
+    if (reservedPaths.includes(params.location.toLowerCase()) || 
+        reservedPaths.includes(params.service.toLowerCase()) ||
+        params.location.includes('/') || 
+        params.service.includes('/')) {
+      console.error(`Reserved or invalid path used as location/service slug: location=${params.location}, service=${params.service}`);
       notFound();
     }
 
@@ -95,6 +100,13 @@ export default async function LocationServicePage({ params }: { params: { locati
     // Convert slugs to lowercase for consistent matching
     const locationSlug = params.location.toLowerCase();
     const serviceSlug = params.service.toLowerCase();
+
+    // Check if slugs contain special characters (only allow alphanumeric, dash, underscore)
+    const validSlugPattern = /^[a-z0-9-_]+$/;
+    if (!validSlugPattern.test(locationSlug) || !validSlugPattern.test(serviceSlug)) {
+      console.error(`Invalid slug format: location=${locationSlug}, service=${serviceSlug}`);
+      notFound();
+    }
 
     // Find the city first
     const city = await prisma.city.findFirst({

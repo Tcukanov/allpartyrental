@@ -360,7 +360,7 @@ export default function AdminTransactionsPage() {
                 <HStack justify="space-between">
                   <Text fontWeight="bold">Amount:</Text>
                   <Text fontWeight="bold" color="green.500">
-                    ${selectedTransaction.amount.toFixed(2)}
+                    ${Number(selectedTransaction.amount).toFixed(2)}
                   </Text>
                 </HStack>
                 
@@ -527,7 +527,7 @@ const TransactionsTable = ({ transactions, onViewDetails }) => {
             <Tr key={transaction.id}>
               <Td fontSize="xs" fontFamily="mono">{transaction.id.substring(0, 10)}...</Td>
               <Td maxW="200px" isTruncated>{transaction.service?.name || 'N/A'}</Td>
-              <Td isNumeric fontWeight="medium">${transaction.amount.toFixed(2)}</Td>
+              <Td isNumeric fontWeight="medium">${Number(transaction.amount).toFixed(2)}</Td>
               <Td>{transaction.client?.name || 'N/A'}</Td>
               <Td>{transaction.provider?.name || 'N/A'}</Td>
               <Td><StatusBadge status={transaction.status} /></Td>

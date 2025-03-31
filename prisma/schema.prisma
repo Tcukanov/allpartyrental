@@ -19,6 +19,7 @@ enum UserRole {
 enum ServiceStatus {
   ACTIVE
   INACTIVE
+  PENDING_APPROVAL
 }
 
 enum PartyStatus {
@@ -89,6 +90,9 @@ model Profile {
   phone             String?
   address           String?
   website           String?
+  googleBusinessUrl String?
+  googleBusinessRating Float?
+  googleBusinessReviews Int?
   socialLinks       Json?
   isProStatus       Boolean           @default(false)
   createdAt         DateTime          @default(now())
@@ -146,6 +150,11 @@ model Service {
   price             Decimal
   photos            String[]
   status            ServiceStatus     @default(ACTIVE)
+  availableDays     String[]          // Days of the week when service is available
+  availableHoursStart String?         // Start time of availability (e.g., "09:00")
+  availableHoursEnd String?           // End time of availability (e.g., "17:00")
+  minRentalHours    Int?              // Minimum rental duration in hours
+  maxRentalHours    Int?              // Maximum rental duration in hours
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   

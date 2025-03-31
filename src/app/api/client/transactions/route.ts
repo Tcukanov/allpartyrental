@@ -29,26 +29,25 @@ export async function GET(request: NextRequest) {
     // Fetch all transactions for this client
     const transactions = await prisma.transaction.findMany({
       where: {
-        clientId: userId,
-      } as Prisma.TransactionWhereInput,
+        offer: {
+          clientId: userId
+        }
+      },
       include: {
-        service: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            price: true,
-            imageUrl: true,
-          },
+        offer: {
+          include: {
+            service: true,
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
         },
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      } as Prisma.TransactionInclude,
+        party: true
+      },
       orderBy: {
         createdAt: 'desc',
       },

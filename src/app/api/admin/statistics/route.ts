@@ -1,102 +1,129 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { prisma } from '@/lib/prisma/client';
-import { Session } from 'next-auth';
-import { SessionStrategy } from 'next-auth';
+import { prisma } from '@/lib/prisma';
+import { ServiceStatus } from '@prisma/client';
 
-interface CustomSession extends Session {
-  user?: {
-    id?: string;
-    name?: string;
-    email?: string;
-    image?: string;
-    role?: string;
-  };
-}
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions as { session: { strategy: SessionStrategy } }) as CustomSession;
-
-    // Check if user is authenticated and is an admin
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Check if user is authenticated
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ 
+        success: false, 
+        error: { message: 'You must be logged in to access this endpoint' }
+      }, { status: 401 });
     }
 
-    // Get statistics
-    const [
-      totalUsers,
-      totalProviders,
-      totalClients,
-      totalServices,
-      totalParties,
-      totalRevenue
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { role: 'PROVIDER' } }),
-      prisma.user.count({ where: { role: 'CLIENT' } }),
-      prisma.service.count(),
-      prisma.party.count(),
-      prisma.transaction.aggregate({
-        _sum: {
-          amount: true
-        },
-        where: {
-          status: 'COMPLETED'
-        }
-      })
-    ]);
+    // Check if user is an admin
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json({ 
+        success: false, 
+        error: { message: 'You do not have permission to access this endpoint' }
+      }, { status: 403 });
+    }
 
-    // Get recent parties
-    const recentParties = await prisma.party.findMany({
-      take: 5,
-      orderBy: {
-        createdAt: 'desc'
-      },
-      include: {
-        client: true,
-        partyServices: {
-          include: {
-            service: true
-          }
+    // Get current date at midnight
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Fetch user statistics
+    const totalUsers = await prisma.user.count();
+    const newUsersToday = await prisma.user.count({
+      where: {
+        createdAt: {
+          gte: today
         }
       }
     });
+    const totalProviders = await prisma.user.count({
+      where: {
+        role: 'PROVIDER'
+      }
+    });
+    const totalClients = await prisma.user.count({
+      where: {
+        role: 'CLIENT'
+      }
+    });
 
-    // Get popular services
-    const popularServices = await prisma.service.findMany({
-      take: 5,
-      orderBy: {
-        offers: {
-          _count: 'desc'
+    // Fetch service statistics
+    const totalServices = await prisma.service.count();
+    const activeServices = await prisma.service.count({
+      where: {
+        status: ServiceStatus.ACTIVE
+      }
+    });
+    const pendingApprovalServices = await prisma.service.count({
+      where: {
+        status: 'PENDING_APPROVAL' as ServiceStatus
+      }
+    });
+
+    // Fetch transaction statistics
+    const totalTransactions = await prisma.transaction.count();
+    const transactionsToday = await prisma.transaction.count({
+      where: {
+        createdAt: {
+          gte: today
         }
-      },
-      include: {
-        _count: {
-          select: { offers: true }
+      }
+    });
+    const transactionsValue = await prisma.transaction.aggregate({
+      _sum: {
+        amount: true
+      }
+    });
+
+    // Fetch party statistics
+    const totalParties = await prisma.party.count();
+    const activeParties = await prisma.party.count({
+      where: {
+        date: {
+          gte: new Date()
+        }
+      }
+    });
+    const completedParties = await prisma.party.count({
+      where: {
+        date: {
+          lt: new Date()
         }
       }
     });
 
     return NextResponse.json({
-      totalUsers,
-      totalProviders,
-      totalClients,
-      totalServices,
-      totalParties,
-      totalRevenue: totalRevenue._sum.amount || 0,
-      recentParties,
-      popularServices
+      success: true,
+      data: {
+        users: {
+          total: totalUsers,
+          newToday: newUsersToday,
+          providers: totalProviders,
+          clients: totalClients
+        },
+        services: {
+          total: totalServices,
+          active: activeServices,
+          pendingApproval: pendingApprovalServices
+        },
+        transactions: {
+          total: totalTransactions,
+          today: transactionsToday,
+          value: transactionsValue._sum.amount || 0
+        },
+        parties: {
+          total: totalParties,
+          active: activeParties,
+          completed: completedParties
+        }
+      }
     });
+    
   } catch (error) {
     console.error('Error fetching admin statistics:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ 
+      success: false, 
+      error: { message: 'Failed to fetch admin statistics' }
+    }, { status: 500 });
   }
 }

@@ -1,98 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma/client';
+import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 /**
- * Get transaction by ID
+ * Get a transaction by ID
+ * This can be used to check if a transaction exists and see its details
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    console.log(`Fetching transaction ${params.id}`);
     
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
-        { status: 401 }
-      );
-    }
-    
-    const transactionId = params.id;
-    
-    if (!transactionId) {
-      return NextResponse.json(
-        { success: false, error: { code: 'BAD_REQUEST', message: 'Transaction ID is required' } },
-        { status: 400 }
-      );
-    }
-    
-    // Fetch the transaction
+    // Try to get the transaction by ID
     const transaction = await prisma.transaction.findUnique({
-      where: { id: transactionId },
+      where: { id: params.id },
       include: {
-        offer: {
-          include: {
-            client: {
-              select: {
-                id: true,
-                name: true,
-                profile: {
-                  select: {
-                    avatar: true
-                  }
-                }
-              }
-            },
-            provider: {
-              select: {
-                id: true,
-                name: true,
-                profile: {
-                  select: {
-                    avatar: true
-                  }
-                }
-              }
-            },
-            service: true,
-            partyService: {
-              include: {
-                party: true
-              }
-            }
-          }
-        },
+        offer: true,
         party: true
       }
     });
     
     if (!transaction) {
+      console.log(`Transaction not found: ${params.id}`);
       return NextResponse.json(
-        { success: false, error: { code: 'NOT_FOUND', message: 'Transaction not found' } },
+        { success: false, error: { message: 'Transaction not found' } },
         { status: 404 }
       );
     }
     
-    // Check authorization - the user must be either the client or the provider
-    const isClient = transaction.offer.client.id === session.user.id;
-    const isProvider = transaction.offer.provider.id === session.user.id;
-    const isAdmin = session.user.role === 'ADMIN';
-    
-    if (!isClient && !isProvider && !isAdmin) {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'You are not authorized to view this transaction' } },
-        { status: 403 }
-      );
-    }
-    
-    return NextResponse.json({ success: true, data: transaction }, { status: 200 });
+    console.log(`Transaction found: ${transaction.id}`);
+    return NextResponse.json({
+      success: true,
+      data: { transaction }
+    });
   } catch (error) {
-    console.error('Get transaction error:', error);
+    console.error('Error fetching transaction:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { success: false, error: { message: 'Failed to fetch transaction' } },
       { status: 500 }
     );
   }

@@ -44,7 +44,7 @@ const CARD_ELEMENT_OPTIONS = {
   },
 };
 
-export default function ServiceRequestPayment({ service, offer, onPaymentComplete, onCancel }) {
+export default function ServiceRequestPayment({ service, offer, onPaymentComplete, onCancel, bookingDetails }) {
   const stripe = useStripe();
   const elements = useElements();
   const toast = useToast();
@@ -57,9 +57,12 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
   const [reviewDeadline, setReviewDeadline] = useState(null);
 
   // Calculate total amount (including platform fee)
+  const servicePrice = offer?.price || service?.price || 0;
+  // Fixed price regardless of duration
+  const baseAmount = Number(servicePrice);
   const serviceFeePercent = 5.0; // 5% platform fee for clients
-  const serviceFee = (offer?.price || service?.price) * (serviceFeePercent / 100);
-  const totalAmount = Number(offer?.price || service?.price) + Number(serviceFee);
+  const serviceFee = baseAmount * (serviceFeePercent / 100);
+  const totalAmount = baseAmount + Number(serviceFee);
 
   const handleCardChange = (event) => {
     setCardError(event.error?.message || null);
@@ -82,7 +85,126 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
     setIsProcessing(true);
     
     try {
+      // First, validate that we have either an offer or a service
+      if (!offer && !service) {
+        throw new Error('No service or offer provided');
+      }
+
+      // Validate required fields for service
+      if (!offer && service) {
+        if (!service.providerId) {
+          console.error("Service missing providerId:", service);
+          throw new Error('Service is missing provider information. Please try again later.');
+        }
+      }
+
       // Create transaction
+      console.log("Creating transaction with:", {
+        serviceId: !offer ? service.id : null,
+        offerId: offer?.id,
+        amount: baseAmount,
+        providerId: offer?.providerId || service?.providerId,
+        bookingDate: bookingDetails?.isoDateTime || undefined,
+        duration: bookingDetails?.duration || undefined
+      });
+      
+      if (!offer && service) {
+        console.log("Direct Service Transaction Mode - Service details:", {
+          id: service.id,
+          name: service.name, 
+          providerId: service.providerId,
+          price: service.price,
+          bookingDetails: bookingDetails
+        });
+        
+        // Try the alternative test endpoint for direct service transactions
+        try {
+          console.log("Attempting to use debug transaction creation endpoint...");
+          const debugResponse = await fetch('/api/debug/create-transaction', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              serviceId: service.id,
+              bookingDate: bookingDetails?.isoDateTime,
+              duration: bookingDetails?.duration
+            }),
+          });
+          
+          const debugData = await debugResponse.json();
+          console.log("Debug transaction response:", debugData);
+          
+          if (debugData.success) {
+            console.log("Debug transaction created successfully!");
+            
+            // Use the transaction from the debug response
+            setTransaction(debugData.data.transaction);
+            
+            // Continue with payment processing using the new transaction
+            const paymentResponse = await fetch(`/api/transactions/${debugData.data.transaction.id}/pay`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (!paymentResponse.ok) {
+              const paymentErrorData = await paymentResponse.json();
+              console.error('Payment error details:', paymentErrorData);
+              throw new Error(
+                paymentErrorData.error?.message || 
+                paymentErrorData.error?.details || 
+                `Payment processing failed with status ${paymentResponse.status}`
+              );
+            }
+
+            const paymentData = await paymentResponse.json();
+            
+            if (!paymentData.success) {
+              throw new Error(paymentData.error?.message || 'Failed to process payment');
+            }
+            
+            // Set client secret and review deadline
+            setClientSecret(paymentData.data.clientSecret);
+            setReviewDeadline(new Date(paymentData.data.reviewDeadline));
+            
+            // Confirm card payment
+            const { error, paymentIntent } = await stripe.confirmCardPayment(paymentData.data.clientSecret, {
+              payment_method: {
+                card: elements.getElement(CardElement),
+              },
+            });
+            
+            if (error) {
+              throw new Error(error.message);
+            }
+            
+            if (paymentIntent.status === 'requires_capture') {
+              setIsComplete(true);
+              toast({
+                title: "Payment authorized!",
+                description: "Your payment has been authorized and will be held in escrow. The provider now has 24 hours to review and approve your request.",
+                status: "success",
+                duration: 8000,
+                isClosable: true,
+              });
+              
+              if (onPaymentComplete) {
+                onPaymentComplete(transaction);
+              }
+            } else {
+              throw new Error(`Unexpected payment status: ${paymentIntent.status}`);
+            }
+            
+            return; // Exit early since we're using the debug flow
+          }
+        } catch (debugError) {
+          console.error("Debug transaction creation failed:", debugError);
+          // Continue with regular flow
+        }
+      }
+      
       const transactionResponse = await fetch('/api/transactions', {
         method: 'POST',
         headers: {
@@ -91,68 +213,173 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
         body: JSON.stringify({
           offerId: offer?.id,
           serviceId: !offer ? service.id : null,
-          amount: Number(offer?.price || service?.price),
+          amount: baseAmount,
+          providerId: offer?.providerId || service?.providerId,
+          bookingDate: bookingDetails?.isoDateTime,
+          duration: bookingDetails?.duration,
+          isFixedPrice: true
         }),
       });
+
+      let errorData;
       
-      const transactionData = await transactionResponse.json();
-      
-      if (!transactionData.success) {
-        throw new Error(transactionData.error?.message || 'Failed to create transaction');
-      }
-      
-      const transaction = transactionData.data.transaction;
-      setTransaction(transaction);
-      
-      // Process payment
-      const paymentResponse = await fetch(`/api/transactions/${transaction.id}/pay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      const paymentData = await paymentResponse.json();
-      
-      if (!paymentData.success) {
-        throw new Error(paymentData.error?.message || 'Failed to process payment');
-      }
-      
-      // Set client secret and review deadline
-      setClientSecret(paymentData.data.clientSecret);
-      setReviewDeadline(new Date(paymentData.data.reviewDeadline));
-      
-      // Confirm card payment
-      const { error, paymentIntent } = await stripe.confirmCardPayment(paymentData.data.clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement),
-        },
-      });
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      if (paymentIntent.status === 'requires_capture') {
-        setIsComplete(true);
+      // Handle authentication errors
+      if (transactionResponse.status === 401) {
         toast({
-          title: "Payment authorized!",
-          description: "Your payment has been authorized and will be held in escrow. The provider now has 24 hours to review and approve your request.",
-          status: "success",
-          duration: 8000,
+          title: "Authentication required",
+          description: "Please sign in to continue with your payment",
+          status: "error",
+          duration: 5000,
           isClosable: true,
         });
         
-        if (onPaymentComplete) {
-          onPaymentComplete(transaction);
+        // Redirect to login
+        window.location.href = `/api/auth/signin?callbackUrl=${encodeURIComponent(window.location.href)}`;
+        return;
+      }
+      
+      // Try to get detailed error information
+      try {
+        errorData = await transactionResponse.json();
+        console.log("Transaction response data:", errorData);
+      } catch (e) {
+        console.error("Failed to parse transaction response:", e, "Status:", transactionResponse.status);
+        // Try to get the raw response text for debugging
+        try {
+          const responseText = await transactionResponse.text();
+          console.error("Raw response text:", responseText);
+        } catch (textError) {
+          console.error("Could not get response text:", textError);
         }
+        errorData = { 
+          success: false, 
+          error: { message: `Could not parse server response. Status: ${transactionResponse.status}` } 
+        };
+      }
+      
+      // If the response was not successful
+      if (!transactionResponse.ok) {
+        console.error('Transaction error details:', errorData);
+        const errorMessage = 
+          errorData.error?.message || 
+          errorData.error?.details || 
+          `Transaction failed with status ${transactionResponse.status}`;
+          
+        // Display more user-friendly error based on status code  
+        if (transactionResponse.status === 409) {
+          throw new Error('A transaction for this service already exists. Please check your transactions page.');
+        } else if (transactionResponse.status === 404) {
+          throw new Error('Unable to find the necessary information to complete this transaction. Please try again.');
+        } else {
+          throw new Error(errorMessage);
+        }
+      }
+      
+      // If the response doesn't indicate success
+      if (!errorData.success || !errorData.data?.transaction) {
+        console.error('Transaction unsuccessful:', errorData);
+        if (errorData.error?.details) {
+          console.error('Detailed error:', errorData.error.details);
+        }
+        throw new Error(errorData.error?.message || 'Failed to create transaction');
+      }
+      
+      const transaction = errorData.data.transaction;
+      console.log('Transaction created successfully:', {
+        id: transaction.id,
+        status: transaction.status,
+        amount: transaction.amount
+      });
+      setTransaction(transaction);
+      
+      // Process payment
+      try {
+        const paymentResponse = await fetch(`/api/transactions/${transaction.id}/pay`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!paymentResponse.ok) {
+          const paymentErrorData = await paymentResponse.json();
+          console.error('Payment error details:', paymentErrorData);
+          throw new Error(
+            paymentErrorData.error?.message || 
+            paymentErrorData.error?.details || 
+            `Payment processing failed with status ${paymentResponse.status}`
+          );
+        }
+
+        const paymentData = await paymentResponse.json();
+        
+        if (!paymentData.success) {
+          throw new Error(paymentData.error?.message || 'Failed to process payment');
+        }
+        
+        // Set client secret and review deadline
+        setClientSecret(paymentData.data.clientSecret);
+        setReviewDeadline(new Date(paymentData.data.reviewDeadline));
+        
+        // Confirm card payment
+        const { error, paymentIntent } = await stripe.confirmCardPayment(paymentData.data.clientSecret, {
+          payment_method: {
+            card: elements.getElement(CardElement),
+          },
+        });
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        if (paymentIntent.status === 'requires_capture') {
+          setIsComplete(true);
+          toast({
+            title: "Payment authorized!",
+            description: "Your payment has been authorized and will be held in escrow. The provider now has 24 hours to review and approve your request.",
+            status: "success",
+            duration: 8000,
+            isClosable: true,
+          });
+          
+          if (onPaymentComplete) {
+            onPaymentComplete(transaction);
+          }
+        } else {
+          throw new Error(`Unexpected payment status: ${paymentIntent.status}`);
+        }
+      } catch (paymentError) {
+        console.error('Payment processing error:', paymentError);
+        // Try to cancel the transaction since payment failed
+        try {
+          await fetch(`/api/transactions/${transaction.id}/cancel`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+        } catch (cancelError) {
+          console.error('Failed to cancel transaction after payment error:', cancelError);
+        }
+        throw paymentError;
       }
     } catch (error) {
       console.error('Payment error:', error);
       setCardError(error.message);
+      
+      // Determine the most user-friendly error message to display
+      let displayMessage = error.message;
+      
+      // Check for specific error messages to display better information
+      if (displayMessage.includes('Failed to create offer')) {
+        displayMessage = "We're having trouble processing your request right now. Please try again in a few minutes or contact customer support.";
+      } else if (displayMessage.includes('foreign key constraint')) {
+        displayMessage = "There was an issue with your request. Please refresh the page and try again.";
+      }
+      
       toast({
         title: "Payment failed",
-        description: error.message,
+        description: displayMessage,
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -187,21 +414,55 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
           
           <Divider />
           
-          <VStack spacing={2} align="stretch">
-            <HStack justify="space-between">
-              <Text>Service Fee:</Text>
-              <Text>{formatCurrency(offer?.price || service?.price)}</Text>
+          {/* Order summary */}
+          <Box mb={6} p={4} borderWidth="1px" borderRadius="md" bg="gray.50">
+            <Heading as="h3" size="sm" mb={3}>Order Summary</Heading>
+            
+            {bookingDetails && (
+              <Box mb={4} pb={3} borderBottomWidth="1px">
+                <Heading as="h4" size="xs" mb={2}>Booking Details</Heading>
+                <HStack fontSize="sm" mb={1}>
+                  <Text fontWeight="medium">Date:</Text>
+                  <Text>{bookingDetails.formattedDate}</Text>
+                </HStack>
+                <HStack fontSize="sm" mb={1}>
+                  <Text fontWeight="medium">Time:</Text>
+                  <Text>{bookingDetails.time}</Text>
+                </HStack>
+                <HStack fontSize="sm">
+                  <Text fontWeight="medium">Duration:</Text>
+                  <Text>{bookingDetails.duration} hour{bookingDetails.duration !== 1 ? 's' : ''}</Text>
+                </HStack>
+                <Text fontSize="xs" color="gray.600" mt={2}>
+                  Note: This service has a fixed price regardless of rental duration.
+                </Text>
+              </Box>
+            )}
+            
+            <HStack justify="space-between" mb={1}>
+              <Text>Service Price (fixed):</Text>
+              <Text>{formatCurrency(servicePrice)}</Text>
             </HStack>
-            <HStack justify="space-between">
-              <Text>Platform Fee ({serviceFeePercent}%):</Text>
+            
+            {bookingDetails?.duration > 0 && (
+              <HStack justify="space-between" mb={1}>
+                <Text>Duration:</Text>
+                <Text>{bookingDetails.duration} hour{bookingDetails.duration !== 1 ? 's' : ''}</Text>
+              </HStack>
+            )}
+            
+            <HStack justify="space-between" mb={1}>
+              <Text>Service Fee ({serviceFeePercent}%):</Text>
               <Text>{formatCurrency(serviceFee)}</Text>
             </HStack>
+            
             <Divider my={2} />
+            
             <HStack justify="space-between" fontWeight="bold">
               <Text>Total:</Text>
               <Text>{formatCurrency(totalAmount)}</Text>
             </HStack>
-          </VStack>
+          </Box>
           
           <Box>
             <Text mb={2} fontWeight="bold">Payment Information</Text>

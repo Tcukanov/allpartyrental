@@ -27,7 +27,8 @@ import {
   ModalBody,
   ModalCloseButton,
   ModalFooter,
-  useDisclosure
+  useDisclosure,
+  Image
 } from '@chakra-ui/react';
 import { AddIcon, EditIcon, DeleteIcon } from '@chakra-ui/icons';
 
@@ -36,9 +37,10 @@ interface Service {
   name: string;
   description: string;
   price: number;
-  category: string;
+  category: { name?: string } | string;
   status: string;
   createdAt: string;
+  photos?: string[];
 }
 
 export default function ProviderServicesPage() {
@@ -78,13 +80,21 @@ export default function ProviderServicesPage() {
         throw new Error(`Error: ${response.status}`);
       }
       
-      const data = await response.json();
+      const responseData = await response.json();
       
-      if (data.success) {
-        setServices(data.data || []);
+      // Handle both response formats
+      let servicesData;
+      if (responseData.success && Array.isArray(responseData.data)) {
+        // New format
+        servicesData = responseData.data;
+      } else if (Array.isArray(responseData)) {
+        // Old format
+        servicesData = responseData;
       } else {
-        throw new Error(data.error?.message || 'Failed to fetch services');
+        throw new Error('Invalid response format');
       }
+      
+      setServices(servicesData || []);
     } catch (err) {
       console.error('Error fetching services:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -158,8 +168,8 @@ export default function ProviderServicesPage() {
     switch (status.toUpperCase()) {
       case 'ACTIVE':
         return <Badge colorScheme="green">Active</Badge>;
-      case 'PENDING':
-        return <Badge colorScheme="yellow">Pending</Badge>;
+      case 'PENDING_APPROVAL':
+        return <Badge colorScheme="orange">Pending Approval</Badge>;
       case 'INACTIVE':
         return <Badge colorScheme="red">Inactive</Badge>;
       default:
@@ -188,6 +198,15 @@ export default function ProviderServicesPage() {
         </Button>
       </Flex>
 
+      <Box mb={6} p={4} bg="blue.50" color="blue.800" borderRadius="md">
+        <Text fontWeight="medium">Service Approval Process</Text>
+        <Text fontSize="sm">
+          All new services require admin approval before they become visible to clients. 
+          Services with <Badge colorScheme="orange" size="sm">Pending Approval</Badge> status are under review. 
+          Once approved, the status will change to <Badge colorScheme="green" size="sm">Active</Badge>.
+        </Text>
+      </Box>
+
       {error && (
         <Box mb={6} p={4} bg="red.100" color="red.800" borderRadius="md">
           <Text>{error}</Text>
@@ -208,15 +227,35 @@ export default function ProviderServicesPage() {
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
           {services.map((service) => (
             <Card key={service.id} boxShadow="md" height="100%">
+              {service.photos && service.photos.length > 0 ? (
+                <Image 
+                  src={service.photos[0]} 
+                  alt={service.name}
+                  height="200px"
+                  width="100%"
+                  objectFit="cover"
+                />
+              ) : (
+                <Box 
+                  height="200px"
+                  width="100%"
+                  bg="gray.100" 
+                  display="flex" 
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <Text color="gray.500">No image</Text>
+                </Box>
+              )}
               <CardBody>
                 <Stack spacing={3}>
                   <Heading size="md">{service.name}</Heading>
                   <Text color="gray.500" fontSize="sm">
-                    Category: {service.category}
+                    Category: {typeof service.category === 'string' ? service.category : service.category?.name || 'Uncategorized'}
                   </Text>
                   <Text noOfLines={3}>{service.description}</Text>
                   <Text fontWeight="bold">
-                    ${service.price.toFixed(2)}
+                    ${Number(service.price).toFixed(2)}
                   </Text>
                   <HStack>
                     {getStatusBadge(service.status)}

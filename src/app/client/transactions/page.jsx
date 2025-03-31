@@ -132,8 +132,8 @@ export default function ClientTransactionsPage() {
             flexShrink={0}
           >
             <Image
-              src={transaction.service?.imageUrl || '/images/placeholder-service.jpg'}
-              alt={transaction.service?.name || 'Service'}
+              src={transaction.offer?.service?.photos?.[0] || '/images/placeholder-service.jpg'}
+              alt={transaction.offer?.service?.name || 'Service'}
               borderRadius="md"
               objectFit="cover"
               width="100%"
@@ -145,19 +145,19 @@ export default function ClientTransactionsPage() {
           <Box flex="1">
             <Flex justify="space-between" mb={2} align="flex-start" direction={{ base: 'column', sm: 'row' }}>
               <Heading as="h3" size="md" mb={{ base: 2, sm: 0 }}>
-                {transaction.service?.name || 'Service Request'}
+                {transaction.offer?.service?.name || 'Service Request'}
               </Heading>
               <TransactionStatusBadge status={transaction.status} />
             </Flex>
             
             <Text mb={2} color="gray.600">
-              Provider: {transaction.provider?.name || 'Provider Name'}
+              Provider: {transaction.offer?.provider?.name || 'Provider Name'}
             </Text>
             
             <Flex wrap="wrap" gap={4} mb={4}>
               <Flex align="center">
                 <Icon as={FiDollarSign} mr={1} color="green.500" />
-                <Text fontWeight="bold">${transaction.amount.toFixed(2)}</Text>
+                <Text fontWeight="bold">${Number(transaction.amount).toFixed(2)}</Text>
               </Flex>
               
               <Flex align="center">
@@ -178,7 +178,7 @@ export default function ClientTransactionsPage() {
             <Flex justify="space-between" align="center" wrap="wrap" gap={2}>
               <Button 
                 as={Link}
-                href={`/services/${transaction.service?.id}`}
+                href={`/services/${transaction.offer?.service?.id}`}
                 size="sm"
                 variant="outline"
               >

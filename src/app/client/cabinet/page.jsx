@@ -599,7 +599,7 @@ export default function ClientCabinetPage() {
                             {new Date(transaction.createdAt).toLocaleDateString()}
                           </Text>
                           <HStack justify="space-between">
-                            <Text fontWeight="bold">${transaction.amount.toFixed(2)}</Text>
+                            <Text fontWeight="bold">${Number(transaction.amount).toFixed(2)}</Text>
                             <Button
                               as={Link}
                               href={`/client/transactions#${transaction.id}`}

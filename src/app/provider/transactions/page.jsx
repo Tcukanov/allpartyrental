@@ -235,9 +235,9 @@ export default function ProviderTransactionsPage() {
             <Flex wrap="wrap" gap={4} mb={4}>
               <Flex align="center">
                 <Icon as={FiDollarSign} mr={1} color="green.500" />
-                <Text fontWeight="bold">${transaction.amount.toFixed(2)}</Text>
-                <Text fontSize="sm" ml={1} color="gray.500">
-                  (You receive: ${(transaction.amount * 0.95).toFixed(2)})
+                <Text fontWeight="bold">${Number(transaction.amount).toFixed(2)}</Text>
+                <Text fontSize="sm" ml={2} color="gray.500">
+                  (You receive: ${(Number(transaction.amount) * 0.95).toFixed(2)})
                 </Text>
               </Flex>
               

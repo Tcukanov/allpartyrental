@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { prisma } from '@/lib/prisma/client';
+import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   try {
@@ -9,7 +9,7 @@ export async function GET() {
     
     if (!session?.user || session.user.role !== 'PROVIDER') {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { success: false, error: { message: 'Unauthorized' } },
         { status: 401 }
       );
     }
@@ -24,11 +24,20 @@ export async function GET() {
       }
     });
 
-    return NextResponse.json(services);
+    return NextResponse.json({ 
+      success: true, 
+      data: services 
+    });
   } catch (error) {
     console.error('Error fetching services:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        success: false, 
+        error: { 
+          message: 'Internal server error',
+          details: error instanceof Error ? error.message : String(error)
+        } 
+      },
       { status: 500 }
     );
   }
@@ -40,7 +49,7 @@ export async function POST(request: Request) {
     
     if (!session?.user || session.user.role !== 'PROVIDER') {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { success: false, error: { message: 'Unauthorized' } },
         { status: 401 }
       );
     }
@@ -58,11 +67,20 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json(service);
+    return NextResponse.json({ 
+      success: true, 
+      data: service 
+    });
   } catch (error) {
     console.error('Error creating service:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        success: false, 
+        error: { 
+          message: 'Internal server error',
+          details: error instanceof Error ? error.message : String(error)
+        } 
+      },
       { status: 500 }
     );
   }

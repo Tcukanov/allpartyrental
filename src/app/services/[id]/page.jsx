@@ -137,11 +137,21 @@ export default function ServiceDetailPage({ params }) {
   const [userRole, setUserRole] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   
+  // Set user role from session
+  useEffect(() => {
+    if (session?.user) {
+      setUserRole(session.user.role);
+    } else {
+      setUserRole(null);
+    }
+  }, [session]);
+  
   // Fetch service data from database or use fallback
   useEffect(() => {
     const fetchServiceData = async () => {
       try {
         setIsLoading(true);
+        let data = null;
         
         // Try to fetch from API
         const response = await fetch(`/api/services/${params.id}`);
@@ -153,6 +163,9 @@ export default function ServiceDetailPage({ params }) {
             console.log('Using fallback data for service ID 6');
             setService(fallbackService);
             setSimilarServices(fallbackSimilarServices);
+            
+            // Set isOwner to false for fallback data
+            setIsOwner(false);
           } else if (fallbackSimilarServices.find(s => s.id === params.id)) {
             // If we have this ID in our fallback similar services
             const fallbackService = fallbackSimilarServices.find(s => s.id === params.id);
@@ -166,22 +179,31 @@ export default function ServiceDetailPage({ params }) {
             
             // Use other services as similar
             setSimilarServices(fallbackSimilarServices.filter(s => s.id !== params.id));
+            
+            // Set isOwner to false for fallback data
+            setIsOwner(false);
           } else {
             throw new Error('Service not found');
           }
         } else {
           // If API succeeds, use the data
-          const data = await response.json();
+          data = await response.json();
           
           if (!data.success) {
             throw new Error(data.error?.message || 'Failed to load service');
           }
           
-          setService(data.data);
+          // Ensure the service object has the correct providerId
+          const serviceData = {
+            ...data.data,
+            providerId: data.data.provider?.id
+          };
+          
+          setService(serviceData);
           
           // Try to fetch similar services
           try {
-            const similarResponse = await fetch(`/api/services?categoryId=${data.data.categoryId}&limit=3&exclude=${params.id}`);
+            const similarResponse = await fetch(`/api/services/public?categoryId=${data.data.categoryId}&limit=3&exclude=${params.id}`);
             if (similarResponse.ok) {
               const similarData = await similarResponse.json();
               if (similarData.success) {
@@ -199,12 +221,11 @@ export default function ServiceDetailPage({ params }) {
             // Use fallback similar services if API fails
             setSimilarServices(fallbackSimilarServices.filter(s => s.id !== params.id));
           }
-        }
-        
-        // Check if current user is the service owner
-        if (session) {
-          setUserRole(session.user.role);
-          setIsOwner(session.user.id === data.data.providerUserId);
+          
+          // Check if current user is the service owner
+          if (session && data?.data) {
+            setIsOwner(session.user.id === data.data.providerUserId);
+          }
         }
       } catch (error) {
         console.error('Error fetching service:', error);
@@ -369,9 +390,9 @@ export default function ServiceDetailPage({ params }) {
   return (
     <Container maxW="container.lg" py={10}>
       <Box mb={8}>
-        {service.imageUrl ? (
+        {service.photos && service.photos.length > 0 ? (
                 <Image 
-            src={service.imageUrl}
+                  src={service.photos[selectedImage]} 
                   alt={service.name} 
                   w="100%" 
             h={{ base: "200px", md: "400px" }}
@@ -383,14 +404,39 @@ export default function ServiceDetailPage({ params }) {
             bg="gray.200"
             w="100%"
             h={{ base: "200px", md: "400px" }}
-                    borderRadius="md" 
+            borderRadius="md" 
             display="flex"
             alignItems="center"
             justifyContent="center"
           >
             <Text color="gray.500">No image available</Text>
-                </Box>
-              )}
+              </Box>
+        )}
+              
+        {/* Thumbnail gallery */}
+        {service.photos && service.photos.length > 1 && (
+          <SimpleGrid columns={Math.min(service.photos.length, 5)} spacing={2} mt={2}>
+                {service.photos.map((photo, index) => (
+                  <Box 
+                    key={index} 
+                cursor="pointer" 
+                borderWidth={selectedImage === index ? "2px" : "0px"}
+                borderColor="blue.500"
+                    borderRadius="md" 
+                    onClick={() => setSelectedImage(index)}
+                  >
+                    <Image 
+                      src={photo} 
+                  alt={`${service.name} ${index + 1}`}
+                  height="60px"
+                  width="100%"
+                      objectFit="cover"
+                  borderRadius="md"
+                    />
+                  </Box>
+                ))}
+          </SimpleGrid>
+        )}
             </Box>
             
       <Stack spacing={6}>
@@ -398,7 +444,7 @@ export default function ServiceDetailPage({ params }) {
           <Box flex="1" mr={4} mb={4}>
             <Heading as="h1" size="xl" mb={2}>
               {service.name}
-            </Heading>
+                        </Heading>
             
             <Flex align="center" mb={2}>
               <Icon as={FaUser} mr={2} color="blue.500" />
@@ -425,7 +471,7 @@ export default function ServiceDetailPage({ params }) {
             <Stack spacing={4} bg="gray.50" p={4} borderRadius="md" width={{ base: "100%", md: "300px" }}>
                     <Flex align="center">
                 <Icon as={FiDollarSign} fontSize="xl" mr={2} color="green.500" />
-                <Heading size="md">${service.price.toFixed(2)}</Heading>
+                <Heading size="md">${Number(service.price).toFixed(2)}</Heading>
                 <Text fontSize="sm" ml={1} color="gray.600">
                   {service.priceType === 'HOURLY' ? '/ hour' : service.priceType === 'DAILY' ? '/ day' : ''}
                 </Text>
@@ -452,8 +498,13 @@ export default function ServiceDetailPage({ params }) {
                       </Flex>
                     )}
                     
-              {!isOwner && userRole === 'CLIENT' && (
-                <ServiceRequestButton service={service} />
+              {!isOwner && session && session.user.role === 'CLIENT' && (
+                <ServiceRequestButton 
+                  service={{
+                    ...service,
+                    providerId: service.provider?.id
+                  }} 
+                />
               )}
               
               {isOwner && (
@@ -462,8 +513,8 @@ export default function ServiceDetailPage({ params }) {
                     </Button>
               )}
               
-              {!userRole && (
-                <Button colorScheme="blue" width="full" as="a" href="/login">
+              {!session && (
+                <Button colorScheme="blue" width="full" as="a" href="/api/auth/signin">
                   Login to Request
                 </Button>
               )}
@@ -490,10 +541,129 @@ export default function ServiceDetailPage({ params }) {
                 <Flex key={index} align="center">
                   <Box as="span" w={2} h={2} bg="blue.500" borderRadius="full" mr={2}></Box>
                   <Text>{feature}</Text>
-                </Flex>
-              ))}
+                          </Flex>
+                  ))}
             </SimpleGrid>
-          </Box>
+              </Box>
+            )}
+                  
+                  <Divider />
+                  
+            {service.provider && (
+          <Box>
+            <Heading as="h2" size="md" mb={4}>
+              About the Provider
+            </Heading>
+            <Flex align="center" mb={4}>
+              {service.provider.profile?.avatar ? (
+                      <Image 
+                  src={service.provider.profile.avatar} 
+                        alt={service.provider.name} 
+                  boxSize="80px"
+                        borderRadius="full" 
+                        mr={4}
+                      />
+              ) : (
+                <Box
+                  bg="blue.100"
+                  color="blue.500"
+                  borderRadius="full"
+                  boxSize="80px"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  fontSize="2xl"
+                  fontWeight="bold"
+                  mr={4}
+                >
+                  {service.provider.name.charAt(0)}
+                </Box>
+              )}
+                      <Box>
+                <Heading size="md" mb={1}>{service.provider.name}</Heading>
+                <HStack spacing={2} mb={1}>
+                  {service.provider.isVerified && (
+                    <Badge colorScheme="green">Verified</Badge>
+                  )}
+                  {service.provider.isPro && (
+                    <Badge colorScheme="purple">Pro</Badge>
+                            )}
+                          </HStack>
+                {service.provider.since && (
+                  <Text fontSize="sm" color="gray.600">Member since {service.provider.since}</Text>
+                        )}
+                      </Box>
+                    </Flex>
+                    
+            {service.provider.rating && (
+              <Flex align="center" mb={2}>
+                <Flex align="center" mr={2}>
+                  {Array(5).fill('').map((_, i) => (
+                    <StarIcon
+                      key={i}
+                      color={i < Math.floor(service.provider.rating) ? 'yellow.400' : 'gray.300'}
+                      mr={0.5}
+                    />
+                  ))}
+                </Flex>
+                <Text fontWeight="medium">{service.provider.rating}</Text>
+                {service.provider.reviewCount && (
+                  <Text ml={1} color="gray.600">({service.provider.reviewCount} reviews)</Text>
+                        )}
+                      </Flex>
+                    )}
+                    
+            {service.provider.googleBusinessRating && (
+              <Flex align="center" mb={3} bg="gray.50" p={2} borderRadius="md">
+                <Image src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_74x24dp.png" h="20px" mr={2} alt="Google" />
+                <Flex align="center" mr={2}>
+                  {Array(5).fill('').map((_, i) => (
+                    <StarIcon
+                      key={i}
+                      color={i < Math.floor(service.provider.googleBusinessRating) ? 'yellow.400' : 'gray.300'}
+                      mr={0.5}
+                      boxSize={3}
+                    />
+                  ))}
+                </Flex>
+                <Text fontWeight="medium" fontSize="sm">{service.provider.googleBusinessRating}</Text>
+                {service.provider.googleBusinessReviews && (
+                  <Text fontSize="xs" ml={1} color="gray.600">({service.provider.googleBusinessReviews} Google reviews)</Text>
+                )}
+                {service.provider.googleBusinessUrl && (
+                  <Text as="a" fontSize="xs" ml={2} color="blue.500" href={service.provider.googleBusinessUrl} target="_blank" rel="noopener noreferrer">
+                    See reviews
+                  </Text>
+                )}
+              </Flex>
+            )}
+            
+            <Flex gap={2} mt={2}>
+              <Button 
+                      as={Link} 
+                href={`/providers/${service.provider.id}`}
+                colorScheme="blue" 
+                variant="outline"
+                leftIcon={<FaUser />}
+              >
+                View Provider Profile
+              </Button>
+              
+              {(service.provider.location || service.city) && (
+                <Button
+                  as="a"
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(service.provider.location || service.city.name + ', ' + service.city.state)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  colorScheme="red"
+                  variant="outline"
+                  leftIcon={<FaMapMarkerAlt />}
+                >
+                  View on Map
+                </Button>
+              )}
+            </Flex>
+                        </Box>
         )}
         
         {service.policies && (
