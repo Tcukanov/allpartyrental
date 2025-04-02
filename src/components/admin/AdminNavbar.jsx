@@ -44,13 +44,15 @@ import {
   FiLogOut,
   FiUser,
   FiHelpCircle,
+  FiZap,
 } from 'react-icons/fi';
+import { MdDashboard } from 'react-icons/md';
 
 const NAV_ITEMS = [
   {
     label: 'Dashboard',
-    href: '/admin/panel',
-    icon: FiHome,
+    href: '/admin/dashboard',
+    icon: MdDashboard,
   },
   {
     label: 'Transactions',
@@ -112,8 +114,11 @@ export default function AdminNavbar() {
           
           <HStack spacing={8} alignItems="center">
             <Box fontWeight="bold" fontSize="lg">
-              <Link as={NextLink} href="/admin/panel" _hover={{ textDecoration: 'none' }}>
-                Admin Panel
+              <Link as={NextLink} href="/admin/dashboard" _hover={{ textDecoration: 'none' }}>
+                <Flex align="center">
+                  <Icon as={FiZap} w={6} h={6} color="brand.500" mr={2} />
+                  <Text fontWeight="bold" fontSize="lg">AllPartyAdmin</Text>
+                </Flex>
               </Link>
             </Box>
             

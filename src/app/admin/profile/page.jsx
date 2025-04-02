@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function AdminPanelRedirect() {
+export default function AdminProfileRedirect() {
   const router = useRouter();
   
   useEffect(() => {
@@ -16,4 +16,4 @@ export default function AdminPanelRedirect() {
       Redirecting to dashboard...
     </div>
   );
-}
+} 

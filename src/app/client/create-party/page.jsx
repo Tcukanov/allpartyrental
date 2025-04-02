@@ -335,7 +335,7 @@ const SelectedService = ({ service, index, removeService, handleDragStart, handl
 };
 
 // Selected services area component
-const SelectedServicesArea = ({ services, removeService, addService }) => {
+const SelectedServicesArea = ({ services, removeService, addService, isMobileDragging, onMobileDrop }) => {
   const [draggedItem, setDraggedItem] = useState(null);
   const [isHighlighted, setIsHighlighted] = useState(false);
   
@@ -434,13 +434,14 @@ const SelectedServicesArea = ({ services, removeService, addService }) => {
       borderWidth="2px"
       borderRadius="md"
       borderStyle="dashed"
-      borderColor={isHighlighted ? "blue.500" : "gray.300"}
+      borderColor={isHighlighted || isMobileDragging ? "blue.500" : "gray.300"}
       p={4}
-      bg={isHighlighted ? "blue.50" : "gray.50"}
+      bg={isHighlighted || isMobileDragging ? "blue.50" : "gray.50"}
       flex={1}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={(e) => handleDrop(e, services.length)}
+      onClick={isMobileDragging ? onMobileDrop : undefined}
       transition="all 0.2s ease"
       position="relative"
       data-drop-target="true"
@@ -448,8 +449,8 @@ const SelectedServicesArea = ({ services, removeService, addService }) => {
         borderColor: "blue.300",
         bg: "gray.100"
       }}
-      _after={isHighlighted ? {
-        content: '"Drop here"',
+      _after={(isHighlighted || isMobileDragging) ? {
+        content: isMobileDragging ? '"Tap here to add"' : '"Drop here"',
         position: "absolute",
         top: "0",
         left: "0",
@@ -1172,6 +1173,8 @@ export default function PartyConfiguratorPage() {
               services={services} 
               removeService={removeService} 
               addService={addService}
+              isMobileDragging={isMobileDragging}
+              onMobileDrop={handleMobileDrop}
             />
           </Box>
         )}

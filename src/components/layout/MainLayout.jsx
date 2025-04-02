@@ -57,7 +57,7 @@ const providerLinks = [
 ];
 
 const adminLinks = [
-  { name: 'Admin Panel', href: '/admin/panel' },
+  { name: 'Admin Dashboard', href: '/admin/dashboard' },
 ];
 
 // Public links
