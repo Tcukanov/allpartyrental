@@ -1,16 +1,11 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Container,
   Heading,
   Text,
-  Stack,
-  Card,
-  CardBody,
-  Button,
-  Flex,
   Table,
   Thead,
   Tbody,
@@ -18,553 +13,403 @@ import {
   Th,
   Td,
   Badge,
-  ButtonGroup,
-  Tooltip,
+  Select,
+  Input,
   HStack,
+  Button,
+  Flex,
   useToast,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Spinner,
-  useDisclosure,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  ModalCloseButton,
-  Code,
-  FormControl,
-  FormLabel,
-  Textarea,
+  Card,
+  CardBody,
+  SimpleGrid,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
   Alert,
   AlertIcon,
   AlertTitle,
   AlertDescription,
 } from '@chakra-ui/react';
-import { 
-  FiRefreshCw, 
-  FiCheckCircle, 
-  FiXCircle, 
-  FiClock, 
-  FiCalendar, 
-  FiDollarSign,
-  FiSend,
-  FiFile,
-  FiInfo
-} from 'react-icons/fi';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { SearchIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 
-// Helper function to format dates
-const formatDate = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-// Badge component for transaction status
-const StatusBadge = ({ status }) => {
-  const statusConfig = {
-    'PENDING': { color: 'gray', label: 'Pending' },
-    'PROVIDER_REVIEW': { color: 'yellow', label: 'Provider Review' },
-    'DECLINED': { color: 'red', label: 'Declined' },
-    'ESCROW': { color: 'blue', label: 'In Escrow' },
-    'COMPLETED': { color: 'green', label: 'Completed' },
-    'REFUNDED': { color: 'purple', label: 'Refunded' },
-    'CANCELLED': { color: 'orange', label: 'Cancelled' }
-  };
-
-  const config = statusConfig[status] || { color: 'gray', label: status };
-  
-  return (
-    <Badge colorScheme={config.color} fontSize="0.8em" px={2} py={1} borderRadius="md">
-      {config.label}
-    </Badge>
-  );
-};
+// Mock transaction data for display while API is being fixed
+const MOCK_TRANSACTIONS = [
+  {
+    id: "tx_mock1",
+    amount: 299.99,
+    status: "COMPLETED",
+    description: "Payment for Birthday Party Decorations",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    partyId: "party_123",
+    userId: "user_456",
+    partyName: "Alice's Birthday",
+    userName: "John Doe",
+    userEmail: "john@example.com"
+  },
+  {
+    id: "tx_mock2",
+    amount: 149.50,
+    status: "PENDING",
+    description: "Deposit for Wedding Photography",
+    createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    updatedAt: new Date(Date.now() - 86400000).toISOString(),
+    partyId: "party_789",
+    userId: "user_101",
+    partyName: "Smith Wedding",
+    userName: "Sarah Smith",
+    userEmail: "sarah@example.com"
+  },
+  {
+    id: "tx_mock3",
+    amount: 75.00,
+    status: "REFUNDED",
+    description: "Cancelled catering service",
+    createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+    updatedAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    partyId: "party_456",
+    userId: "user_789",
+    partyName: "Corporate Event",
+    userName: "Michael Johnson",
+    userEmail: "michael@example.com"
+  },
+  {
+    id: "tx_mock4",
+    amount: 350.00,
+    status: "FAILED",
+    description: "Failed payment for entertainment services",
+    createdAt: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
+    updatedAt: new Date(Date.now() - 259200000).toISOString(),
+    partyId: "party_321",
+    userId: "user_654",
+    partyName: "Children's Party",
+    userName: "Emily Davis",
+    userEmail: "emily@example.com"
+  }
+];
 
 export default function AdminTransactionsPage() {
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [processingTxs, setProcessingTxs] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [processorResult, setProcessorResult] = useState(null);
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const toast = useToast();
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const { 
-    isOpen: isProcessorOpen, 
-    onOpen: onProcessorOpen, 
-    onClose: onProcessorClose 
-  } = useDisclosure();
+  const [transactions, setTransactions] = useState([]);
+  const [statistics, setStatistics] = useState({
+    totalAmount: 0,
+    thisMonth: 0,
+    avgAmount: 0,
+    count: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [apiError, setApiError] = useState(null);
+  const [useMockData, setUseMockData] = useState(false);
 
+  // Fetch transactions
   useEffect(() => {
-    fetchTransactions();
-  }, []);
-
-  const fetchTransactions = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Fetch all transactions
-      const response = await fetch('/api/admin/transactions');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
+    const fetchTransactions = async () => {
+      if (status === 'unauthenticated') {
+        router.push('/auth/signin');
+        return;
       }
-      
-      const data = await response.json();
-      setTransactions(data);
-    } catch (err) {
-      console.error('Error fetching transactions:', err);
-      setError(err.message);
-      toast({
-        title: 'Error',
-        description: err.message,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleViewDetails = (transaction) => {
-    setSelectedTransaction(transaction);
-    onOpen();
-  };
+      if (status === 'authenticated' && session.user.role !== 'ADMIN') {
+        toast({
+          title: 'Access denied',
+          description: 'You do not have permission to view this page',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        router.push('/');
+        return;
+      }
 
-  const handleProcessTransactions = async () => {
-    try {
-      setProcessingTxs(true);
-      setProcessorResult(null);
-      
-      const response = await fetch('/api/system/process-transactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/admin/transactions');
+        
+        if (!response.ok) {
+          // If api returns an error, use mock data
+          const errorData = await response.json();
+          console.error('API Error:', errorData);
+          
+          setApiError(errorData.error || 'Failed to fetch transactions');
+          
+          // Fall back to mock data
+          setUseMockData(true);
+          setTransactions(MOCK_TRANSACTIONS);
+          
+          // Calculate statistics from mock data
+          const total = MOCK_TRANSACTIONS.reduce((sum, t) => sum + (t.amount || 0), 0);
+          setStatistics({
+            totalAmount: total.toFixed(2),
+            thisMonth: total.toFixed(2),
+            avgAmount: (total / MOCK_TRANSACTIONS.length).toFixed(2),
+            count: MOCK_TRANSACTIONS.length
+          });
+          
+          return;
         }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to process transactions');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setTransactions(data.data || []);
+          
+          // Calculate statistics
+          const total = data.data.reduce((sum, t) => sum + (t.amount || 0), 0);
+          const now = new Date();
+          const thisMonth = data.data.filter(t => {
+            const date = new Date(t.createdAt);
+            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+          }).reduce((sum, t) => sum + (t.amount || 0), 0);
+          
+          setStatistics({
+            totalAmount: total.toFixed(2),
+            thisMonth: thisMonth.toFixed(2),
+            avgAmount: data.data.length > 0 ? (total / data.data.length).toFixed(2) : 0,
+            count: data.data.length
+          });
+        } else {
+          throw new Error(data.error || 'Failed to fetch transactions');
+        }
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+        
+        // Set error message and use mock data
+        setApiError(error.message || 'Failed to fetch transactions');
+        setUseMockData(true);
+        setTransactions(MOCK_TRANSACTIONS);
+        
+        // Calculate statistics from mock data
+        const total = MOCK_TRANSACTIONS.reduce((sum, t) => sum + (t.amount || 0), 0);
+        setStatistics({
+          totalAmount: total.toFixed(2),
+          thisMonth: total.toFixed(2),
+          avgAmount: (total / MOCK_TRANSACTIONS.length).toFixed(2),
+          count: MOCK_TRANSACTIONS.length
+        });
+      } finally {
+        setIsLoading(false);
       }
-      
-      const result = await response.json();
-      setProcessorResult(result.data);
-      onProcessorOpen();
-      
-      // Refresh transactions list
-      fetchTransactions();
-      
-      toast({
-        title: 'Success',
-        description: 'Transactions processed successfully',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
-    } catch (err) {
-      console.error('Error processing transactions:', err);
-      toast({
-        title: 'Error',
-        description: err.message,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setProcessingTxs(false);
-    }
+    };
+
+    fetchTransactions();
+  }, [session, status, router, toast]);
+
+  // Filter transactions based on status and search term
+  const filteredTransactions = transactions.filter(transaction => {
+    const matchesFilter = filter === 'all' || transaction.status === filter;
+    const matchesSearch = 
+      searchTerm === '' || 
+      transaction.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.partyId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.userId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesFilter && matchesSearch;
+  });
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
-  // Filter transactions by status
-  const pendingReviewTransactions = transactions.filter(
-    tx => tx.status === 'PROVIDER_REVIEW'
-  );
-  
-  const escrowTransactions = transactions.filter(
-    tx => tx.status === 'ESCROW'
-  );
-  
-  const completedTransactions = transactions.filter(
-    tx => tx.status === 'COMPLETED'
-  );
-  
-  const cancelledTransactions = transactions.filter(
-    tx => tx.status === 'DECLINED' || tx.status === 'REFUNDED' || tx.status === 'CANCELLED'
-  );
-
-  if (loading) {
-    return (
-      <Container maxW="container.xl">
-        <Flex justify="center" align="center" height="50vh" direction="column">
-          <Spinner size="xl" mb={4} color="blue.500" />
-          <Text>Loading transactions...</Text>
-        </Flex>
-      </Container>
-    );
-  }
+  // Get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'COMPLETED':
+        return 'green';
+      case 'PENDING':
+        return 'yellow';
+      case 'FAILED':
+        return 'red';
+      case 'REFUNDED':
+        return 'purple';
+      default:
+        return 'gray';
+    }
+  };
 
   return (
-    <Container maxW="container.xl">
-      <Stack spacing={6}>
-        <Flex justify="space-between" align="center" wrap="wrap">
-          <Box>
-            <Heading as="h1" size="xl" mb={2}>Transaction Management</Heading>
-            <Text color="gray.600">Monitor and manage all transactions in the system</Text>
-          </Box>
-          
-          <HStack>
-            <Button 
-              leftIcon={<FiRefreshCw />} 
-              onClick={fetchTransactions}
-              colorScheme="blue"
-              variant="outline"
-            >
-              Refresh
-            </Button>
-            <Button 
-              leftIcon={<FiClock />} 
-              onClick={handleProcessTransactions}
-              colorScheme="green"
-              isLoading={processingTxs}
-              loadingText="Processing"
-            >
-              Process Deadlines
-            </Button>
-          </HStack>
+    <Container maxW="container.xl" py={8}>
+      <Box mb={8}>
+        <Heading as="h1" size="xl">Transaction Management</Heading>
+        <Text color="gray.600" mt={2}>
+          Monitor and manage all financial transactions in the system
+        </Text>
+      </Box>
+
+      {isLoading ? (
+        <Flex justify="center" align="center" h="60vh">
+          <Spinner size="xl" thickness="4px" color="blue.500" />
         </Flex>
-        
-        {error && (
-          <Alert status="error" mb={4}>
-            <AlertIcon />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        
-        <Tabs variant="enclosed" colorScheme="blue">
-          <TabList>
-            <Tab>All ({transactions.length})</Tab>
-            <Tab 
-              color={pendingReviewTransactions.length > 0 ? "yellow.500" : undefined}
-              fontWeight={pendingReviewTransactions.length > 0 ? "bold" : undefined}
-            >
-              Provider Review ({pendingReviewTransactions.length})
-            </Tab>
-            <Tab>In Escrow ({escrowTransactions.length})</Tab>
-            <Tab>Completed ({completedTransactions.length})</Tab>
-            <Tab>Cancelled/Refunded ({cancelledTransactions.length})</Tab>
-          </TabList>
-          
-          <TabPanels>
-            {/* All Transactions */}
-            <TabPanel px={0}>
-              <TransactionsTable 
-                transactions={transactions} 
-                onViewDetails={handleViewDetails} 
+      ) : (
+        <>
+          {useMockData && (
+            <Alert status="warning" mb={6}>
+              <AlertIcon />
+              <Box>
+                <AlertTitle>Using demo data</AlertTitle>
+                <AlertDescription>
+                  {apiError ? (
+                    <>
+                      The transaction API returned an error: "{apiError}". We're showing mock data for demonstration purposes.
+                      The real transaction data will be available once the database schema is updated.
+                    </>
+                  ) : (
+                    "Showing mock transaction data for demonstration. Real transaction data will be available soon."
+                  )}
+                </AlertDescription>
+              </Box>
+            </Alert>
+          )}
+
+          {/* Statistics Cards */}
+          <SimpleGrid columns={{ base: 1, md: 4 }} spacing={6} mb={8}>
+            <Card>
+              <CardBody>
+                <Stat>
+                  <StatLabel>Total Transactions</StatLabel>
+                  <StatNumber>{statistics.count}</StatNumber>
+                  <StatHelpText>All processed transactions</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+            
+            <Card>
+              <CardBody>
+                <Stat>
+                  <StatLabel>Total Amount</StatLabel>
+                  <StatNumber>${statistics.totalAmount}</StatNumber>
+                  <StatHelpText>Cumulative transaction value</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+            
+            <Card>
+              <CardBody>
+                <Stat>
+                  <StatLabel>This Month</StatLabel>
+                  <StatNumber>${statistics.thisMonth}</StatNumber>
+                  <StatHelpText>Current month's transaction value</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+            
+            <Card>
+              <CardBody>
+                <Stat>
+                  <StatLabel>Average Transaction</StatLabel>
+                  <StatNumber>${statistics.avgAmount}</StatNumber>
+                  <StatHelpText>Average transaction value</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+          </SimpleGrid>
+
+          {/* Filters */}
+          <Flex direction={{ base: 'column', md: 'row' }} justify="space-between" mb={6} gap={4}>
+            <HStack>
+              <Select 
+                w={{ base: 'full', md: '200px' }}
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              >
+                <option value="all">All Statuses</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="PENDING">Pending</option>
+                <option value="FAILED">Failed</option>
+                <option value="REFUNDED">Refunded</option>
+              </Select>
+            </HStack>
+            
+            <HStack>
+              <Input
+                placeholder="Search transactions..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                width={{ base: 'full', md: '300px' }}
               />
-            </TabPanel>
-            
-            {/* Provider Review */}
-            <TabPanel px={0}>
-              {pendingReviewTransactions.length === 0 ? (
-                <Box textAlign="center" py={10}>
-                  <Text>No transactions awaiting provider review</Text>
-                </Box>
-              ) : (
-                <TransactionsTable 
-                  transactions={pendingReviewTransactions} 
-                  onViewDetails={handleViewDetails} 
-                />
-              )}
-            </TabPanel>
-            
-            {/* In Escrow */}
-            <TabPanel px={0}>
-              {escrowTransactions.length === 0 ? (
-                <Box textAlign="center" py={10}>
-                  <Text>No transactions in escrow</Text>
-                </Box>
-              ) : (
-                <TransactionsTable 
-                  transactions={escrowTransactions} 
-                  onViewDetails={handleViewDetails} 
-                />
-              )}
-            </TabPanel>
-            
-            {/* Completed */}
-            <TabPanel px={0}>
-              {completedTransactions.length === 0 ? (
-                <Box textAlign="center" py={10}>
-                  <Text>No completed transactions</Text>
-                </Box>
-              ) : (
-                <TransactionsTable 
-                  transactions={completedTransactions} 
-                  onViewDetails={handleViewDetails} 
-                />
-              )}
-            </TabPanel>
-            
-            {/* Cancelled/Refunded */}
-            <TabPanel px={0}>
-              {cancelledTransactions.length === 0 ? (
-                <Box textAlign="center" py={10}>
-                  <Text>No cancelled or refunded transactions</Text>
-                </Box>
-              ) : (
-                <TransactionsTable 
-                  transactions={cancelledTransactions} 
-                  onViewDetails={handleViewDetails} 
-                />
-              )}
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </Stack>
-      
-      {/* Transaction Details Modal */}
-      {selectedTransaction && (
-        <Modal isOpen={isOpen} onClose={onClose} size="lg">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Transaction Details</ModalHeader>
-            <ModalCloseButton />
-            
-            <ModalBody>
-              <Stack spacing={4}>
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">ID:</Text>
-                  <Text>{selectedTransaction.id}</Text>
-                </HStack>
-                
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">Status:</Text>
-                  <StatusBadge status={selectedTransaction.status} />
-                </HStack>
-                
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">Amount:</Text>
-                  <Text fontWeight="bold" color="green.500">
-                    ${Number(selectedTransaction.amount).toFixed(2)}
-                  </Text>
-                </HStack>
-                
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">Service:</Text>
-                  <Text>{selectedTransaction.service?.name || 'N/A'}</Text>
-                </HStack>
-                
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">Client:</Text>
-                  <Text>{selectedTransaction.client?.name || 'N/A'}</Text>
-                </HStack>
-                
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">Provider:</Text>
-                  <Text>{selectedTransaction.provider?.name || 'N/A'}</Text>
-                </HStack>
-                
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">Created:</Text>
-                  <Text>{formatDate(selectedTransaction.createdAt)}</Text>
-                </HStack>
-                
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">Updated:</Text>
-                  <Text>{formatDate(selectedTransaction.updatedAt)}</Text>
-                </HStack>
-                
-                {selectedTransaction.reviewDeadline && (
-                  <HStack justify="space-between">
-                    <Text fontWeight="bold">Review Deadline:</Text>
-                    <Text>{formatDate(selectedTransaction.reviewDeadline)}</Text>
-                  </HStack>
-                )}
-                
-                {selectedTransaction.escrowEndTime && (
-                  <HStack justify="space-between">
-                    <Text fontWeight="bold">Escrow End:</Text>
-                    <Text>{formatDate(selectedTransaction.escrowEndTime)}</Text>
-                  </HStack>
-                )}
-                
-                {selectedTransaction.paymentIntentId && (
-                  <HStack justify="space-between">
-                    <Text fontWeight="bold">Payment Intent ID:</Text>
-                    <Text fontSize="sm" fontFamily="mono">
-                      {selectedTransaction.paymentIntentId}
-                    </Text>
-                  </HStack>
-                )}
-              </Stack>
-            </ModalBody>
-            
-            <ModalFooter>
-              <Button colorScheme="blue" mr={3} onClick={onClose}>
-                Close
+              <Button leftIcon={<SearchIcon />} colorScheme="blue">
+                Search
               </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
+            </HStack>
+          </Flex>
+
+          {/* Transactions Table */}
+          {filteredTransactions.length > 0 ? (
+            <Box overflowX="auto">
+              <Table variant="simple">
+                <Thead>
+                  <Tr>
+                    <Th>ID</Th>
+                    <Th>Date</Th>
+                    <Th>Description</Th>
+                    <Th isNumeric>Amount</Th>
+                    <Th>Status</Th>
+                    <Th>Party ID</Th>
+                    <Th>User ID</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {filteredTransactions.map((transaction) => (
+                    <Tr key={transaction.id}>
+                      <Td>{transaction.id}</Td>
+                      <Td>{formatDate(transaction.createdAt)}</Td>
+                      <Td>{transaction.description || 'N/A'}</Td>
+                      <Td isNumeric>${transaction.amount?.toFixed(2) || '0.00'} {transaction.currency ? transaction.currency.toUpperCase() : ''}</Td>
+                      <Td>
+                        <Badge colorScheme={getStatusColor(transaction.status)}>
+                          {transaction.status || 'N/A'}
+                        </Badge>
+                        {transaction.failureMessage && (
+                          <Text fontSize="xs" color="red.500" mt={1}>
+                            {transaction.failureMessage}
+                          </Text>
+                        )}
+                      </Td>
+                      <Td>{transaction.partyName || transaction.partyId || 'N/A'}</Td>
+                      <Td>
+                        {transaction.userName || transaction.userId || 'N/A'}
+                        {transaction.receiptUrl && (
+                          <Button 
+                            as="a" 
+                            href={transaction.receiptUrl} 
+                            target="_blank" 
+                            size="xs" 
+                            colorScheme="blue" 
+                            leftIcon={<ExternalLinkIcon />}
+                            ml={2}
+                          >
+                            Receipt
+                          </Button>
+                        )}
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
+          ) : (
+            <Box textAlign="center" py={10}>
+              <Text fontSize="lg">No transactions found</Text>
+              <Text color="gray.500">
+                {filter !== 'all' || searchTerm 
+                  ? 'Try changing your filters or search term'
+                  : 'There are no transactions in the system yet'}
+              </Text>
+            </Box>
+          )}
+        </>
       )}
-      
-      {/* Processor Results Modal */}
-      <Modal isOpen={isProcessorOpen} onClose={onProcessorClose} size="xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Transaction Processing Results</ModalHeader>
-          <ModalCloseButton />
-          
-          <ModalBody>
-            {processorResult ? (
-              <Stack spacing={4}>
-                <HStack justify="space-between">
-                  <Text fontWeight="bold">Timestamp:</Text>
-                  <Text>{formatDate(processorResult.timestamp)}</Text>
-                </HStack>
-                
-                <Box>
-                  <Heading size="sm" mb={2}>Review Deadlines</Heading>
-                  <Card variant="outline">
-                    <CardBody>
-                      <HStack justify="space-between" mb={2}>
-                        <Text>Total Processed:</Text>
-                        <Text>{processorResult.reviewDeadlines.processed}</Text>
-                      </HStack>
-                      <HStack justify="space-between" mb={2}>
-                        <Text>Successful:</Text>
-                        <Text color="green.500">{processorResult.reviewDeadlines.successful}</Text>
-                      </HStack>
-                      <HStack justify="space-between">
-                        <Text>Failed:</Text>
-                        <Text color="red.500">{processorResult.reviewDeadlines.failed}</Text>
-                      </HStack>
-                    </CardBody>
-                  </Card>
-                </Box>
-                
-                <Box>
-                  <Heading size="sm" mb={2}>Escrow Releases</Heading>
-                  <Card variant="outline">
-                    <CardBody>
-                      <HStack justify="space-between" mb={2}>
-                        <Text>Total Processed:</Text>
-                        <Text>{processorResult.escrowReleases.processed}</Text>
-                      </HStack>
-                      <HStack justify="space-between" mb={2}>
-                        <Text>Successful:</Text>
-                        <Text color="green.500">{processorResult.escrowReleases.successful}</Text>
-                      </HStack>
-                      <HStack justify="space-between">
-                        <Text>Failed:</Text>
-                        <Text color="red.500">{processorResult.escrowReleases.failed}</Text>
-                      </HStack>
-                    </CardBody>
-                  </Card>
-                </Box>
-              </Stack>
-            ) : (
-              <Flex justify="center" py={4}>
-                <Text>No processing results available</Text>
-              </Flex>
-            )}
-          </ModalBody>
-          
-          <ModalFooter>
-            <Button colorScheme="blue" onClick={onProcessorClose}>
-              Close
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </Container>
   );
-}
-
-// Table component for displaying transactions
-const TransactionsTable = ({ transactions, onViewDetails }) => {
-  if (transactions.length === 0) {
-    return (
-      <Box textAlign="center" py={10}>
-        <Text>No transactions found</Text>
-      </Box>
-    );
-  }
-  
-  return (
-    <Box overflowX="auto">
-      <Table variant="simple" size="sm">
-        <Thead>
-          <Tr>
-            <Th>ID</Th>
-            <Th>Service</Th>
-            <Th>Amount</Th>
-            <Th>Client</Th>
-            <Th>Provider</Th>
-            <Th>Status</Th>
-            <Th>Created</Th>
-            <Th>Deadlines</Th>
-            <Th>Actions</Th>
-          </Tr>
-        </Thead>
-        <Tbody>
-          {transactions.map(transaction => (
-            <Tr key={transaction.id}>
-              <Td fontSize="xs" fontFamily="mono">{transaction.id.substring(0, 10)}...</Td>
-              <Td maxW="200px" isTruncated>{transaction.service?.name || 'N/A'}</Td>
-              <Td isNumeric fontWeight="medium">${Number(transaction.amount).toFixed(2)}</Td>
-              <Td>{transaction.client?.name || 'N/A'}</Td>
-              <Td>{transaction.provider?.name || 'N/A'}</Td>
-              <Td><StatusBadge status={transaction.status} /></Td>
-              <Td fontSize="xs">{formatDate(transaction.createdAt)}</Td>
-              <Td fontSize="xs">
-                {transaction.status === 'PROVIDER_REVIEW' && transaction.reviewDeadline && (
-                  <Tooltip label={`Review Deadline: ${formatDate(transaction.reviewDeadline)}`}>
-                    <Text color={new Date(transaction.reviewDeadline) < new Date() ? 'red.500' : undefined}>
-                      {formatDate(transaction.reviewDeadline)}
-                    </Text>
-                  </Tooltip>
-                )}
-                {transaction.status === 'ESCROW' && transaction.escrowEndTime && (
-                  <Tooltip label={`Escrow End: ${formatDate(transaction.escrowEndTime)}`}>
-                    <Text color={new Date(transaction.escrowEndTime) < new Date() ? 'red.500' : undefined}>
-                      {formatDate(transaction.escrowEndTime)}
-                    </Text>
-                  </Tooltip>
-                )}
-              </Td>
-              <Td>
-                <ButtonGroup size="sm" variant="ghost">
-                  <Tooltip label="View Details">
-                    <Button
-                      icon={<FiInfo />}
-                      aria-label="View Details"
-                      onClick={() => onViewDetails(transaction)}
-                    >
-                      Details
-                    </Button>
-                  </Tooltip>
-                </ButtonGroup>
-              </Td>
-            </Tr>
-          ))}
-        </Tbody>
-      </Table>
-    </Box>
-  );
-}; 
+} 
