@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { 
   Box, 
   Container, 
@@ -35,22 +35,79 @@ import {
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
-  IconButton
+  IconButton,
+  Icon
 } from '@chakra-ui/react';
-import { CloseIcon, AddIcon } from '@chakra-ui/icons';
+import { CloseIcon, AddIcon, DragHandleIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
 // Mock data for service categories
 const serviceCategories = [
-  { id: 1, name: 'Decoration', icon: '🎨', description: 'Make your party look amazing' },
-  { id: 2, name: 'Catering', icon: '🍽️', description: 'Delicious food for your guests' },
-  { id: 3, name: 'Entertainment', icon: '🎭', description: 'Keep your guests entertained' },
-  { id: 4, name: 'Venues', icon: '🏛️', description: 'Find the perfect location' },
-  { id: 5, name: 'Photography', icon: '📸', description: 'Capture your special moments' },
-  { id: 6, name: 'Music', icon: '🎵', description: 'Set the mood with great music' },
-  { id: 7, name: 'Bounce Houses', icon: '🏠', description: 'Fun for the kids' },
-  { id: 8, name: 'Party Supplies', icon: '🎁', description: 'Everything you need for your party' }
+  { 
+    id: 1, 
+    name: 'Decoration', 
+    icon: '🎨', 
+    description: 'Make your party look amazing', 
+    image: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80',
+    details: 'From balloons to banners, our decorators will transform your venue into a visually stunning space.'
+  },
+  { 
+    id: 2, 
+    name: 'Catering', 
+    icon: '🍽️', 
+    description: 'Delicious food for your guests', 
+    image: 'https://images.unsplash.com/photo-1555244162-803834f70033?ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80',
+    details: 'Professional caterers providing a variety of cuisines tailored to your preferences and dietary needs.'
+  },
+  { 
+    id: 3, 
+    name: 'Entertainment', 
+    icon: '🎭', 
+    description: 'Keep your guests entertained', 
+    image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80',
+    details: 'From DJs to live bands, magicians to clowns, we have the perfect entertainment options for your event.'
+  },
+  { 
+    id: 4, 
+    name: 'Venues', 
+    icon: '🏛️', 
+    description: 'Find the perfect location', 
+    image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80',
+    details: 'Discover the ideal venue for your party, whether it\'s an intimate gathering or a grand celebration.'
+  },
+  { 
+    id: 5, 
+    name: 'Photography', 
+    icon: '📸', 
+    description: 'Capture your special moments', 
+    image: 'https://images.unsplash.com/photo-1554080353-a576cf803bda?ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80',
+    details: 'Professional photographers who will document your special day with beautiful, lasting memories.'
+  },
+  { 
+    id: 6, 
+    name: 'Music', 
+    icon: '🎵', 
+    description: 'Set the mood with great music', 
+    image: 'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80',
+    details: 'Expert DJs and musicians who will create the perfect soundtrack for your event.'
+  },
+  { 
+    id: 7, 
+    name: 'Bounce Houses', 
+    icon: '🏠', 
+    description: 'Fun for the kids', 
+    image: 'https://images.unsplash.com/photo-1578779777128-3e9272e39b30?ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80',
+    details: 'Exciting inflatable bounce houses and games to keep children entertained throughout your event.'
+  },
+  { 
+    id: 8, 
+    name: 'Party Supplies', 
+    icon: '🎁', 
+    description: 'Everything you need for your party', 
+    image: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80',
+    details: 'From plates and cutlery to party favors and table decorations, we have all the essentials covered.'
+  }
 ];
 
 // Sample service options based on category
@@ -83,21 +140,107 @@ const serviceOptions = {
 };
 
 // Clickable category component
-const ClickableCategory = ({ category, onAddService }) => {
+const ClickableCategory = ({ category, onAddService, onMobileDragStart }) => {
+  const handleDragStart = (e) => {
+    console.log("Drag started with category:", category);
+    
+    // Just set the basic required data
+    e.dataTransfer.setData("text/plain", JSON.stringify(category));
+    
+    // Make sure we can see what we're dragging
+    const img = e.target.querySelector('img');
+    if (img) {
+      try {
+        e.dataTransfer.setDragImage(img, 50, 50);
+      } catch (err) {
+        console.error("Error setting drag image:", err);
+      }
+    }
+    
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  // Long press handler for mobile
+  const handleTouchStart = () => {
+    // We'll use this to detect long press
+    const timer = setTimeout(() => {
+      if (onMobileDragStart) {
+        onMobileDragStart(category);
+      }
+    }, 500); // 500ms for long press
+    
+    // Store the timer so we can clear it
+    window.lastTouchTimer = timer;
+  };
+  
+  const handleTouchEnd = () => {
+    // Clear the long press timer if touch ends before the timer
+    if (window.lastTouchTimer) {
+      clearTimeout(window.lastTouchTimer);
+    }
+  };
+
   return (
     <Box
-      cursor="pointer"
+      cursor="grab"
       borderWidth="1px"
       borderRadius="md"
-      p={3}
       bg="white"
       shadow="sm"
-      _hover={{ shadow: "md", borderColor: "brand.500" }}
+      _hover={{ 
+        shadow: "md", 
+        borderColor: "brand.500",
+        transform: "translateY(-2px)"
+      }}
       h="100%"
       onClick={() => onAddService(category)}
+      draggable="true"
+      onDragStart={handleDragStart}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      overflow="hidden"
+      position="relative"
+      transition="all 0.2s"
     >
-      <VStack spacing={2} align="center" textAlign="center">
-        <Text fontSize="2xl">{category.icon}</Text>
+      <Box 
+        position="relative" 
+        height="120px" 
+        overflow="hidden"
+      >
+        <Image
+          src={category.image}
+          alt={category.name}
+          objectFit="cover"
+          width="100%"
+          height="100%"
+          fallbackSrc="https://via.placeholder.com/150"
+        />
+        <Box 
+          position="absolute"
+          top="0"
+          left="0"
+          right="0"
+          bottom="0"
+          bg="blackAlpha.300"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Text fontSize="3xl">{category.icon}</Text>
+        </Box>
+        
+        <Badge 
+          position="absolute" 
+          top="2" 
+          right="2" 
+          colorScheme="blue"
+          opacity="0.9"
+          px={2}
+        >
+          Drag me
+        </Badge>
+      </Box>
+      <VStack spacing={1} align="center" textAlign="center" p={3}>
         <Heading size="sm">{category.name}</Heading>
         <Text fontSize="xs" color="gray.600">{category.description}</Text>
       </VStack>
@@ -106,19 +249,51 @@ const ClickableCategory = ({ category, onAddService }) => {
 };
 
 // Selected service component
-const SelectedService = ({ service, index, removeService }) => {
+const SelectedService = ({ service, index, removeService, handleDragStart, handleDragOver, handleDrop, handleDragEnd }) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const handleLocalDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+    handleDragOver(e);
+  };
+  
+  const handleLocalDragLeave = () => {
+    setIsDragOver(false);
+  };
+  
+  const handleLocalDrop = (e, index) => {
+    setIsDragOver(false);
+    handleDrop(e, index);
+  };
+
   return (
     <Box
+      draggable="true"
+      onDragStart={(e) => handleDragStart(e, index)}
+      onDragOver={handleLocalDragOver}
+      onDragLeave={handleLocalDragLeave}
+      onDrop={(e) => handleLocalDrop(e, index)}
+      onDragEnd={handleDragEnd}
       borderWidth="1px"
       borderRadius="md"
-      p={3}
       mb={3}
-      bg="white"
-      shadow="sm"
+      bg={isDragOver ? "blue.50" : "white"}
+      shadow={isDragOver ? "md" : "sm"}
+      borderColor={isDragOver ? "blue.500" : "gray.200"}
       position="relative"
+      transition="all 0.2s"
+      _hover={{
+        shadow: "md",
+        borderColor: "brand.500",
+        cursor: "move"
+      }}
+      onClick={() => setIsExpanded(!isExpanded)}
     >
-      <Flex justify="space-between" align="center">
+      <Flex p={3} justify="space-between" align="center">
         <HStack>
+          <Icon as={DragHandleIcon} color="gray.400" mr={2} />
           <Text fontWeight="bold">{service.category}</Text>
         </HStack>
         <IconButton
@@ -127,39 +302,195 @@ const SelectedService = ({ service, index, removeService }) => {
           aria-label="Remove service"
           variant="ghost"
           colorScheme="red"
-          onClick={() => removeService(index)}
+          onClick={(e) => {
+            e.stopPropagation();
+            removeService(index);
+          }}
         />
       </Flex>
+      
+      {isExpanded && service.details && (
+        <Box>
+          <Divider />
+          <Flex p={3}>
+            {service.image && (
+              <Image 
+                src={service.image} 
+                alt={service.category}
+                boxSize="80px"
+                objectFit="cover"
+                borderRadius="md"
+                mr={3}
+                fallbackSrc="https://via.placeholder.com/80"
+              />
+            )}
+            <Box>
+              <Text fontSize="sm" color="gray.700">{service.details}</Text>
+            </Box>
+          </Flex>
+        </Box>
+      )}
     </Box>
   );
 };
 
 // Selected services area component
-const SelectedServicesArea = ({ services, removeService }) => {
+const SelectedServicesArea = ({ services, removeService, addService }) => {
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  
+  const handleDragStart = (e, index) => {
+    setDraggedItem(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/html", e.target.parentNode);
+    e.target.style.opacity = "0.75";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Set the dropEffect explicitly for Safari
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+    
+    setIsHighlighted(true);
+    return false;
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsHighlighted(false);
+  };
+
+  const handleDragEnd = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.target) {
+      e.target.style.opacity = "1";
+    }
+    setDraggedItem(null);
+    setIsHighlighted(false);
+  };
+
+  const handleDrop = (e, dropIndex = services.length) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsHighlighted(false);
+    
+    console.log("Drop detected!");
+    
+    // For plain text (this works in Safari)
+    const textData = e.dataTransfer.getData("text/plain");
+    console.log("Text data:", textData);
+    
+    if (textData) {
+      try {
+        // Try to parse it as JSON first
+        const parsedData = JSON.parse(textData);
+        if (parsedData && parsedData.name) {
+          console.log("Parsed category from text/plain:", parsedData);
+          addService(parsedData);
+          return;
+        }
+      } catch (err) {
+        // If it's not JSON, see if it's a category name
+        console.log("Not JSON, trying to find category by name");
+        const category = serviceCategories.find(c => c.name === textData);
+        if (category) {
+          console.log("Found category by name:", category);
+          addService(category);
+          return;
+        }
+      }
+    }
+    
+    // Otherwise handle reordering
+    if (draggedItem === null) return;
+    
+    const dragIndex = draggedItem;
+    if (dragIndex === dropIndex) return;
+
+    // This will remove all services and add them back in the new order
+    const newServices = [...services];
+    const draggedService = newServices[dragIndex];
+    
+    // Remove the dragged item
+    newServices.splice(dragIndex, 1);
+    // Insert at new position
+    newServices.splice(dropIndex, 0, draggedService);
+    
+    // We need to tell the main component about the reordering
+    window.dispatchEvent(new CustomEvent('reorderServices', { 
+      detail: { services: newServices }
+    }));
+  };
+
   return (
     <Box
       minH="100px"
       borderWidth="2px"
       borderRadius="md"
       borderStyle="dashed"
-      borderColor="gray.300"
+      borderColor={isHighlighted ? "blue.500" : "gray.300"}
       p={4}
-      bg="gray.50"
+      bg={isHighlighted ? "blue.50" : "gray.50"}
       flex={1}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={(e) => handleDrop(e, services.length)}
+      transition="all 0.2s ease"
+      position="relative"
+      data-drop-target="true"
+      _hover={{
+        borderColor: "blue.300",
+        bg: "gray.100"
+      }}
+      _after={isHighlighted ? {
+        content: '"Drop here"',
+        position: "absolute",
+        top: "0",
+        left: "0",
+        right: "0",
+        bottom: "0",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "blue.500",
+        fontWeight: "bold",
+        fontSize: "2xl",
+        backgroundColor: "rgba(237, 242, 247, 0.8)",
+        zIndex: "1"
+      } : {}}
     >
       {services.length === 0 ? (
         <VStack spacing={2} align="center" justify="center" h="100%" color="gray.500">
           <Text>No services selected yet</Text>
-          <Text fontSize="sm">Click on a service category to add it</Text>
+          <Text fontSize="sm">Click or drag a service category to add it</Text>
+          <Badge colorScheme="blue" mt={2}>Drop zone for services</Badge>
         </VStack>
       ) : (
         <VStack spacing={2} align="stretch">
+          {services.length > 1 && (
+            <Flex justifyContent="center" mb={3}>
+              <Badge colorScheme="blue" p={2} borderRadius="md" display="flex" alignItems="center">
+                <Icon as={DragHandleIcon} mr={2} /> 
+                Drag services to reorder
+              </Badge>
+            </Flex>
+          )}
           {services.map((service, index) => (
             <SelectedService
               key={index}
               service={service}
               index={index}
               removeService={removeService}
+              handleDragStart={handleDragStart}
+              handleDragOver={handleDragOver}
+              handleDrop={handleDrop}
+              handleDragEnd={handleDragEnd}
             />
           ))}
         </VStack>
@@ -423,6 +754,10 @@ export default function PartyConfiguratorPage() {
   const router = useRouter();
   const toast = useToast();
   
+  // State for mobile drag handling
+  const [isMobileDragging, setIsMobileDragging] = useState(false);
+  const [mobileDragItem, setMobileDragItem] = useState(null);
+  
   // Check if user is signed in
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -437,8 +772,43 @@ export default function PartyConfiguratorPage() {
     }
   }, [status, router, toast]);
 
+  // Safari drag and drop fix
+  useEffect(() => {
+    // This prevents Safari from redirecting when dragging images
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      return false;
+    });
+    
+    document.addEventListener('drop', (e) => {
+      // Prevent default unless it's on a valid drop target
+      if (!e.target.closest('[data-drop-target="true"]')) {
+        e.preventDefault();
+      }
+      return false;
+    });
+    
+    return () => {
+      document.removeEventListener('dragover', (e) => e.preventDefault());
+      document.removeEventListener('drop', (e) => e.preventDefault());
+    };
+  }, []);
+
   // State for selected services
   const [services, setServices] = useState([]);
+  
+  // Listen for service reordering events
+  useEffect(() => {
+    const handleReorderServices = (e) => {
+      const { services: newServices } = e.detail;
+      setServices(newServices);
+    };
+    
+    window.addEventListener('reorderServices', handleReorderServices);
+    return () => {
+      window.removeEventListener('reorderServices', handleReorderServices);
+    };
+  }, []);
   
   // State for event details
   const [eventDetails, setEventDetails] = useState({
@@ -476,7 +846,14 @@ export default function PartyConfiguratorPage() {
       return;
     }
     
-    setServices(prev => [...prev, { category: category.name }]);
+    // Find the category in our serviceCategories array to get all details
+    const categoryData = serviceCategories.find(cat => cat.name === category.name);
+    
+    setServices(prev => [...prev, { 
+      category: category.name,
+      image: categoryData?.image,
+      details: categoryData?.details
+    }]);
     
     toast({
       title: "Service added",
@@ -646,6 +1023,15 @@ export default function PartyConfiguratorPage() {
         return;
       }
 
+      // Display loading toast
+      const loadingToast = toast({
+        title: 'Creating your party',
+        description: 'Please wait while we set up your party...',
+        status: 'loading',
+        duration: null,
+        isClosable: false,
+      });
+
       // Prepare party data
       const partyData = {
         name: eventDetails.name,
@@ -655,7 +1041,11 @@ export default function PartyConfiguratorPage() {
         duration: eventDetails.duration || 3,
         guestCount: eventDetails.guestCount || 20,
         description: eventDetails.description || '',
-        services: services.map(service => service.category)
+        services: services.map(service => ({
+          name: service.category,
+          description: service.details || '',
+          image: service.image || ''
+        }))
       };
 
       console.log('Submitting party data:', partyData);
@@ -668,6 +1058,9 @@ export default function PartyConfiguratorPage() {
         },
         body: JSON.stringify(partyData)
       });
+
+      // Close loading toast
+      toast.close(loadingToast);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -702,6 +1095,27 @@ export default function PartyConfiguratorPage() {
     { title: 'Event Details', description: 'When and where' },
     { title: 'Service Options', description: 'Customize your choices' },
   ];
+
+  // Fallback for mobile devices
+  const handleMobileDragStart = (category) => {
+    setIsMobileDragging(true);
+    setMobileDragItem(category);
+    toast({
+      title: "Drag started",
+      description: `Tap on the drop zone to add ${category.name}`,
+      status: "info",
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+  
+  const handleMobileDrop = () => {
+    if (isMobileDragging && mobileDragItem) {
+      addService(mobileDragItem);
+      setIsMobileDragging(false);
+      setMobileDragItem(null);
+    }
+  };
 
   return (
     <Container maxW="container.md" py={8}>
@@ -742,14 +1156,22 @@ export default function PartyConfiguratorPage() {
                   key={category.id} 
                   category={category} 
                   onAddService={addService}
+                  onMobileDragStart={handleMobileDragStart}
                 />
               ))}
             </SimpleGrid>
             
             <Heading size="sm" mb={2} mt={6}>Selected Services</Heading>
+            {services.length > 0 && (
+              <Text mb={2} fontSize="sm" color="gray.600">
+                You can add specific details for each service in the next steps. 
+                {services.length > 1 && " Drag and drop to prioritize services in order of importance."}
+              </Text>
+            )}
             <SelectedServicesArea 
               services={services} 
               removeService={removeService} 
+              addService={addService}
             />
           </Box>
         )}

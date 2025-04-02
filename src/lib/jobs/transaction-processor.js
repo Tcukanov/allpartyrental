@@ -1,6 +1,7 @@
 'use strict';
 
-import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma/client';
 import { paymentService } from '@/lib/payment/service';
 import { logger } from '@/lib/logger';
 

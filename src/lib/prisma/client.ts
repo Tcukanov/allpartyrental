@@ -13,3 +13,6 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+// Export the PrismaClient constructor as well for type imports
+export { PrismaClient };

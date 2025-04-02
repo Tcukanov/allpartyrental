@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,39 +25,64 @@ export async function GET(request) {
       );
     }
     
-    // Return basic mock data
+    // Get actual data from database
+    const [
+      totalUsers,
+      totalParties,
+      totalServices,
+      totalOffers,
+      pendingOffers,
+      approvedOffers,
+      rejectedOffers
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.party.count(),
+      prisma.service.count(),
+      prisma.offer.count(),
+      prisma.offer.count({ where: { status: 'PENDING' } }),
+      prisma.offer.count({ where: { status: 'APPROVED' } }),
+      prisma.offer.count({ where: { status: 'REJECTED' } })
+    ]);
+    
+    // Calculate new users in the last 7 days
+    const last7Days = new Date();
+    last7Days.setDate(last7Days.getDate() - 7);
+    
+    const newUsers = await prisma.user.count({
+      where: {
+        createdAt: {
+          gte: last7Days
+        }
+      }
+    });
+    
+    // Calculate percentage change
+    const percentChange = totalUsers > 0 ? ((newUsers / totalUsers) * 100).toFixed(1) : '0';
+    
     return NextResponse.json({
       metrics: {
         users: {
-          total: 1287,
-          new: 15,
-          percentChange: '1.2'
+          total: totalUsers,
+          new: newUsers,
+          percentChange
         },
-        transactions: {
-          total: 4532,
-          new: 25,
-          percentChange: '0.6'
+        parties: {
+          total: totalParties
         },
-        revenue: {
-          total: 87654.32,
-          new: 750.00,
-          percentChange: '0.9'
+        services: {
+          total: totalServices
         }
       },
-      transactionStatus: {
-        pending: 25,
-        processing: 15,
-        completed: 75,
-        cancelled: 8,
-        refunded: 3
+      offerStatus: {
+        pending: pendingOffers,
+        approved: approvedOffers,
+        rejected: rejectedOffers,
+        total: totalOffers
       },
       systemHealth: {
         apiStatus: 'healthy',
         dbStatus: 'healthy',
-        processorStatus: 'healthy',
-        lastBackup: new Date().toISOString(),
-        queuedJobs: 3,
-        failedJobs: 0
+        lastCheck: new Date().toISOString()
       }
     });
   } catch (error) {
