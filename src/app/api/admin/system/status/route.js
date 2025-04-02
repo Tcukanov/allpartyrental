@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
+import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { logger } from '@/lib/logger';
 import os from 'os';
 import { exec } from 'child_process';
 import util from 'util';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma/client';
+
+export const dynamic = 'force-dynamic';
 
 // Convert exec to promise-based
 const execPromise = util.promisify(exec);
@@ -43,7 +44,7 @@ export async function GET(request) {
     const session = await getServerSession(authOptions);
     
     if (!session) {
-      logger.warn('Unauthorized access attempt to system status API');
+      console.warn('Unauthorized access attempt to system status API');
       return NextResponse.json(
         { error: 'Unauthorized. Please log in.' },
         { status: 401 }
@@ -52,14 +53,14 @@ export async function GET(request) {
     
     // Check if user is an admin
     if (session.user.role !== 'ADMIN') {
-      logger.warn(`User ${session.user.email} attempted to access system status without admin privileges`);
+      console.warn(`User attempted to access system status without admin privileges`);
       return NextResponse.json(
         { error: 'Forbidden. Admin access required.' },
         { status: 403 }
       );
     }
     
-    logger.info(`Admin ${session.user.email} accessed system status`);
+    console.info(`Admin accessed system status`);
     
     // Collect system information
     const systemInfo = {
@@ -150,9 +151,9 @@ export async function GET(request) {
       }
     });
   } catch (error) {
-    logger.error('Error retrieving system status:', error);
+    console.error('Error retrieving system status:', error);
     return NextResponse.json(
-      { error: 'Failed to retrieve system status', message: error.message },
+      { error: 'Failed to retrieve system status', message: error.message ? error.message : String(error) },
       { status: 500 }
     );
   }

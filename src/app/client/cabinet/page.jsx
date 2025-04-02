@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Box, Container, Heading, Text, VStack, Tabs, TabList, TabPanels, Tab, TabPanel, SimpleGrid, Card, CardBody, Flex, Avatar, Badge, Button, Stat, StatLabel, StatNumber, StatHelpText, useToast, HStack, Icon, Spinner } from '@chakra-ui/react';
-import { CalendarIcon, PartyIcon, HistoryIcon, SettingsIcon, ChatIcon, BellIcon } from '@chakra-ui/icons';
+import { CalendarIcon, SettingsIcon, ChatIcon, BellIcon } from '@chakra-ui/icons';
 import { FaCalendarAlt, FaGift, FaHistory, FaCog, FaComment, FaEnvelope, FaMoneyBillWave } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -386,7 +386,7 @@ export default function ClientCabinetPage() {
           <Card cursor="pointer" onClick={() => router.push('/client/create-party')}>
             <CardBody>
               <VStack spacing={4} align="center">
-                <Icon as={PartyIcon} w={8} h={8} color="brand.500" />
+                <Icon as={FaGift} w={8} h={8} color="brand.500" />
                 <Text fontWeight="bold">Create New Party</Text>
                 <Text fontSize="sm" color="gray.600" textAlign="center">
                   Start planning your next event
@@ -410,7 +410,7 @@ export default function ClientCabinetPage() {
           <Card cursor="pointer" onClick={() => router.push('/client/party-history')}>
                     <CardBody>
               <VStack spacing={4} align="center">
-                <Icon as={HistoryIcon} w={8} h={8} color="brand.500" />
+                <Icon as={FaHistory} w={8} h={8} color="brand.500" />
                 <Text fontWeight="bold">Party History</Text>
                 <Text fontSize="sm" color="gray.600" textAlign="center">
                   View your past events
