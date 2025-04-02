@@ -35,8 +35,6 @@ import {
   CheckCircleIcon, 
   TimeIcon, 
   RepeatIcon,
-  PartyIcon,
-  HistoryIcon,
   SettingsIcon
 } from '@chakra-ui/icons';
 import { MdCelebration, MdPending, MdHistory, MdEvent } from 'react-icons/md';
@@ -211,7 +209,7 @@ export default function ClientDashboardPage() {
           <Card cursor="pointer" onClick={() => router.push('/client/create-party')}>
             <CardBody>
               <VStack spacing={4} align="center">
-                <Icon as={PartyIcon} w={8} h={8} color="brand.500" />
+                <Icon as={MdCelebration} w={8} h={8} color="brand.500" />
                 <Text fontWeight="bold">Create New Party</Text>
                 <Text fontSize="sm" color="gray.600" textAlign="center">
                   Start planning your next event
@@ -232,10 +230,22 @@ export default function ClientDashboardPage() {
             </CardBody>
           </Card>
           
+          <Card cursor="pointer" onClick={() => router.push('/client/approved-services')}>
+            <CardBody>
+              <VStack spacing={4} align="center">
+                <Icon as={CheckCircleIcon} w={8} h={8} color="green.500" />
+                <Text fontWeight="bold">Approved Services</Text>
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  View your approved service requests
+                </Text>
+              </VStack>
+            </CardBody>
+          </Card>
+          
           <Card cursor="pointer" onClick={() => router.push('/client/party-history')}>
             <CardBody>
               <VStack spacing={4} align="center">
-                <Icon as={HistoryIcon} w={8} h={8} color="brand.500" />
+                <Icon as={MdHistory} w={8} h={8} color="brand.500" />
                 <Text fontWeight="bold">Party History</Text>
                 <Text fontSize="sm" color="gray.600" textAlign="center">
                   View your past events

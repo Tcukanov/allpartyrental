@@ -11,7 +11,7 @@ import {
   useToast,
   Spinner,
 } from '@chakra-ui/react';
-import { SendIcon } from '@chakra-ui/icons';
+import { ArrowForwardIcon } from '@chakra-ui/icons';
 
 export default function ChatComponent({ offer, onClose }) {
   const [messages, setMessages] = useState([]);
@@ -152,7 +152,7 @@ export default function ChatComponent({ offer, onClose }) {
             <Button
               type="submit"
               colorScheme="brand"
-              leftIcon={<SendIcon />}
+              leftIcon={<ArrowForwardIcon />}
               isDisabled={!newMessage.trim()}
             >
               Send

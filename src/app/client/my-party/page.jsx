@@ -55,7 +55,6 @@ import {
   RepeatIcon
 } from '@chakra-ui/icons';
 import { format } from 'date-fns';
-import MainLayout from '@/components/layout/MainLayout';
 import ChatComponent from '@/components/chat/ChatComponent';
 import PaymentComponent from '@/components/payment/PaymentComponent';
 import { loadStripe } from '@stripe/stripe-js';
@@ -351,13 +350,11 @@ export default function MyPartyPage() {
   
   if (sessionStatus === 'loading' || isLoading) {
     return (
-      <MainLayout>
-        <Container maxW="container.xl" py={8}>
-          <Flex justify="center" align="center" h="60vh">
-            <Spinner size="xl" color="brand.500" />
-          </Flex>
-        </Container>
-      </MainLayout>
+      <Container maxW="container.xl" py={8}>
+        <Flex justify="center" align="center" h="60vh">
+          <Spinner size="xl" color="brand.500" />
+        </Flex>
+      </Container>
     );
   }
   
@@ -368,94 +365,239 @@ export default function MyPartyPage() {
   
   if (!party) {
     return (
-      <MainLayout>
-        <Container maxW="container.xl" py={8}>
-          <VStack spacing={4} align="center" justify="center" h="60vh">
-            <Heading size="lg">No Active Party</Heading>
-            <Text>You don't have any active parties.</Text>
-            <Button 
-              colorScheme="brand" 
-              leftIcon={<EditIcon />}
-              onClick={() => router.push('/client/create-party')}
-            >
-              Create a Party
-            </Button>
-          </VStack>
-        </Container>
-      </MainLayout>
+      <Container maxW="container.xl" py={8}>
+        <VStack spacing={6} align="center" pt={10}>
+          <Heading>No Party Found</Heading>
+          <Text>You don't have an active party. Would you like to create one?</Text>
+          <Button 
+            colorScheme="brand" 
+            size="lg" 
+            onClick={() => router.push('/client/create-party')}
+          >
+            Create a Party
+          </Button>
+        </VStack>
+      </Container>
     );
   }
   
   return (
-    <MainLayout>
-      <Container maxW="container.xl" py={8}>
-        <VStack spacing={8} align="stretch">
-            <Box>
-            <Heading as="h1" size="xl">{party.name}</Heading>
-            <Text color="gray.600" mt={2}>
-              Manage your party details and services
-                </Text>
-            </Box>
-            
-            <Card>
-              <CardBody>
-              <VStack spacing={6} align="stretch">
-                <Flex justify="space-between" align="center">
-            <HStack>
-                    <Icon as={CalendarIcon} color="brand.500" />
-                    <Text fontWeight="bold">Date & Time</Text>
-                  </HStack>
-                  <Badge colorScheme={getStatusColor(party.status)} fontSize="md" px={2} py={1}>
-                    {party.status.replace('_', ' ')}
-              </Badge>
-          </Flex>
-          
-                <HStack spacing={4}>
-                  <Box>
-                    <Text color="gray.600">Date</Text>
-                    <Text fontWeight="medium">{format(new Date(party.date), 'MMMM d, yyyy')}</Text>
-                  </Box>
-                  <Box>
-                    <Text color="gray.600">Time</Text>
-                    <Text fontWeight="medium">{party.startTime}</Text>
-                    </Box>
-                  <Box>
-                    <Text color="gray.600">Location</Text>
-                    <Text fontWeight="medium">{party.city?.name}</Text>
-                      </Box>
-                                </HStack>
-                                
-                <Divider />
-
+    <Container maxW="container.xl" py={8}>
+      <VStack spacing={8} align="stretch">
+        <Box>
+          <Heading as="h1" size="xl">{party.name}</Heading>
+          <Text color="gray.600" mt={2}>
+            Manage your party details and services
+          </Text>
+        </Box>
+        
+        <Card>
+          <CardBody>
+            <VStack spacing={6} align="stretch">
+              <Flex justify="space-between" align="center">
+                <HStack>
+                  <Icon as={CalendarIcon} color="brand.500" />
+                  <Text fontWeight="bold">Date & Time</Text>
+                </HStack>
+                <Badge colorScheme={getStatusColor(party.status)} fontSize="md" px={2} py={1}>
+                  {party.status.replace('_', ' ')}
+                </Badge>
+              </Flex>
+              
+              <HStack spacing={4}>
                 <Box>
-                  <Text fontWeight="bold" mb={4}>Services</Text>
-                  <VStack spacing={3} align="stretch">
-                    {party.partyServices.map(service => (
-                      <Flex key={service.id} justify="space-between" align="center">
-                        <Text>{service.service.name}</Text>
-                        <Badge colorScheme={getStatusColor(service.status)}>
-                          {service.status}
-                        </Badge>
-                      </Flex>
-                    ))}
-                      </VStack>
+                  <Text color="gray.600">Date</Text>
+                  <Text fontWeight="medium">{format(new Date(party.date), 'MMMM d, yyyy')}</Text>
                 </Box>
+                <Box>
+                  <Text color="gray.600">Time</Text>
+                  <Text fontWeight="medium">{party.startTime}</Text>
+                </Box>
+                <Box>
+                  <Text color="gray.600">Location</Text>
+                  <Text fontWeight="medium">{party.city?.name}</Text>
+                </Box>
+              </HStack>
+              
+              <Divider />
+
+              <Box>
+                <Text fontWeight="bold" mb={4}>Services</Text>
+                <VStack spacing={3} align="stretch">
+                  {party.partyServices.map(service => (
+                    <Flex key={service.id} justify="space-between" align="center">
+                      <Text>{service.service.name}</Text>
+                      <Badge colorScheme={getStatusColor(service.status)}>
+                        {service.status}
+                      </Badge>
+                    </Flex>
+                  ))}
+                </VStack>
+              </Box>
+              
+              <Divider />
+              
+              <Flex justify="space-between">
+                <Button variant="outline" onClick={() => router.push('/client/dashboard')}>
+                  Back to Dashboard
+                </Button>
+                <Button colorScheme="brand" onClick={() => router.push(`/client/edit-party?id=${party.id}`)}>
+                  Edit Party
+                </Button>
+              </Flex>
+            </VStack>
+          </CardBody>
+        </Card>
+      </VStack>
+      
+      {/* Offer Modal */}
+      <Modal isOpen={isOfferModalOpen} onClose={onOfferModalClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          {activeOffer && (
+            <>
+              <ModalHeader>Offer from {activeOffer.provider.name}</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                <VStack spacing={4} align="stretch">
+                  <HStack spacing={4}>
+                    <Avatar 
+                      size="md" 
+                      name={activeOffer.provider.name} 
+                      src={activeOffer.provider.profile?.avatar}
+                    />
+                    <Box>
+                      <Heading size="md">{activeOffer.provider.name}</Heading>
+                      <Text fontSize="sm" color="gray.600">Service Provider</Text>
+                    </Box>
+                  </HStack>
                   
                   <Divider />
                   
-                <Flex justify="space-between">
-                  <Button variant="outline" onClick={() => router.push('/client/dashboard')}>
-                    Back to Dashboard
-                  </Button>
-                  <Button colorScheme="brand" onClick={() => router.push(`/client/edit-party?id=${party.id}`)}>
-                    Edit Party
-                  </Button>
-                </Flex>
-              </VStack>
-            </CardBody>
-          </Card>
+                  <Box>
+                    <Text fontWeight="bold" mb={2}>Service</Text>
+                    <Text>{activeOffer.service.name}</Text>
+                  </Box>
+                  
+                  <Box>
+                    <Text fontWeight="bold" mb={2}>Offer Price</Text>
+                    <Text fontSize="xl" fontWeight="bold" color="green.500">
+                      ${Number(activeOffer.price).toFixed(2)}
+                    </Text>
+                  </Box>
+                  
+                  <Box>
+                    <Text fontWeight="bold" mb={2}>Description</Text>
+                    <Text>{activeOffer.description}</Text>
+                  </Box>
+                  
+                  {activeOffer.photos && activeOffer.photos.length > 0 && (
+                    <Box>
+                      <Text fontWeight="bold" mb={2}>Photos</Text>
+                      <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={2}>
+                        {activeOffer.photos.map((photo, index) => (
+                          <Image 
+                            key={index}
+                            src={photo}
+                            alt={`Offer photo ${index+1}`}
+                            borderRadius="md"
+                            objectFit="cover"
+                            height="150px"
+                          />
+                        ))}
+                      </SimpleGrid>
+                    </Box>
+                  )}
                 </VStack>
-      </Container>
-    </MainLayout>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="ghost" mr={3} onClick={onOfferModalClose}>
+                  Close
+                </Button>
+                {activeOffer.status === 'PENDING' && (
+                  <>
+                    <Button 
+                      colorScheme="red" 
+                      variant="outline" 
+                      mr={3}
+                      onClick={() => {
+                        handleRejectOffer(activeOffer.id);
+                        onOfferModalClose();
+                      }}
+                    >
+                      Reject
+                    </Button>
+                    <Button 
+                      colorScheme="green" 
+                      onClick={() => {
+                        handleApproveOffer(activeOffer.id);
+                        onOfferModalClose();
+                      }}
+                    >
+                      Approve
+                    </Button>
+                  </>
+                )}
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+      
+      {/* Chat Modal */}
+      <Modal isOpen={isChatModalOpen} onClose={onChatModalClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          {activeOffer && (
+            <>
+              <ModalHeader>Chat with {activeOffer.provider.name}</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                {activeOffer.chat ? (
+                  <ChatComponent chatId={activeOffer.chat.id} />
+                ) : (
+                  <Text>No chat available for this offer.</Text>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button colorScheme="blue" mr={3} onClick={onChatModalClose}>
+                  Close
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+      
+      {/* Payment Modal */}
+      <Modal isOpen={isPaymentModalOpen} onClose={onPaymentModalClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          {activeOffer && activeOffer.transaction && (
+            <>
+              <ModalHeader>Payment for {activeOffer.service.name}</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                <Elements stripe={stripePromise}>
+                  <PaymentComponent 
+                    transaction={activeOffer.transaction}
+                    onSuccess={() => {
+                      onPaymentModalClose();
+                      // Refresh party data
+                      router.refresh();
+                    }}
+                  />
+                </Elements>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="ghost" onClick={onPaymentModalClose}>
+                  Close
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+    </Container>
   );
 }

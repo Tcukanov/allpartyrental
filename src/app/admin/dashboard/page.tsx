@@ -63,23 +63,18 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user is authenticated and an admin
+  // Check if user has admin rights
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/login');
-    } else if (session?.user?.role !== 'ADMIN') {
-      router.push('/');
-      toast({
-        title: 'Access Denied',
-        description: 'Only administrators can access this page',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    } else {
-      fetchDashboardStats();
+      router.push('/auth/signin');
+    } else if (status === 'authenticated') {
+      if (session?.user?.role !== 'ADMIN') {
+        router.push('/');
+      } else {
+        fetchDashboardStats();
+      }
     }
-  }, [session, status, router, toast]);
+  }, [status, session, router]);
 
   // Fetch dashboard statistics
   const fetchDashboardStats = async () => {

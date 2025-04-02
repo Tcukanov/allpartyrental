@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Box, 
   Container, 
@@ -36,6 +36,35 @@ export default function SignInPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isGoogleAccount, setIsGoogleAccount] = useState(false);
+  
+  // Check if the email is associated with Google when it changes
+  useEffect(() => {
+    // Debounce the API call to avoid making too many requests
+    const handler = setTimeout(async () => {
+      if (email && email.includes('@')) {
+        try {
+          const response = await fetch('/api/auth/check-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          
+          const data = await response.json();
+          
+          if (data.isGoogleAccount) {
+            setIsGoogleAccount(true);
+          } else {
+            setIsGoogleAccount(false);
+          }
+        } catch (error) {
+          console.error('Error checking email:', error);
+        }
+      }
+    }, 500); // 500ms debounce
+    
+    return () => clearTimeout(handler);
+  }, [email]);
   
   const handleEmailSignIn = async (e) => {
     e.preventDefault();
@@ -51,9 +80,42 @@ export default function SignInPage() {
       return;
     }
     
+    // If it's a Google account, show a toast and don't attempt sign in
+    if (isGoogleAccount) {
+      toast({
+        title: 'Google Account Detected',
+        description: 'This email is associated with Google Sign In. Please use the "Sign In with Google" button below.',
+        status: 'info',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
+      // First check if the email exists without a password (Google account)
+      const checkResponse = await fetch('/api/auth/check-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      
+      const checkData = await checkResponse.json();
+      
+      if (checkData.isGoogleAccount) {
+        toast({
+          title: 'Google Account Detected',
+          description: 'This email is associated with Google Sign In. Please use the "Sign In with Google" button below.',
+          status: 'info',
+          duration: 5000,
+          isClosable: true,
+        });
+        setIsLoading(false);
+        return;
+      }
+      
       const result = await signIn('credentials', {
         redirect: false,
         email,
@@ -125,7 +187,13 @@ export default function SignInPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
+                  borderColor={isGoogleAccount ? 'orange.300' : undefined}
                 />
+                {isGoogleAccount && (
+                  <Text color="orange.500" fontSize="sm" mt={1}>
+                    This email uses Google Sign In. Please use the Google button below.
+                  </Text>
+                )}
               </FormControl>
               
               <FormControl id="password" isRequired>
@@ -136,6 +204,7 @@ export default function SignInPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="********"
+                    isDisabled={isGoogleAccount}
                   />
                   <InputRightElement>
                     <IconButton
@@ -144,6 +213,7 @@ export default function SignInPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowPassword(!showPassword)}
+                      isDisabled={isGoogleAccount}
                     />
                   </InputRightElement>
                 </InputGroup>
@@ -157,6 +227,7 @@ export default function SignInPage() {
                 width="full"
                 isLoading={isLoading}
                 loadingText="Signing in"
+                isDisabled={isGoogleAccount}
               >
                 Sign In with Email
               </Button>
@@ -177,13 +248,16 @@ export default function SignInPage() {
             <Button 
               leftIcon={<FcGoogle />}
               onClick={handleGoogleSignIn} 
-              variant="outline" 
+              variant={isGoogleAccount ? "solid" : "outline"}
+              colorScheme={isGoogleAccount ? "green" : undefined}
               size="lg" 
               width="full"
               isLoading={isLoading}
               loadingText="Signing in"
+              boxShadow={isGoogleAccount ? "0 0 0 2px #38A169" : undefined}
             >
               Sign In with Google
+              {isGoogleAccount && " (Recommended)"}
             </Button>
           </Box>
           

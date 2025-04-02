@@ -29,12 +29,14 @@ import {
   Select,
   Avatar,
   Spinner,
-  Icon
+  Icon,
+  Tooltip
 } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
-import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon } from '@chakra-ui/icons';
+import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon, ChatIcon } from '@chakra-ui/icons';
 import { useSession } from 'next-auth/react';
-import { FaComment } from 'react-icons/fa';
+import { FaComment, FaEye } from 'react-icons/fa';
+import { BsChatDots } from 'react-icons/bs';
 
 // Mock data for service provider dashboard
 const mockServices = [
@@ -80,7 +82,8 @@ const mockRequests = [
     location: 'New York',
     serviceType: 'Decoration',
     status: 'New',
-    details: 'Looking for princess themed decorations for my daughter\'s 7th birthday party.'
+    details: 'Looking for princess themed decorations for my daughter\'s 7th birthday party.',
+    chatId: 1
   },
   {
     id: 2,
@@ -91,7 +94,8 @@ const mockRequests = [
     location: 'New York',
     serviceType: 'Decoration',
     status: 'Offer Sent',
-    details: 'Need elegant decorations for our 25th anniversary celebration. Gold and white theme preferred.'
+    details: 'Need elegant decorations for our 25th anniversary celebration. Gold and white theme preferred.',
+    chatId: 2
   },
   {
     id: 3,
@@ -103,6 +107,18 @@ const mockRequests = [
     serviceType: 'Entertainment',
     status: 'In Progress',
     details: 'Looking for a DJ for my son\'s high school graduation party. Need someone who can play a mix of current hits and classics.'
+  },
+  {
+    id: 4,
+    clientName: 'Robert Wilson',
+    partyType: 'Corporate Event',
+    date: '2025-04-30',
+    time: '19:00',
+    location: 'New York',
+    serviceType: 'Catering',
+    status: 'Approved',
+    details: 'Corporate year-end celebration. Need catering for 50 people with vegetarian options.',
+    chatId: 3
   }
 ];
 
@@ -164,6 +180,43 @@ const mockAdPackages = [
   }
 ];
 
+// Helper function to get color scheme for status badges
+const getStatusColor = (status) => {
+  // Normalize status to uppercase for consistent comparison
+  const normalizedStatus = typeof status === 'string' ? status.toUpperCase() : 'UNKNOWN';
+  
+  switch (normalizedStatus) {
+    case 'NEW':
+    case 'DRAFT':
+      return 'green';
+    case 'IN PROGRESS':
+    case 'PENDING':
+      return 'blue';
+    case 'OFFER SENT':
+      return 'purple';
+    case 'PROVIDER_REVIEW':
+      return 'orange';
+    case 'APPROVED':
+    case 'CONFIRMED':
+      return 'teal';
+    case 'COMPLETED':
+    case 'PAID':
+      return 'green';
+    case 'REJECTED':
+    case 'DECLINED':
+    case 'CANCELLED':
+      return 'red';
+    case 'ESCROW':
+      return 'cyan';
+    case 'DISPUTED':
+      return 'orange';
+    case 'REFUNDED':
+      return 'gray';
+    default:
+      return 'gray';
+  }
+};
+
 // Service categories
 const serviceCategories = [
   'Decoration',
@@ -190,16 +243,17 @@ const daysOfWeek = [
 export default function ProviderCabinetPage() {
   const router = useRouter();
   const toast = useToast();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [services, setServices] = useState(mockServices);
   const [requests, setRequests] = useState(mockRequests);
-  const [chats, setChats] = useState(mockChats);
+  const [chats, setChats] = useState([]);
   const [adPackages, setAdPackages] = useState(mockAdPackages);
   const [isEditing, setIsEditing] = useState(false);
   const [currentService, setCurrentService] = useState(null);
   const [filteredRequests, setFilteredRequests] = useState(mockRequests);
   const [requestFilter, setRequestFilter] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
+  const [isChatsLoading, setIsChatsLoading] = useState(true);
   const [profileData, setProfileData] = useState({
     companyName: '',
     contactPerson: '',
@@ -213,6 +267,341 @@ export default function ProviderCabinetPage() {
     socialLinks: {}
   });
   const [isProfileSaving, setIsProfileSaving] = useState(false);
+
+  // Clear any outdated localStorage values
+  useEffect(() => {
+    // Clear all localStorage provider data to ensure fresh start
+    const clearOutdatedLocalStorage = () => {
+      console.log('Clearing all provider profile data from localStorage');
+      
+      // Clear all provider_ keys
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('provider_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    };
+    
+    clearOutdatedLocalStorage();
+  }, []);
+
+  // Authentication check
+  useEffect(() => {
+    if (sessionStatus === 'unauthenticated') {
+      router.push('/auth/signin');
+    } else if (sessionStatus === 'authenticated') {
+      if (session?.user?.role !== 'PROVIDER') {
+        router.push('/');
+        toast({
+          title: 'Access Denied',
+          description: 'Only service providers can access this page',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        fetchProviderStats();
+        // Fetch notifications and chat data initially
+        fetchChats();
+      }
+    }
+  }, [session, sessionStatus, router, toast]);
+
+  // Check for new messages every minute
+  useEffect(() => {
+    if (sessionStatus !== 'authenticated') return;
+    
+    const checkNewMessages = () => {
+      fetchChats();
+      console.log('Checking for new messages...');
+    };
+    
+    // Initial check
+    checkNewMessages();
+    
+    // Set up interval
+    const interval = setInterval(checkNewMessages, 60000); // Check every minute
+    
+    return () => clearInterval(interval);
+  }, [sessionStatus]);
+
+  // Fetch recent chats with clients
+  const fetchChats = async () => {
+    try {
+      setIsChatsLoading(true);
+      console.log("Fetching chats for user:", session?.user);
+      
+      const response = await fetch('/api/chats');
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching chats: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log("Chats API response:", data);
+      
+      if (data.chats && Array.isArray(data.chats)) {
+        // Transform the data to match our component's expected format
+        const formattedChats = data.chats.map(chat => {
+          if (!chat.offer) {
+            console.warn(`Chat ${chat.id} has no associated offer`);
+            return null;
+          }
+          
+          // Check if current user is the provider (more robust check)
+          const isProvider = session?.user?.role === 'PROVIDER' && 
+                            (session?.user?.id === chat.offer?.providerId || 
+                             session?.user?.id === chat.offer?.provider?.id);
+          
+          console.log(`Chat ${chat.id}: User role=${session?.user?.role}, isProvider=${isProvider}`);
+          console.log(`Chat ${chat.id}: Provider ID=${chat.offer?.providerId}, Client ID=${chat.offer?.clientId}`);
+          
+          // Get other user based on current user role
+          let otherUser;
+          if (isProvider) {
+            otherUser = chat.offer?.client;
+            console.log(`Chat ${chat.id}: Other user (client):`, otherUser);
+          } else {
+            otherUser = chat.offer?.provider;
+            console.log(`Chat ${chat.id}: Other user (provider):`, otherUser);
+          }
+          
+          // If we can't determine the other user, use a fallback
+          if (!otherUser) {
+            console.warn(`Chat ${chat.id}: Could not determine other user`);
+            otherUser = {
+              name: isProvider ? 'Client' : 'Provider',
+              profile: { avatar: null }
+            };
+          }
+          
+          // Calculate unread messages - messages from other user that haven't been read
+          const unreadCount = chat.messages
+            ? chat.messages.filter(msg => 
+                msg.senderId !== session?.user?.id && 
+                !msg.isRead
+              ).length
+            : 0;
+          
+          console.log(`Chat ${chat.id} with ${otherUser?.name}: ${unreadCount} unread messages`);
+          
+          return {
+            id: chat.id,
+            clientName: otherUser?.name || 'Anonymous',
+            clientAvatar: otherUser?.profile?.avatar || null,
+            serviceName: chat.offer?.service?.name || 'Service request',
+            lastMessage: chat.messages?.[0]?.content || 'No messages yet',
+            timestamp: chat.messages?.[0]?.createdAt || chat.updatedAt || new Date().toISOString(),
+            unread: unreadCount, 
+          };
+        }).filter(Boolean); // Remove any null entries
+        
+        console.log("Formatted chats:", formattedChats);
+        setChats(formattedChats);
+        
+        // Show toast if there are unread messages
+        const totalUnread = formattedChats.reduce((sum, chat) => sum + chat.unread, 0);
+        if (totalUnread > 0) {
+          toast({
+            title: `${totalUnread} unread message${totalUnread > 1 ? 's' : ''}`,
+            description: "Click on the message button to view your conversations",
+            status: "info",
+            duration: 3000,
+            isClosable: true,
+            position: "bottom-right"
+          });
+        }
+      } else {
+        console.warn("No chats found in API response:", data);
+        setChats([]);
+      }
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load chat data',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      
+      // Set empty chats array on error
+      setChats([]);
+    } finally {
+      setIsChatsLoading(false);
+    }
+  };
+  
+  // Handle Socket.io connection for real-time updates
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    
+    // Initialize Socket.io if needed
+    if (typeof window !== 'undefined') {
+      const initSocket = async () => {
+        try {
+          const { io } = await import('socket.io-client');
+          const socket = io({
+            path: '/api/socket',
+            auth: {
+              token: session.accessToken,
+            },
+          });
+          
+          socket.on('connect', () => {
+            console.log('Socket connected for provider cabinet updates');
+          });
+          
+          socket.on('notification:new', (notification) => {
+            console.log('New notification received:', notification);
+            // If it's a message notification, refresh chats
+            if (notification.type === 'MESSAGE') {
+              fetchChats();
+            }
+          });
+          
+          return socket;
+        } catch (error) {
+          console.error('Error initializing socket:', error);
+          return null;
+        }
+      };
+      
+      const socketPromise = initSocket();
+      
+      return () => {
+        socketPromise.then(socket => {
+          if (socket) {
+            socket.disconnect();
+          }
+        });
+      };
+    }
+  }, [session]);
+  
+  // Initial data fetch for provider cabinet
+  const fetchProviderStats = async () => {
+    setIsLoading(true);
+    
+    try {
+      // Fetch profile data
+      const profileResponse = await fetch('/api/provider/profile');
+      const profileData = await profileResponse.json();
+      
+      if (profileData.success) {
+        setProfileData(profileData.data || {});
+      }
+      
+      // Fetch requests data with chats
+      try {
+        // First fetch offers to get complete data
+        const offersResponse = await fetch('/api/provider/requests');
+        const offersData = await offersResponse.json();
+        
+        // Then fetch party history data
+        const partyHistoryResponse = await fetch('/api/provider/service-requests');
+        const partyHistoryData = await partyHistoryResponse.json();
+        
+        // Combine the data
+        let allRequests = [];
+        
+        // Map offers to request format
+        if (offersData.success && Array.isArray(offersData.data)) {
+          const mappedOffers = offersData.data.map(offer => {
+            // Extract party details
+            const partyDetails = offer.partyService?.party;
+            
+            return {
+              id: offer.id,
+              offerId: offer.id,
+              partyId: offer.partyService?.partyId,
+              partyType: partyDetails?.name || 'Service Request',
+              clientName: offer.client?.name || 'Anonymous Client',
+              clientId: offer.client?.id,
+              date: partyDetails?.date ? new Date(partyDetails.date).toLocaleDateString() : 'TBD',
+              time: partyDetails?.startTime || 'TBD',
+              location: partyDetails?.location || 'TBD',
+              serviceType: offer.service?.name || 'Service',
+              status: offer.status || 'New',
+              details: offer.message || 'No details provided',
+              amount: offer.amount || offer.service?.price || 0,
+              chatId: offer.chatId || offer.chat?.id || null
+            };
+          });
+          
+          allRequests = [...mappedOffers];
+        }
+        
+        // Map party history data to requests
+        if (partyHistoryData.success && Array.isArray(partyHistoryData.data)) {
+          const mappedPartyHistory = partyHistoryData.data.map(party => {
+            // Get the first party service related to this provider
+            const relevantService = party.partyServices.find(ps => 
+              ps.service?.providerId === session.user.id
+            );
+            
+            // Get related offer if any
+            const relevantOffer = relevantService?.offers?.find(o => 
+              o.providerId === session.user.id
+            );
+            
+            return {
+              id: `party-${party.id}-${relevantService?.id || '0'}`,
+              partyId: party.id,
+              offerId: relevantOffer?.id,
+              partyType: party.name || 'Party',
+              clientName: party.client?.name || 'Anonymous Client',
+              clientId: party.clientId,
+              date: party.date ? new Date(party.date).toLocaleDateString() : 'TBD',
+              time: party.startTime || 'TBD',
+              location: party.location || 'TBD',
+              serviceType: relevantService?.service?.name || 'Service',
+              status: relevantOffer?.status || party.status || 'New',
+              details: relevantService?.specificOptions?.details || 'No details provided',
+              amount: relevantOffer?.amount || relevantService?.service?.price || 0,
+              chatId: relevantOffer?.chatId || relevantOffer?.chat?.id || null
+            };
+          });
+          
+          // Add to the list but avoid duplicates
+          mappedPartyHistory.forEach(partyItem => {
+            if (!allRequests.some(req => 
+              (req.offerId && req.offerId === partyItem.offerId) || 
+              (req.partyId && req.partyId === partyItem.partyId && req.serviceType === partyItem.serviceType)
+            )) {
+              allRequests.push(partyItem);
+            }
+          });
+        }
+              
+        console.log('Combined requests with chat info:', allRequests);
+        
+        // Only update if we have data
+        if (allRequests.length > 0) {
+          setRequests(allRequests);
+          setFilteredRequests(allRequests);
+        }
+      } catch (requestsError) {
+        console.error('Error fetching provider requests:', requestsError);
+        // Falls back to mock data if the API call fails
+      }
+      
+      // Fetch chats data
+      fetchChats();
+      
+    } catch (error) {
+      console.error('Error fetching provider dashboard data:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to load dashboard data',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Fetch services when component mounts
   useEffect(() => {
@@ -256,52 +645,6 @@ export default function ProviderCabinetPage() {
       setFilteredRequests(requests.filter(request => request.status === requestFilter));
     }
   }, [requestFilter, requests]);
-
-  // Add this after other useEffects
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      if (!session) return;
-      
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/provider/profile');
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data) {
-            const profile = data.data;
-            const userData = session.user;
-            
-            setProfileData({
-              companyName: userData.name || '',
-              contactPerson: profile.contactPerson || '',
-              email: userData.email || '',
-              phone: profile.phone || '',
-              address: profile.address || '',
-              website: profile.website || '',
-              googleBusinessUrl: profile.googleBusinessUrl || '',
-              description: profile.description || '',
-              avatar: profile.avatar || '',
-              socialLinks: profile.socialLinks || {}
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load profile data',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchProfileData();
-  }, [session, toast]);
 
   // Handle service form submission
   const handleServiceSubmit = async (e) => {
@@ -504,6 +847,130 @@ export default function ProviderCabinetPage() {
     });
   };
 
+  // Handle navigating to a chat
+  const handleNavigateToChat = (chatId, e) => {
+    e.stopPropagation(); // Prevent triggering the card click event
+    if (chatId) {
+      router.push(`/chats/${chatId}`);
+    } else {
+      toast({
+        title: "No Chat Available",
+        description: "There is no chat associated with this request yet.",
+        status: "info",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  // Handle navigating to a party
+  const handleViewParty = (partyId, e) => {
+    if (e) e.stopPropagation(); // Prevent triggering other click events
+    
+    if (!partyId) {
+      toast({
+        title: "Error",
+        description: "Party ID is missing",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    
+    // Navigate to party details page
+    router.push(`/provider/party/${partyId}`);
+  };
+
+  // Create a new chat for a service request
+  const handleCreateChat = async (request, e) => {
+    e.stopPropagation(); // Prevent triggering the card click event
+    
+    try {
+      // Debug log the request object
+      console.log("Creating chat for request:", request);
+      
+      // Show loading toast
+      const loadingToastId = toast({
+        title: "Creating chat",
+        description: "Setting up a new conversation...",
+        status: "loading",
+        duration: null,
+        isClosable: false,
+      });
+      
+      // Extract the offerId from the request - use different possible paths
+      const offerId = request.offerId || request.offer?.id || request.partyService?.offers?.[0]?.id;
+      
+      console.log("Extracted offerId:", offerId);
+      
+      if (!offerId) {
+        // Close loading toast
+        toast.close(loadingToastId);
+        
+        // Show error
+        toast({
+          title: "Cannot create chat",
+          description: "No offer associated with this request. A chat can only be created for an offer.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+      
+      // Create chat via API
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ offerId }),
+      });
+      
+      const data = await response.json();
+      console.log("Chat creation response:", data);
+      
+      // Close loading toast
+      toast.close(loadingToastId);
+      
+      if (data.chat && data.chat.id) {
+        // Success - navigate to chat
+        toast({
+          title: "Chat created",
+          description: "Successfully created a new conversation.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+        
+        // Refresh data first
+        await fetchProviderStats();
+        
+        // Navigate to chat
+        router.push(`/chats/${data.chat.id}`);
+      } else {
+        // Error creating chat
+        toast({
+          title: "Error",
+          description: data.error || "Failed to create chat. Please try again.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating chat:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create chat",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
     setProfileData(prev => ({
@@ -516,35 +983,67 @@ export default function ProviderCabinetPage() {
     try {
       setIsProfileSaving(true);
       
+      // Create a clean profile object with all fields
+      const profileToSave = {
+        companyName: profileData.companyName || '',
+        contactPerson: profileData.contactPerson || '',
+        email: profileData.email || '',
+        phone: profileData.phone || '',
+        address: profileData.address || '',
+        website: profileData.website || '',
+        googleBusinessUrl: profileData.googleBusinessUrl || '',
+        description: profileData.description || '',
+        avatar: profileData.avatar || '',
+        socialLinks: profileData.socialLinks || {}
+      };
+      
+      console.log('Saving profile data to API:', profileToSave);
+      
+      // First try to save to the API
       const response = await fetch('/api/provider/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(profileData)
+        body: JSON.stringify(profileToSave)
       });
       
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          toast({
-            title: 'Profile Updated',
-            description: 'Your profile has been updated successfully',
-            status: 'success',
-            duration: 3000,
-            isClosable: true,
-          });
+      console.log('Profile save response status:', response.status);
+      const result = await response.json();
+      console.log('Profile save response:', result);
+      
+      // Always save to localStorage for backup
+      for (const [key, value] of Object.entries(profileToSave)) {
+        if (typeof value === 'object') {
+          localStorage.setItem(`provider_${key}`, JSON.stringify(value));
         } else {
-          throw new Error(result.error?.message || 'Failed to update profile');
+          localStorage.setItem(`provider_${key}`, value || '');
         }
+      }
+      
+      if (response.ok && result.success) {
+        toast({
+          title: 'Profile Updated',
+          description: 'Your profile has been updated successfully',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
       } else {
-        throw new Error('Failed to update profile');
+        // API save failed but we saved locally
+        toast({
+          title: 'Profile Saved Locally',
+          description: 'Your profile was saved locally but could not be saved to the server. Changes will persist in this browser only.',
+          status: 'warning',
+          duration: 5000,
+          isClosable: true,
+        });
       }
     } catch (error) {
       console.error('Error saving profile:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update profile',
+        description: error.message || 'Failed to save profile',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -554,17 +1053,77 @@ export default function ProviderCabinetPage() {
     }
   };
 
+  const handleResetProfile = () => {
+    // Clear all provider_ keys from localStorage
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('provider_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Reset profile to defaults
+    setProfileData({
+      companyName: session?.user?.name || '',
+      contactPerson: '',
+      email: session?.user?.email || '',
+      phone: '',
+      address: '',
+      website: '',
+      googleBusinessUrl: '',
+      description: '',
+      avatar: '',
+      socialLinks: {}
+    });
+    
+    toast({
+      title: 'Profile Reset',
+      description: 'Your profile has been reset to defaults',
+      status: 'info',
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+
   return (
       <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
-        <Heading as="h1" size="xl" mb={6}>Service Provider Dashboard</Heading>
+        <Flex justify="space-between" align="center" mb={2}>
+          <Heading as="h1" size="xl">Service Provider Dashboard</Heading>
+          
+          {/* Notification and chat quick access */}
+          <HStack spacing={4}>
+            <Tooltip label="View all messages">
+              <Button 
+                leftIcon={<Icon as={FaComment} />} 
+                colorScheme="brand"
+                onClick={() => router.push('/chats')}
+                position="relative"
+                variant="outline"
+              >
+                Messages
+                {chats.filter(c => c.unread > 0).length > 0 && (
+                  <Badge 
+                    colorScheme="red" 
+                    borderRadius="full" 
+                    position="absolute" 
+                    top="-8px" 
+                    right="-8px"
+                  >
+                    {chats.filter(c => c.unread > 0).length}
+                  </Badge>
+                )}
+              </Button>
+            </Tooltip>
+          </HStack>
+        </Flex>
         
         <Tabs variant="enclosed" colorScheme="brand">
           <TabList>
             <Tab>Profile</Tab>
+            <Tab>Services</Tab>
             <Tab>Requests</Tab>
+            <Tab>Party History</Tab>
             <Tab>Chats</Tab>
-            <Tab>Manage Services</Tab>
             <Tab>Advertising</Tab>
           </TabList>
           
@@ -601,7 +1160,15 @@ export default function ProviderCabinetPage() {
                           name="email"
                           value={profileData.email}
                           onChange={handleProfileChange}
+                          isReadOnly
+                          isDisabled
+                          opacity={0.8}
+                          cursor="not-allowed"
+                          _hover={{ cursor: "not-allowed" }}
                         />
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          Email cannot be changed as it is used for account identification
+                        </Text>
                       </FormControl>
                       
                       <FormControl>
@@ -709,170 +1276,22 @@ export default function ProviderCabinetPage() {
                     >
                       Save Profile
                     </Button>
+                    
+                    <Button 
+                      mt={6} 
+                      ml={4}
+                      variant="outline"
+                      colorScheme="red"
+                      onClick={handleResetProfile}
+                    >
+                      Reset Profile
+                    </Button>
                   </CardBody>
                 </Card>
               </VStack>
             </TabPanel>
             
-            {/* Requests Tab */}
-            <TabPanel>
-              <VStack spacing={6} align="stretch">
-                <Flex justify="space-between" align="center">
-                  <Heading as="h2" size="lg">Incoming Requests</Heading>
-                  
-                  <Select 
-                    width="200px" 
-                    value={requestFilter}
-                    onChange={(e) => setRequestFilter(e.target.value)}
-                  >
-                    <option value="All">All Requests</option>
-                    <option value="New">New</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Offer Sent">Offer Sent</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                  </Select>
-                </Flex>
-                
-                {filteredRequests.length === 0 ? (
-                  <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
-                    <Text>No requests matching the selected filter.</Text>
-                  </Box>
-                ) : (
-                  filteredRequests.map(request => (
-                    <Card key={request.id} mb={4}>
-                      <CardBody>
-                        <Flex direction={{ base: 'column', md: 'row' }} justify="space-between">
-                          <Box mb={{ base: 4, md: 0 }}>
-                            <Flex align="center" mb={2}>
-                              <Heading as="h3" size="md">{request.partyType}</Heading>
-                              <Badge ml={2} colorScheme={
-                                request.status === 'New' ? 'green' :
-                                request.status === 'In Progress' ? 'blue' :
-                                request.status === 'Offer Sent' ? 'purple' :
-                                request.status === 'Approved' ? 'teal' :
-                                'red'
-                              }>
-                                {request.status}
-                              </Badge>
-                            </Flex>
-                            
-                            <Text mb={2}><strong>Client:</strong> {request.clientName}</Text>
-                            <Text mb={2}><strong>Date & Time:</strong> {request.date} at {request.time}</Text>
-                            <Text mb={2}><strong>Location:</strong> {request.location}</Text>
-                            <Text mb={2}><strong>Service Type:</strong> {request.serviceType}</Text>
-                            <Text><strong>Details:</strong> {request.details}</Text>
-                          </Box>
-                          
-                          <VStack align="stretch" spacing={2} minW="150px">
-                            <Button 
-                              colorScheme="brand" 
-                              leftIcon={<AddIcon />}
-                              isDisabled={request.status === 'Offer Sent' || request.status === 'Approved'}
-                              onClick={() => handleSendOffer(request.id)}
-                              _hover={{ bg: '#ffcba5' }}
-                              _active={{ bg: '#ffcba5' }}
-                            >
-                              Send Offer
-                            </Button>
-                            <Button 
-                              leftIcon={<EditIcon />} 
-                              variant="outline"
-                              _hover={{ bg: '#ffcba5' }}
-                              _active={{ bg: '#ffcba5' }}
-                            >
-                              View Details
-                            </Button>
-                          </VStack>
-                        </Flex>
-                      </CardBody>
-                    </Card>
-                  ))
-                )}
-              </VStack>
-            </TabPanel>
-            
-            {/* Chats Tab */}
-            <TabPanel>
-              <VStack spacing={6} align="stretch">
-                <Flex justify="space-between" align="center">
-                <Heading as="h2" size="lg">Chats with Clients</Heading>
-                  <Button 
-                    colorScheme="brand" 
-                    size="sm" 
-                    leftIcon={<Icon as={FaComment} />}
-                    onClick={() => router.push('/chats')}
-                  >
-                    View All Chats
-                  </Button>
-                </Flex>
-                
-                {isLoading ? (
-                  <Flex justify="center" p={6}>
-                    <Spinner size="xl" />
-                  </Flex>
-                ) : chats.length === 0 ? (
-                  <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
-                    <Text mb={4}>No active chats.</Text>
-                    <Button 
-                      colorScheme="brand" 
-                      onClick={() => router.push('/chats')}
-                    >
-                      Go to Messages
-                    </Button>
-                  </Box>
-                ) : (
-                  <VStack spacing={4} align="stretch">
-                    {chats.slice(0, 3).map(chat => (
-                      <Card key={chat.id} cursor="pointer" onClick={() => router.push(`/chats/${chat.id}`)} _hover={{ shadow: 'md' }} transition="all 0.2s">
-                        <CardBody>
-                          <Flex justify="space-between" align="center">
-                            <Flex align="center">
-                              <Avatar 
-                                name={chat.clientName} 
-                                src={chat.clientAvatar} 
-                                size="md" 
-                                mr={3}
-                              />
-                              <Box>
-                                <Text fontWeight="bold">{chat.clientName}</Text>
-                                <Text fontSize="xs" color="gray.600">
-                                  Re: {chat.serviceName || 'Service request'}
-                                </Text>
-                                <Text noOfLines={1} fontSize="sm" color="gray.600">
-                                  {chat.lastMessage}
-                                </Text>
-                              </Box>
-                            </Flex>
-                            <Box textAlign="right">
-                              <Text fontSize="xs" color="gray.500">
-                                {new Date(chat.timestamp).toLocaleDateString()}
-                              </Text>
-                              {chat.unread > 0 && (
-                                <Badge colorScheme="red" borderRadius="full" mt={1}>
-                                  {chat.unread}
-                                </Badge>
-                              )}
-                            </Box>
-                          </Flex>
-                        </CardBody>
-                      </Card>
-                    ))}
-                    {chats.length > 3 && (
-                      <Button 
-                        variant="outline" 
-                        onClick={() => router.push('/chats')}
-                        alignSelf="center"
-                      >
-                        See All ({chats.length}) Conversations
-                      </Button>
-                    )}
-                  </VStack>
-                )}
-              </VStack>
-            </TabPanel>
-            
-            {/* Manage Services Tab */}
+            {/* Services Tab */}
             <TabPanel>
               <VStack spacing={6} align="stretch">
                 <Heading as="h2" size="lg">Manage Services</Heading>
@@ -923,6 +1342,288 @@ export default function ProviderCabinetPage() {
               </VStack>
             </TabPanel>
             
+            {/* Requests Tab */}
+            <TabPanel>
+              <VStack spacing={6} align="stretch">
+                <Flex justify="space-between" align="center">
+                  <Heading as="h2" size="lg">Incoming Requests</Heading>
+                  
+                  <Select 
+                    width="200px" 
+                    value={requestFilter}
+                    onChange={(e) => setRequestFilter(e.target.value)}
+                  >
+                    <option value="All">All Requests</option>
+                    <option value="New">New</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Offer Sent">Offer Sent</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </Select>
+                </Flex>
+                
+                {/* Message about chat functionality */}
+                <Box p={4} bg="blue.50" borderRadius="md" mb={4}>
+                  <Flex align="center">
+                    <Icon as={BsChatDots} color="blue.500" mr={3} boxSize={6} />
+                    <Box>
+                      <Text fontWeight="bold">Need to communicate with clients?</Text>
+                      <Text>
+                        Use the chat button next to each client's name to start a conversation or view existing messages.
+                      </Text>
+                    </Box>
+                  </Flex>
+                </Box>
+                
+                {filteredRequests.length === 0 ? (
+                  <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
+                    <Text>No requests matching the selected filter.</Text>
+                  </Box>
+                ) : (
+                  filteredRequests.map(request => (
+                    <Card key={request.id} mb={4}>
+                      <CardBody>
+                        <Flex direction={{ base: 'column', md: 'row' }} justify="space-between">
+                          <Box mb={{ base: 4, md: 0 }}>
+                            <Flex align="center" mb={2}>
+                              <Heading as="h3" size="md">{request.partyType}</Heading>
+                              <Badge ml={2} colorScheme={getStatusColor(request.status)}>
+                                {request.status}
+                              </Badge>
+                            </Flex>
+                            
+                            <VStack spacing={2} align="stretch">
+                              <Flex justify="space-between" align="center">
+                                <Text><strong>Client:</strong> {request.clientName}</Text>
+                                
+                                {/* Chat Button - Always displayed next to client name */}
+                                <Tooltip label={request.chatId ? "Go to conversation" : "Start conversation"}>
+                                  <Button
+                                    size="xs"
+                                    onClick={(e) => request.chatId ? handleNavigateToChat(request.chatId, e) : handleCreateChat(request, e)}
+                                    colorScheme={request.chatId ? "brand" : "gray"}
+                                    leftIcon={<Icon as={BsChatDots} />}
+                                    ml={2}
+                                  >
+                                    {request.chatId ? "Chat" : "Start Chat"}
+                                  </Button>
+                                </Tooltip>
+                              </Flex>
+                              
+                              <Text><strong>Date & Time:</strong> {request.date} at {request.time}</Text>
+                              <Text><strong>Location:</strong> {request.location}</Text>
+                              <Text><strong>Service Type:</strong> {request.serviceType}</Text>
+                              
+                              <Flex mt={2}>
+                                {/* View Party Button */}
+                                <Button
+                                  size="sm"
+                                  colorScheme="blue"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewParty(request?.partyId);
+                                  }}
+                                  leftIcon={<Icon as={FaEye} />}
+                                >
+                                  View Party
+                                </Button>
+                              </Flex>
+                            </VStack>
+                          </Box>
+                          
+                          <VStack align="stretch" spacing={2} minW="150px">
+                            <Button 
+                              colorScheme="brand" 
+                              leftIcon={<AddIcon />}
+                              isDisabled={request.status === 'Offer Sent' || request.status === 'Approved'}
+                              onClick={() => handleSendOffer(request.id)}
+                              _hover={{ bg: '#ffcba5' }}
+                              _active={{ bg: '#ffcba5' }}
+                            >
+                              Send Offer
+                            </Button>
+                            <Button 
+                              leftIcon={<EditIcon />} 
+                              variant="outline"
+                              _hover={{ bg: '#ffcba5' }}
+                              _active={{ bg: '#ffcba5' }}
+                            >
+                              View Details
+                            </Button>
+                          </VStack>
+                        </Flex>
+                      </CardBody>
+                    </Card>
+                  ))
+                )}
+              </VStack>
+            </TabPanel>
+            
+            {/* Party History Tab */}
+            <TabPanel>
+              <VStack spacing={6} align="stretch">
+                <Heading as="h2" size="lg" mb={4}>Party History</Heading>
+                
+                {isLoading ? (
+                  <Flex justify="center" p={6}>
+                    <Spinner size="xl" />
+                  </Flex>
+                ) : filteredRequests.filter(request => 
+                    request.status === 'COMPLETED' || 
+                    request.status === 'Completed' || 
+                    request.status === 'PAID'
+                  ).length === 0 ? (
+                  <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
+                    <Text>No completed parties yet.</Text>
+                  </Box>
+                ) : (
+                  <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
+                    {filteredRequests
+                      .filter(request => 
+                        request.status === 'COMPLETED' || 
+                        request.status === 'Completed' || 
+                        request.status === 'PAID'
+                      )
+                      .map(request => (
+                        <Card key={request.id} mb={4} variant="outline">
+                          <CardBody>
+                            <Flex direction="column">
+                              <Flex justify="space-between" align="flex-start" mb={4}>
+                                <VStack align="flex-start" spacing={1}>
+                                  <Heading as="h3" size="md">{request.partyType}</Heading>
+                                  <Badge colorScheme={getStatusColor(request.status)}>Completed</Badge>
+                                </VStack>
+                                
+                                <Text fontWeight="bold" fontSize="lg">
+                                  ${typeof request.amount === 'number' ? request.amount.toFixed(2) : request.amount}
+                                </Text>
+                              </Flex>
+                              
+                              <VStack align="flex-start" spacing={2} mb={4}>
+                                <Text><strong>Client:</strong> {request.clientName}</Text>
+                                <Text><strong>Date:</strong> {request.date}</Text>
+                                <Text><strong>Service:</strong> {request.serviceType}</Text>
+                                <Text><strong>Location:</strong> {request.location}</Text>
+                              </VStack>
+                              
+                              <Flex mt={2} gap={2} justifyContent="flex-end">
+                                {/* Message Button - Show with conditional styling */}
+                                <Tooltip label={request.chatId ? `Chat ID: ${request.chatId}` : "Create a chat to communicate"}>
+                                  <Button
+                                    size="sm"
+                                    onClick={(e) => request.chatId ? handleNavigateToChat(request.chatId, e) : handleCreateChat(request, e)}
+                                    colorScheme={request.chatId ? "green" : "gray"}
+                                    variant="outline"
+                                    leftIcon={<Icon as={BsChatDots} />}
+                                  >
+                                    {request.chatId ? "Message" : "Create Chat"}
+                                  </Button>
+                                </Tooltip>
+                                
+                                {/* View Party Button */}
+                                <Button
+                                  size="sm"
+                                  colorScheme="blue"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewParty(request?.partyId);
+                                  }}
+                                  leftIcon={<Icon as={FaEye} />}
+                                >
+                                  View Party
+                                </Button>
+                              </Flex>
+                            </Flex>
+                          </CardBody>
+                        </Card>
+                      ))}
+                  </SimpleGrid>
+                )}
+              </VStack>
+            </TabPanel>
+            
+            {/* Chats Tab */}
+            <TabPanel>
+              <VStack spacing={6} align="stretch">
+                <Flex justify="space-between" align="center" mb={4}>
+                  <Heading as="h2" size="md">Recent Messages</Heading>
+                  <Button 
+                    size="sm"
+                    colorScheme="brand"
+                    leftIcon={<Icon as={FaComment} />}
+                    onClick={() => router.push('/chats')}
+                  >
+                    View All Chats
+                  </Button>
+                </Flex>
+                
+                {isChatsLoading ? (
+                  <Flex justify="center" p={6}>
+                    <Spinner size="xl" />
+                  </Flex>
+                ) : chats.length === 0 ? (
+                  <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
+                    <Text mb={4}>No active chats.</Text>
+                    <Button 
+                      colorScheme="brand" 
+                      onClick={() => router.push('/chats')}
+                    >
+                      Go to Messages
+                    </Button>
+                  </Box>
+                ) : (
+                  <VStack spacing={4} align="stretch">
+                    {chats.slice(0, 3).map(chat => (
+                      <Card key={chat.id} cursor="pointer" onClick={(e) => handleNavigateToChat(chat.id, e)} _hover={{ shadow: 'md' }} transition="all 0.2s">
+                        <CardBody>
+                          <Flex justify="space-between" align="center">
+                            <Flex align="center">
+                              <Avatar 
+                                name={chat.clientName} 
+                                src={chat.clientAvatar} 
+                                size="md" 
+                                mr={3}
+                              />
+                              <Box>
+                                <Text fontWeight="bold">{chat.clientName}</Text>
+                                <Text fontSize="xs" color="gray.600">
+                                  Re: {chat.serviceName || 'Service request'}
+                                </Text>
+                                <Text noOfLines={1} fontSize="sm" color="gray.600">
+                                  {chat.lastMessage}
+                                </Text>
+                              </Box>
+                            </Flex>
+                            <Box textAlign="right">
+                              <Text fontSize="xs" color="gray.500">
+                                {new Date(chat.timestamp).toLocaleDateString()}
+                              </Text>
+                              {chat.unread > 0 && (
+                                <Badge colorScheme="red" borderRadius="full" mt={1}>
+                                  {chat.unread}
+                                </Badge>
+                              )}
+                            </Box>
+                          </Flex>
+                        </CardBody>
+                      </Card>
+                    ))}
+                    {chats.length > 3 && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => router.push('/chats')}
+                        alignSelf="center"
+                      >
+                        See All ({chats.length}) Conversations
+                      </Button>
+                    )}
+                  </VStack>
+                )}
+              </VStack>
+            </TabPanel>
+            
             {/* Advertising Tab */}
             <TabPanel>
               <VStack spacing={6} align="stretch">
@@ -962,6 +1663,42 @@ export default function ProviderCabinetPage() {
           </TabPanels>
         </Tabs>
       </VStack>
+      
+      {/* Floating Chat Button */}
+      <Box 
+        position="fixed" 
+        bottom="30px" 
+        right="30px" 
+        zIndex={10}
+      >
+        <Tooltip label="Go to Messages">
+          <Button
+            size="lg"
+            colorScheme="brand"
+            borderRadius="full"
+            width="60px"
+            height="60px"
+            boxShadow="lg"
+            onClick={() => router.push('/chats')}
+            position="relative"
+          >
+            <Icon as={FaComment} w={6} h={6} />
+            
+            {chats.filter(c => c.unread > 0).length > 0 && (
+              <Badge 
+                colorScheme="red" 
+                borderRadius="full" 
+                position="absolute" 
+                top="-5px" 
+                right="-5px"
+                px={2}
+              >
+                {chats.filter(c => c.unread > 0).length}
+              </Badge>
+            )}
+          </Button>
+        </Tooltip>
+      </Box>
     </Container>
   );
 }

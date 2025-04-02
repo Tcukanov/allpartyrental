@@ -88,16 +88,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { cityId, name, date, startTime, duration, guestCount } = body;
+    // Determine content type and process accordingly
+    const contentType = request.headers.get('content-type') || '';
+    
+    let partyData: any = {};
+    
+    if (contentType.includes('multipart/form-data')) {
+      // Handle form data
+      const formData = await request.formData();
+      
+      // Extract party data from form
+      partyData = {
+        cityId: formData.get('cityId'),
+        name: formData.get('name'),
+        date: formData.get('date'),
+        startTime: formData.get('time'),
+        duration: parseInt(formData.get('duration') as string) || 2,
+        guestCount: parseInt(formData.get('guestCount') as string) || 10,
+        description: formData.get('description')
+      };
+      
+      // Handle images if needed
+      // const images = formData.getAll('images') as File[];
+      // TODO: Process images if needed
+      
+    } else {
+      // Handle JSON data
+      partyData = await request.json();
+    }
+    
+    const { cityId, name, date, startTime, duration, guestCount } = partyData;
 
     // Validate input
-    if (!cityId || !name || !date || !startTime || !duration || !guestCount) {
+    if (!cityId || !name || !date || !startTime) {
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing required fields' } },
         { status: 400 }
       );
     }
+
+    console.log('Creating party with data:', partyData);
 
     // Create party
     const party = await prisma.party.create({
@@ -107,8 +137,9 @@ export async function POST(request: NextRequest) {
         name,
         date: new Date(date),
         startTime,
-        duration,
-        guestCount,
+        duration: duration || 2,
+        guestCount: guestCount || 10,
+        status: 'DRAFT'
       },
     });
 
@@ -116,7 +147,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Create party error:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' } },
       { status: 500 }
     );
   }

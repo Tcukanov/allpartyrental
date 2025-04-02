@@ -1,32 +1,26 @@
 'use client';
 
-import { Button, Container, Heading, Text, VStack, Box } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, Button, VStack } from '@chakra-ui/react';
 import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <Container maxW="container.lg" py={20}>
-      <VStack spacing={8} align="center" textAlign="center">
-        <Heading as="h1" size="2xl">404 - Page Not Found</Heading>
-        
-        <Box maxW="600px">
-          <Text fontSize="xl" mb={8}>
-            Oops! The page you are looking for doesn't exist or has been moved.
-          </Text>
-          
-          <Text mb={8}>
-            The URL might be incorrect, or the page may have been removed or renamed.
-          </Text>
+    <Container maxW="container.xl" py={20}>
+      <VStack spacing={8} textAlign="center">
+        <Heading as="h1" size="2xl">
+          404 - Page Not Found
+        </Heading>
+        <Text fontSize="xl" color="gray.600">
+          The page you are looking for might have been removed, had its name changed, 
+          or is temporarily unavailable.
+        </Text>
+        <Box>
+          <Link href="/" passHref>
+            <Button colorScheme="brand" size="lg">
+              Return to Home
+            </Button>
+          </Link>
         </Box>
-        
-        <Button
-          as={Link}
-          href="/"
-          colorScheme="brand"
-          size="lg"
-        >
-          Return to Home
-        </Button>
       </VStack>
     </Container>
   );

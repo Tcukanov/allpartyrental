@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { NotificationType } from '@prisma/client'; 
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
       return NextResponse.json(
@@ -31,44 +33,50 @@ export async function POST(
       );
     }
 
-    // Get the request with service data
-    const serviceRequest = await prisma.request.findUnique({
+    // Get the offer with service data
+    const offer = await prisma.offer.findUnique({
       where: { id },
       include: {
         service: {
           select: {
             id: true,
-            providerId: true
+            providerId: true,
+            name: true  // Include the service name
+          }
+        },
+        client: {
+          select: {
+            id: true
           }
         }
       }
     });
 
-    if (!serviceRequest) {
+    if (!offer) {
       return NextResponse.json(
-        { success: false, error: { code: 'NOT_FOUND', message: 'Request not found' } },
+        { success: false, error: { code: 'NOT_FOUND', message: 'Offer not found' } },
         { status: 404 }
       );
     }
 
     // Check if the provider owns the service
-    if (serviceRequest.service.providerId !== user.id) {
+    if (offer.service.providerId !== user.id) {
       return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'You can only manage requests for your own services' } },
+        { success: false, error: { code: 'FORBIDDEN', message: 'You can only manage offers for your own services' } },
         { status: 403 }
       );
     }
 
-    // Check if the request is in PENDING status
-    if (serviceRequest.status !== 'PENDING') {
+    // Check if the offer is in PENDING status
+    if (offer.status !== 'PENDING') {
       return NextResponse.json(
-        { success: false, error: { code: 'BAD_REQUEST', message: 'Only pending requests can be approved' } },
+        { success: false, error: { code: 'BAD_REQUEST', message: 'Only pending offers can be approved' } },
         { status: 400 }
       );
     }
 
-    // Update the request status to APPROVED
-    const updatedRequest = await prisma.request.update({
+    // Update the offer status to APPROVED
+    const updatedOffer = await prisma.offer.update({
       where: { id },
       data: {
         status: 'APPROVED',
@@ -78,17 +86,17 @@ export async function POST(
     // Create a notification for the client
     await prisma.notification.create({
       data: {
-        userId: serviceRequest.clientId,
+        userId: offer.client.id,
         title: 'Service Request Approved',
-        content: `Your request for the service "${serviceRequest.service.name}" has been approved.`,
-        type: 'REQUEST_APPROVED',
+        content: `Your request for the service "${offer.service.name}" has been approved.`,
+        type: NotificationType.SYSTEM,
         isRead: false,
       }
     });
 
     return NextResponse.json({
       success: true,
-      data: updatedRequest
+      data: updatedOffer
     }, { status: 200 });
   } catch (error) {
     console.error('Approve request error:', error);

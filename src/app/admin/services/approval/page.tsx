@@ -98,23 +98,25 @@ export default function ServiceApprovalPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const { isOpen: isRejectModalOpen, onOpen: onRejectModalOpen, onClose: onRejectModalClose } = useDisclosure();
 
-  // Check if user is authenticated and an admin
+  // Authentication check
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/login');
-    } else if (session?.user?.role !== 'ADMIN') {
-      router.push('/');
-      toast({
-        title: 'Access Denied',
-        description: 'Only administrators can access this page',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    } else {
-      fetchPendingServices();
+      router.push('/auth/signin');
+    } else if (status === 'authenticated') {
+      if (session?.user?.role !== 'ADMIN') {
+        router.push('/');
+        toast({
+          title: 'Access Denied',
+          description: 'Only administrators can access this page',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        fetchPendingServices();
+      }
     }
-  }, [session, status, router]);
+  }, [session, status, router, toast]);
 
   const fetchPendingServices = async () => {
     try {
@@ -312,7 +314,7 @@ export default function ServiceApprovalPage() {
             <Card key={service.id} overflow="hidden" variant="outline">
               <Box height="200px" bg="gray.100" position="relative">
                 <Image
-                  src="/service-placeholder.jpg"
+                  src={service.photos?.[0] || ''}
                   alt={service.name}
                   objectFit="cover"
                   width="100%"

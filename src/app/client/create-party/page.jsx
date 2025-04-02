@@ -37,8 +37,7 @@ import {
   NumberDecrementStepper,
   IconButton
 } from '@chakra-ui/react';
-import { useDrag, useDrop } from 'react-dnd';
-import { CloseIcon, AddIcon, DragHandleIcon } from '@chakra-ui/icons';
+import { CloseIcon, AddIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
@@ -83,34 +82,19 @@ const serviceOptions = {
   ],
 };
 
-// Item types for drag and drop
-const ItemTypes = {
-  CATEGORY: 'category',
-  SERVICE_SLOT: 'serviceSlot'
-};
-
-// Draggable category component
-const DraggableCategory = ({ category }) => {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: ItemTypes.CATEGORY,
-    item: { type: ItemTypes.CATEGORY, category },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging()
-    })
-  }));
-
+// Clickable category component
+const ClickableCategory = ({ category, onAddService }) => {
   return (
     <Box
-      ref={drag}
-      opacity={isDragging ? 0.5 : 1}
-      cursor="move"
+      cursor="pointer"
       borderWidth="1px"
       borderRadius="md"
       p={3}
       bg="white"
       shadow="sm"
-      _hover={{ shadow: "md" }}
+      _hover={{ shadow: "md", borderColor: "brand.500" }}
       h="100%"
+      onClick={() => onAddService(category)}
     >
       <VStack spacing={2} align="center" textAlign="center">
         <Text fontSize="2xl">{category.icon}</Text>
@@ -121,30 +105,10 @@ const DraggableCategory = ({ category }) => {
   );
 };
 
-// Service slot component
-const ServiceSlot = ({ service, index, moveService, removeService }) => {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: ItemTypes.SERVICE_SLOT,
-    item: { type: ItemTypes.SERVICE_SLOT, index },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging()
-    })
-  }));
-
-  const [, drop] = useDrop(() => ({
-    accept: ItemTypes.SERVICE_SLOT,
-    hover: (item, monitor) => {
-      if (item.index !== index) {
-        moveService(item.index, index);
-        item.index = index;
-      }
-    }
-  }));
-
+// Selected service component
+const SelectedService = ({ service, index, removeService }) => {
   return (
     <Box
-      ref={(node) => drag(drop(node))}
-      opacity={isDragging ? 0.5 : 1}
       borderWidth="1px"
       borderRadius="md"
       p={3}
@@ -155,7 +119,6 @@ const ServiceSlot = ({ service, index, moveService, removeService }) => {
     >
       <Flex justify="space-between" align="center">
         <HStack>
-          <DragHandleIcon />
           <Text fontWeight="bold">{service.category}</Text>
         </HStack>
         <IconButton
@@ -171,21 +134,11 @@ const ServiceSlot = ({ service, index, moveService, removeService }) => {
   );
 };
 
-// Droppable area component
-const DroppableArea = ({ services, addService, moveService, removeService }) => {
-  const [, drop] = useDrop(() => ({
-    accept: ItemTypes.CATEGORY,
-    drop: (item, monitor) => {
-      const { category } = item;
-      addService(category);
-      return { moved: true };
-    }
-  }));
-
+// Selected services area component
+const SelectedServicesArea = ({ services, removeService }) => {
   return (
     <Box
-      ref={drop}
-      minH="300px"
+      minH="100px"
       borderWidth="2px"
       borderRadius="md"
       borderStyle="dashed"
@@ -196,17 +149,16 @@ const DroppableArea = ({ services, addService, moveService, removeService }) => 
     >
       {services.length === 0 ? (
         <VStack spacing={2} align="center" justify="center" h="100%" color="gray.500">
-          <Text>Drag and drop service categories here</Text>
-          <Text fontSize="sm">Example: Decorations, Catering, Entertainment</Text>
+          <Text>No services selected yet</Text>
+          <Text fontSize="sm">Click on a service category to add it</Text>
         </VStack>
       ) : (
         <VStack spacing={2} align="stretch">
           {services.map((service, index) => (
-            <ServiceSlot
+            <SelectedService
               key={index}
               service={service}
               index={index}
-              moveService={moveService}
               removeService={removeService}
             />
           ))}
@@ -218,6 +170,50 @@ const DroppableArea = ({ services, addService, moveService, removeService }) => 
 
 // Event Details Form
 const EventDetailsForm = ({ eventDetails, setEventDetails }) => {
+  const [cities, setCities] = useState([]);
+  const [isCitiesLoading, setIsCitiesLoading] = useState(true);
+  const toast = useToast();
+  
+  // Fetch cities from API
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        setIsCitiesLoading(true);
+        const response = await fetch('/api/cities');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch cities');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          setCities(data.data);
+          
+          // Auto-select first city if none is selected
+          if (data.data.length > 0 && !eventDetails.cityId) {
+            setEventDetails(prev => ({ ...prev, cityId: data.data[0].id }));
+          }
+        } else {
+          setCities([]);
+        }
+      } catch (error) {
+        console.error('Error fetching cities:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load cities. Please try again.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setIsCitiesLoading(false);
+      }
+    };
+    
+    fetchCities();
+  }, [toast, eventDetails.cityId, setEventDetails]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setEventDetails({ ...eventDetails, [name]: value });
@@ -235,12 +231,12 @@ const EventDetailsForm = ({ eventDetails, setEventDetails }) => {
     <VStack spacing={6} align="stretch">
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
         <FormControl isRequired>
-          <FormLabel>Party Name</FormLabel>
+          <FormLabel>Service looking for</FormLabel>
           <Input 
             name="name" 
             value={eventDetails.name || ''} 
             onChange={handleChange} 
-            placeholder="e.g., Sarah's 7th Birthday" 
+            placeholder="e.g., Birthday Decorations" 
           />
         </FormControl>
         
@@ -251,9 +247,19 @@ const EventDetailsForm = ({ eventDetails, setEventDetails }) => {
             value={eventDetails.cityId || ''} 
             onChange={handleChange}
             placeholder="Select a city"
+            isDisabled={isCitiesLoading}
           >
-            {/* Add your city options here */}
+            {cities.map(city => (
+              <option key={city.id} value={city.id}>
+                {city.name}, {city.state}
+              </option>
+            ))}
           </Select>
+          {isCitiesLoading && (
+            <Text fontSize="xs" color="gray.500" mt={1}>
+              Loading cities...
+            </Text>
+          )}
         </FormControl>
         
         <FormControl isRequired>
@@ -456,18 +462,30 @@ export default function PartyConfiguratorPage() {
   
   // Add a service to the list
   const addService = useCallback((category) => {
+    // Check if the service is already added
+    const isAlreadyAdded = services.some(service => service.category === category.name);
+    
+    if (isAlreadyAdded) {
+      toast({
+        title: "Service already added",
+        description: `${category.name} is already in your list`,
+        status: "info",
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+    
     setServices(prev => [...prev, { category: category.name }]);
-  }, []);
-  
-  // Move a service within the list (reordering)
-  const moveService = useCallback((fromIndex, toIndex) => {
-    setServices(prev => {
-      const newServices = [...prev];
-      const [movedService] = newServices.splice(fromIndex, 1);
-      newServices.splice(toIndex, 0, movedService);
-      return newServices;
+    
+    toast({
+      title: "Service added",
+      description: `${category.name} added to your party`,
+      status: "success",
+      duration: 2000,
+      isClosable: true,
     });
-  }, []);
+  }, [services, toast]);
   
   // Remove a service from the list
   const removeService = useCallback((index) => {
@@ -518,71 +536,6 @@ export default function PartyConfiguratorPage() {
   const handlePrevious = () => {
     setActiveStep(prev => prev - 1);
   };
-  
-  // Handle form submission
-  const handleSubmit = async () => {
-    try {
-      // Validate required fields
-      if (!eventDetails.cityId) {
-        toast({
-          title: 'Location required',
-          description: 'Please select a city for your party',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-        return;
-      }
-
-      // Create FormData for image upload
-      const formData = new FormData();
-      images.forEach((image, index) => {
-        formData.append(`images[${index}]`, image);
-      });
-
-      // Add other party details
-      Object.keys(eventDetails).forEach(key => {
-        formData.append(key, eventDetails[key]);
-      });
-
-      // Submit the form
-      const response = await fetch('/api/parties', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create party');
-      }
-
-      const data = await response.json();
-      
-      toast({
-        title: 'Party created successfully',
-        description: 'Your party has been created and is pending approval',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
-
-      router.push(`/client/parties/${data.id}`);
-    } catch (error) {
-      console.error('Error creating party:', error);
-      toast({
-        title: 'Error creating party',
-        description: 'There was an error creating your party. Please try again.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-  
-  const steps = [
-    { title: 'Select Services', description: 'Choose what you need' },
-    { title: 'Event Details', description: 'When and where' },
-    { title: 'Service Options', description: 'Customize your choices' },
-  ];
   
   // Add image state
   const [images, setImages] = useState([]);
@@ -656,6 +609,100 @@ export default function PartyConfiguratorPage() {
     </Box>
   );
 
+  // Handle form submission
+  const handleSubmit = async () => {
+    try {
+      // Validate required fields
+      if (!eventDetails.cityId) {
+        toast({
+          title: 'Location required',
+          description: 'Please select a city for your party',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      if (!eventDetails.name) {
+        toast({
+          title: 'Service name required',
+          description: 'Please enter what service you are looking for',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      if (!eventDetails.date || !eventDetails.time) {
+        toast({
+          title: 'Date and time required',
+          description: 'Please select a date and time for your event',
+          status: 'error',
+          duration: 5000, 
+          isClosable: true,
+        });
+        return;
+      }
+
+      // Prepare party data
+      const partyData = {
+        name: eventDetails.name,
+        cityId: eventDetails.cityId, 
+        date: eventDetails.date,
+        startTime: eventDetails.time,
+        duration: eventDetails.duration || 3,
+        guestCount: eventDetails.guestCount || 20,
+        description: eventDetails.description || '',
+        services: services.map(service => service.category)
+      };
+
+      console.log('Submitting party data:', partyData);
+
+      // Submit the form as JSON instead of FormData
+      const response = await fetch('/api/parties', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(partyData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to create party');
+      }
+
+      const data = await response.json();
+      
+      toast({
+        title: 'Party created successfully',
+        description: 'Your party has been created and is pending approval',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+
+      router.push(`/client/my-party?id=${data.data.id}`);
+    } catch (error) {
+      console.error('Error creating party:', error);
+      toast({
+        title: 'Error creating party',
+        description: error.message || 'Failed to create party. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+  
+  const steps = [
+    { title: 'Select Services', description: 'Choose what you need' },
+    { title: 'Event Details', description: 'When and where' },
+    { title: 'Service Options', description: 'Customize your choices' },
+  ];
+
   return (
     <Container maxW="container.md" py={8}>
       <VStack spacing={8} align="stretch">
@@ -663,63 +710,100 @@ export default function PartyConfiguratorPage() {
           <Heading as="h1" size="xl">Create New Party</Heading>
           <Text color="gray.600" mt={2}>
             Fill in the details below to start planning your party
-            </Text>
+          </Text>
+        </Box>
+        
+        <Stepper index={activeStep} mb={8}>
+          {steps.map((step, index) => (
+            <Step key={index}>
+              <StepIndicator>
+                <StepStatus 
+                  complete={<StepIndicator />}
+                  incomplete={<StepIndicator />}
+                  active={<StepIndicator />}
+                />
+              </StepIndicator>
+              <Box flexShrink='0'>
+                <StepTitle>{step.title}</StepTitle>
+                <StepDescription>{step.description}</StepDescription>
               </Box>
-              
-        <form onSubmit={handleSubmit}>
-          <VStack spacing={6} align="stretch">
-            <FormControl isRequired>
-              <FormLabel>Party Name</FormLabel>
-              <Input placeholder="Enter party name" />
-            </FormControl>
-
-            <FormControl isRequired>
-              <FormLabel>Party Type</FormLabel>
-              <Select placeholder="Select party type">
-                <option value="birthday">Birthday Party</option>
-                <option value="wedding">Wedding Reception</option>
-                <option value="corporate">Corporate Event</option>
-                <option value="other">Other</option>
-              </Select>
-            </FormControl>
-
-            <FormControl isRequired>
-              <FormLabel>Date</FormLabel>
-              <Input type="date" />
-            </FormControl>
-
-            <FormControl isRequired>
-              <FormLabel>Time</FormLabel>
-              <Input type="time" />
-            </FormControl>
-
-            <FormControl isRequired>
-              <FormLabel>Number of Guests</FormLabel>
-              <NumberInput min={1} max={1000}>
-                <NumberInputField />
-                <NumberInputStepper>
-                  <NumberIncrementStepper />
-                  <NumberDecrementStepper />
-                </NumberInputStepper>
-              </NumberInput>
-            </FormControl>
-
-            <FormControl>
-              <FormLabel>Location</FormLabel>
-              <Input placeholder="Enter party location" />
-            </FormControl>
-
-            <FormControl>
-              <FormLabel>Theme</FormLabel>
-              <Input placeholder="Enter party theme (optional)" />
-            </FormControl>
-
-            <Button type="submit" colorScheme="brand" size="lg">
+              <StepSeparator />
+            </Step>
+          ))}
+        </Stepper>
+        
+        {activeStep === 0 && (
+          <Box>
+            <Heading size="md" mb={4}>Select Services</Heading>
+            <Text mb={4}>Click on a service category to add it to your party</Text>
+            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={6}>
+              {serviceCategories.map((category) => (
+                <ClickableCategory 
+                  key={category.id} 
+                  category={category} 
+                  onAddService={addService}
+                />
+              ))}
+            </SimpleGrid>
+            
+            <Heading size="sm" mb={2} mt={6}>Selected Services</Heading>
+            <SelectedServicesArea 
+              services={services} 
+              removeService={removeService} 
+            />
+          </Box>
+        )}
+        
+        {activeStep === 1 && (
+          <Box>
+            <Heading size="md" mb={4}>Event Details</Heading>
+            <EventDetailsForm 
+              eventDetails={eventDetails}
+              setEventDetails={setEventDetails}
+            />
+            <Box mt={6}>
+              <ImagePreview />
+            </Box>
+          </Box>
+        )}
+        
+        {activeStep === 2 && (
+          <Box>
+            <Heading size="md" mb={4}>Service Options</Heading>
+            <ServiceOptionsForm 
+              services={services}
+              serviceOptions={serviceSpecificOptions}
+              setServiceOptions={setServiceSpecificOptions}
+            />
+          </Box>
+        )}
+        
+        <HStack justify="space-between" mt={8}>
+          <Button
+            isDisabled={activeStep === 0}
+            onClick={handlePrevious}
+            variant="outline"
+          >
+            Previous
+          </Button>
+          
+          {activeStep < 2 ? (
+            <Button
+              colorScheme="brand"
+              onClick={handleNext}
+            >
+              Next
+            </Button>
+          ) : (
+            <Button
+              colorScheme="brand"
+              onClick={handleSubmit}
+            >
               Create Party
             </Button>
-          </VStack>
-        </form>
+          )}
+        </HStack>
       </VStack>
-      </Container>
+    </Container>
   );
 }

@@ -128,10 +128,21 @@ export default async function ProviderProfilePage({ params }: { params: { id: st
                     {provider.services.map((service) => (
                       <Card key={service.id} overflow="hidden">
                         <Image
-                          src={Array.isArray(service.photos) ? service.photos[0] : '/images/placeholder.jpg'}
+                          src={Array.isArray(service.photos) && service.photos.length > 0 ? service.photos[0] : ''}
                           alt={service.name}
                           height="200px"
                           objectFit="cover"
+                          fallback={
+                            <Box
+                              height="200px"
+                              bg="gray.200"
+                              display="flex"
+                              alignItems="center"
+                              justifyContent="center"
+                            >
+                              <Text color="gray.500">No image available</Text>
+                            </Box>
+                          }
                         />
                         <CardBody>
                           <VStack align="stretch" spacing={4}>

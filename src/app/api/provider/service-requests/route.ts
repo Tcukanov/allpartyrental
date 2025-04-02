@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { NotificationType } from '@prisma/client';
 
 // Create a new service request
 export async function POST(req: NextRequest) {
@@ -111,14 +112,25 @@ export async function POST(req: NextRequest) {
       }
     });
     
-    // Create notification for the provider
+    // Create notification for the message
     await prisma.notification.create({
       data: {
         userId: service.providerId,
-        type: 'MESSAGE',
-        title: 'New Service Request',
-        content: `You have a new request for ${service.name}`,
+        type: NotificationType.MESSAGE,
+        title: 'New Message',
+        content: `You have a new message regarding ${service.name}. Click to view chat ID: ${chat.id}`,
         isRead: false
+      }
+    });
+    
+    // Create a separate notification for the service request
+    await prisma.notification.create({
+      data: {
+        userId: service.providerId,
+        type: NotificationType.SYSTEM,
+        title: 'New Service Request',
+        content: `You have a new service request for ${service.name}. Please review and respond.`,
+        isRead: false,
       }
     });
     

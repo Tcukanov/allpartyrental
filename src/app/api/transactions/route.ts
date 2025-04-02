@@ -328,40 +328,9 @@ export async function POST(request: NextRequest) {
             amount: amount
           });
           
-          // Instead of using the Prisma ORM directly, try using Prisma's direct SQL execute function
-          // This will help us see the exact SQL error that might be occurring
+          // Use proper Prisma transaction creation without duplication
           try {
-            console.log("Attempting to create transaction via direct SQL");
-            
-            const result = await prisma.$queryRaw`
-              INSERT INTO "Transaction" (
-                "id", 
-                "offerId", 
-                "partyId", 
-                "amount", 
-                "status", 
-                "clientFeePercent", 
-                "providerFeePercent", 
-                "createdAt", 
-                "updatedAt"
-              ) 
-              VALUES (
-                ${randomUUID()}, 
-                ${offer.id}, 
-                ${party.id}, 
-                ${amount}, 
-                'PENDING', 
-                5.0, 
-                10.0, 
-                ${new Date()}, 
-                ${new Date()}
-              )
-              RETURNING *;
-            `;
-            
-            console.log("SQL transaction creation result:", result);
-            
-            // If we get here, the SQL worked, now try a normal Prisma create
+            // Create the transaction using Prisma's standard approach
             transaction = await prisma.transaction.create({
               data: {
                 offerId: offer.id,
@@ -378,28 +347,38 @@ export async function POST(request: NextRequest) {
             });
             
             console.log(`Created transaction with ID: ${transaction.id}`);
-          } catch (sqlError) {
-            console.error("SQL error creating transaction:", sqlError);
-            
-            // Fall back to the original method
-            console.log("Falling back to direct transaction creation");
-            transaction = await prisma.transaction.create({
-              data: {
-                offerId: offer.id,
-                partyId: party.id,
-                amount: new Prisma.Decimal(amount),
-                status: 'PENDING',
-                clientFeePercent: 5.0,
-                providerFeePercent: 10.0
+          } catch (prismaError) {
+            // Check if this is a unique constraint error (transaction already exists)
+            if (prismaError instanceof Prisma.PrismaClientKnownRequestError && 
+                prismaError.code === 'P2002') {
+              console.log("Transaction already exists for this offer, retrieving existing transaction");
+              
+              // Retrieve the existing transaction
+              const existingTransaction = await prisma.transaction.findUnique({
+                where: { offerId: offer.id },
+                include: { 
+                  offer: true,
+                  party: true
+                }
+              });
+              
+              if (existingTransaction) {
+                console.log(`Found existing transaction for offer ${offer.id}: ${existingTransaction.id}`);
+                return NextResponse.json({ 
+                  success: true, 
+                  data: { 
+                    transaction: existingTransaction,
+                    isExisting: true 
+                  } 
+                }, { status: 200 });
+              } else {
+                throw new Error(`Could not find existing transaction for offer ${offer.id} despite unique constraint error`);
               }
-            });
+            }
+            
+            // Rethrow any other error
+            throw prismaError;
           }
-          
-          if (!transaction) {
-            throw new Error("Transaction creation methods failed but no error was thrown");
-          }
-          
-          console.log(`Transaction created successfully: ${transaction.id}`);
           
           return NextResponse.json({ 
             success: true, 

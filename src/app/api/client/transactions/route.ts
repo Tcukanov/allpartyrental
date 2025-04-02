@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
@@ -25,8 +27,9 @@ export async function GET(request: NextRequest) {
 
     // Get client's user ID
     const userId = session.user.id;
+    console.log(`Fetching transactions for client: ${userId}`);
 
-    // Fetch all transactions for this client
+    // Get transactions directly with the needed relationships
     const transactions = await prisma.transaction.findMany({
       where: {
         offer: {
@@ -43,16 +46,24 @@ export async function GET(request: NextRequest) {
                 name: true,
                 email: true
               }
+            },
+            partyService: {
+              include: {
+                party: true
+              }
             }
           }
-        },
-        party: true
+        }
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
 
+    console.log(`Found ${transactions.length} transactions for client ${userId}`);
+    
+    // Instead of filtering on the database, we'll send all transactions
+    // and let the frontend deduplicate them appropriately
     return NextResponse.json(transactions);
   } catch (error) {
     console.error('Error fetching client transactions:', error);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import {
@@ -68,24 +68,27 @@ export default function ProviderRequestsPage() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   // Check if user is authenticated and a provider
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/login');
-    } else if (session?.user?.role !== 'PROVIDER') {
-      router.push('/');
-      toast({
-        title: 'Access Denied',
-        description: 'Only providers can access this page',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    } else {
-      fetchOffers();
+      router.push('/auth/signin');
+    } else if (status === 'authenticated') {
+      if (session?.user?.role !== 'PROVIDER') {
+        router.push('/');
+        toast({
+          title: 'Access Denied',
+          description: 'Only service providers can access this page',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        fetchOffers();
+      }
     }
-  }, [session, status, router]);
+  }, [session, status, router, toast]);
 
   const fetchOffers = async () => {
     try {
@@ -307,7 +310,11 @@ export default function ProviderRequestsPage() {
         )}
       </VStack>
 
-      <AlertDialog isOpen={isOpen} onClose={onClose}>
+      <AlertDialog 
+        isOpen={isOpen} 
+        onClose={onClose}
+        leastDestructiveRef={cancelRef}
+      >
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -317,7 +324,7 @@ export default function ProviderRequestsPage() {
               Are you sure you want to {actionType} this offer?
             </AlertDialogBody>
             <AlertDialogFooter>
-              <Button onClick={onClose}>Cancel</Button>
+              <Button ref={cancelRef} onClick={onClose}>Cancel</Button>
               <Button
                 colorScheme={actionType === 'approve' ? 'green' : 'red'}
                 onClick={() => {

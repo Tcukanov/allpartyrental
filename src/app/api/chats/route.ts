@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -12,6 +14,27 @@ export async function GET() {
         { error: 'Unauthorized' },
         { status: 401 }
       );
+    }
+
+    console.log(`Fetching chats for user ID: ${session.user.id}, role: ${session.user.role}`);
+
+    // First check if user has any offers as provider
+    if (session.user.role === 'PROVIDER') {
+      const providerOffers = await prisma.offer.findMany({
+        where: {
+          providerId: session.user.id
+        },
+        select: {
+          id: true
+        }
+      });
+
+      console.log(`Provider has ${providerOffers.length} offers`);
+      
+      // Log the offer IDs
+      if (providerOffers.length > 0) {
+        console.log("Offer IDs:", providerOffers.map(o => o.id));
+      }
     }
 
     const chats = await prisma.chat.findMany({
@@ -47,6 +70,12 @@ export async function GET() {
                   }
                 }
               }
+            },
+            service: {
+              select: {
+                id: true,
+                name: true
+              }
             }
           }
         },
@@ -61,6 +90,24 @@ export async function GET() {
         updatedAt: 'desc'
       }
     });
+
+    console.log(`Found ${chats.length} chats for user ID: ${session.user.id}`);
+    
+    // Debug: log each chat's offer details
+    if (chats.length > 0) {
+      chats.forEach((chat, index) => {
+        console.log(`Chat ${index + 1}:`, {
+          chatId: chat.id,
+          offerId: chat.offerId,
+          hasOffer: !!chat.offer,
+          clientId: chat.offer?.clientId,
+          providerId: chat.offer?.providerId,
+          clientName: chat.offer?.client?.name,
+          providerName: chat.offer?.provider?.name,
+          messagesCount: chat.messages?.length || 0
+        });
+      });
+    }
 
     return NextResponse.json({ chats });
   } catch (error) {

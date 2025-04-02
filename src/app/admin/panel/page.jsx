@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Box, Container, Heading, Text, VStack, Tabs, TabList, TabPanels, Tab, TabPanel, SimpleGrid, Card, CardBody, Flex, Badge, Button, HStack, Stat, StatLabel, StatNumber, StatHelpText, Table, Thead, Tbody, Tr, Th, Td, useToast, Select, Input, FormControl, FormLabel, Switch } from '@chakra-ui/react';
-import MainLayout from '@/components/layout/MainLayout';
 import { useRouter } from 'next/navigation';
 import { AddIcon, DeleteIcon, EditIcon, WarningIcon, CheckIcon, InfoIcon } from '@chakra-ui/icons';
 import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
@@ -306,9 +305,14 @@ export default function AdminPanelPage() {
   };
 
   return (
-    <MainLayout>
-      <Container maxW="container.xl" py={8}>
-        <Heading as="h1" size="xl" mb={6}>Admin Dashboard</Heading>
+    <Container maxW="container.xl">
+      <VStack spacing={8} align="stretch">
+        <Box>
+          <Heading as="h1" size="xl">Admin Dashboard</Heading>
+          <Text color="gray.600" mt={2}>
+            Manage users, disputes, and system settings
+          </Text>
+        </Box>
         
         <Box mb={6}>
           <Flex direction={{ base: "column", md: "row" }} gap={4}>
@@ -549,7 +553,7 @@ export default function AdminPanelPage() {
             </TabPanel>
           </TabPanels>
         </Tabs>
-      </Container>
-    </MainLayout>
+      </VStack>
+    </Container>
   );
 }

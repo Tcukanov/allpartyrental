@@ -79,6 +79,17 @@ export default function CreateServicePage() {
       try {
         setIsLoading(true);
         
+        // Check authentication status from the useSession hook result
+        if (status === 'unauthenticated') {
+          router.push('/auth/signin');
+          return;
+        }
+        
+        if (session?.user?.role !== 'PROVIDER') {
+          router.push('/');
+          return;
+        }
+        
         // Fetch categories
         const categoriesResponse = await fetch('/api/categories');
         if (!categoriesResponse.ok) {
@@ -115,49 +126,7 @@ export default function CreateServicePage() {
     };
     
     fetchCategoriesAndCities();
-  }, [toast]);
-  
-  // Redirect if not authenticated or not a provider
-  if (status === 'loading' || isLoading) {
-    return (
-      <Flex justify="center" align="center" height="100vh">
-        <Spinner size="xl" />
-      </Flex>
-    );
-  }
-  
-  if (status === 'unauthenticated') {
-    router.push('/auth/login');
-    return null;
-  }
-  
-  if (session?.user?.role !== 'PROVIDER') {
-    router.push('/');
-    toast({
-      title: 'Access Denied',
-      description: 'Only providers can access this page',
-      status: 'error',
-      duration: 3000,
-      isClosable: true,
-    });
-    return null;
-  }
-  
-  if (loadingError) {
-    return (
-      <Container maxW="container.md" py={8}>
-        <VStack spacing={8} align="stretch">
-          <Heading as="h1" size="xl">Create New Service</Heading>
-          <Box p={6} bg="red.50" borderRadius="md">
-            <Text color="red.600">{loadingError}</Text>
-            <Button mt={4} onClick={() => window.location.reload()}>
-              Try Again
-            </Button>
-          </Box>
-        </VStack>
-      </Container>
-    );
-  }
+  }, [toast, router, session, status]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

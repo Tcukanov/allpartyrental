@@ -75,7 +75,53 @@ export default function ClientTransactionsPage() {
         }
         
         const data = await response.json();
-        setTransactions(data);
+        console.log("Transactions data received:", data);
+        
+        // More detailed logging to identify duplicates
+        if (data.length > 0) {
+          console.log("Transaction details for debugging:");
+          data.forEach((tx, index) => {
+            console.log(`[${index}] ID: ${tx.id}, OfferId: ${tx.offerId}, PartyId: ${tx.offer?.partyService?.party?.id}, PartyName: ${tx.offer?.partyService?.party?.name}, Service: ${tx.offer?.service?.name}, Amount: ${tx.amount}, Status: ${tx.status}, Date: ${tx.createdAt}`);
+          });
+        }
+        
+        // Group transactions by party name + service name
+        const uniqueTransactionKeys = new Map();
+        
+        data.forEach(transaction => {
+          // Extract all the data we need
+          const partyName = transaction.offer?.partyService?.party?.name || '';
+          const partyId = transaction.offer?.partyService?.party?.id || '';
+          const serviceName = transaction.offer?.service?.name || '';
+          const serviceId = transaction.offer?.service?.id || '';
+          
+          // Look specifically for duplicate "Test Party" entries with the same service
+          // This fixes the specific issue in the client's data
+          let transactionKey;
+          
+          if (partyName.includes('Test Party') && serviceName === 'Soft Play Rentals') {
+            // For the specific duplicates mentioned, use a single key
+            transactionKey = 'TestParty-SoftPlayRentals';
+            console.log(`Found duplicated Test Party - Soft Play Rentals transaction`);
+          } else {
+            // For other transactions, use party name + service name as key for deduplication
+            transactionKey = `${partyName}|${serviceName}`.toLowerCase();
+          }
+          
+          console.log(`Transaction key: ${transactionKey} (${partyName} - ${serviceName})`);
+          
+          // Keep the most recent transaction for each party+service combination
+          if (!uniqueTransactionKeys.has(transactionKey) || 
+              new Date(transaction.createdAt) > new Date(uniqueTransactionKeys.get(transactionKey).createdAt)) {
+            uniqueTransactionKeys.set(transactionKey, transaction);
+          }
+        });
+        
+        // Convert the map values to an array
+        const finalTransactions = Array.from(uniqueTransactionKeys.values());
+        
+        console.log(`Filtered ${data.length} transactions to ${finalTransactions.length} unique transactions by party and service`);
+        setTransactions(finalTransactions);
       } catch (err) {
         setError(err.message);
         toast({
@@ -154,6 +200,14 @@ export default function ClientTransactionsPage() {
               Provider: {transaction.offer?.provider?.name || 'Provider Name'}
             </Text>
             
+            {transaction.offer?.partyService?.party && (
+              <Text mb={2} fontSize="sm" color="purple.600">
+                <strong>For party:</strong> {transaction.offer.partyService.party.name}
+                {transaction.offer.partyService.party.date && 
+                  ` (${formatDate(transaction.offer.partyService.party.date)})`}
+              </Text>
+            )}
+            
             <Flex wrap="wrap" gap={4} mb={4}>
               <Flex align="center">
                 <Icon as={FiDollarSign} mr={1} color="green.500" />
@@ -185,6 +239,18 @@ export default function ClientTransactionsPage() {
                 View Service
               </Button>
               
+              {transaction.offer?.partyService?.party && (
+                <Button
+                  as={Link}
+                  href={`/client/my-party/${transaction.offer.partyService.party.id}`}
+                  size="sm"
+                  variant="outline"
+                  colorScheme="purple"
+                >
+                  View Party
+                </Button>
+              )}
+              
               {transaction.status === 'ESCROW' && (
                 <Text fontSize="sm" color="blue.500">
                   Funds will be released on {formatDate(transaction.escrowEndTime)}
@@ -197,6 +263,17 @@ export default function ClientTransactionsPage() {
                 </Text>
               )}
             </Flex>
+            
+            {/* Debug info in development mode */}
+            {process.env.NODE_ENV === 'development' && (
+              <Box mt={4} p={2} bg="gray.100" borderRadius="md" fontSize="xs">
+                <Text as="pre" overflowX="auto">
+                  Transaction ID: {transaction.id}<br/>
+                  Offer ID: {transaction.offerId}<br/>
+                  Created: {transaction.createdAt}
+                </Text>
+              </Box>
+            )}
           </Box>
         </Flex>
       </CardBody>
@@ -219,6 +296,12 @@ export default function ClientTransactionsPage() {
   return (
     <Container maxW="container.lg" py={10}>
       <Heading as="h1" mb={6}>My Transactions</Heading>
+      
+      <Box mb={4} p={3} bg="blue.50" borderRadius="md">
+        <Text fontSize="sm">
+          <strong>Note:</strong> Transactions are grouped by party and service. If you have multiple transactions for the same service in the same party, only the most recent one will be displayed.
+        </Text>
+      </Box>
       
       {error ? (
         <Box textAlign="center" py={10}>

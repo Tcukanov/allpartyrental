@@ -158,34 +158,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-export async function GETAll() {
-  try {
-    const services = await prisma.service.findMany({
-      include: {
-        city: true,
-        category: true,
-        provider: true,
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: services
-    });
-  } catch (error) {
-    console.error('Error fetching services:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          message: 'Failed to fetch services'
-        }
-      },
-      { status: 500 }
-    );
-  }
-}

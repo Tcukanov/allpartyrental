@@ -154,3 +154,110 @@ export default function CategoryPage() {
       </MainLayout>
     );
   }
+  
+  return (
+    <MainLayout>
+      <Container maxW="container.xl" py={8}>
+        {/* Breadcrumb navigation */}
+        <Breadcrumb separator={<ChevronRightIcon color="gray.500" />} mb={6}>
+          <BreadcrumbItem>
+            <BreadcrumbLink as={Link} href="/">Home</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbItem>
+            <BreadcrumbLink as={Link} href="/services">Services</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbItem isCurrentPage>
+            <BreadcrumbLink>{category?.name}</BreadcrumbLink>
+          </BreadcrumbItem>
+        </Breadcrumb>
+        
+        {/* Category header */}
+        <Box mb={8}>
+          <Heading as="h1" size="2xl" mb={4}>{category?.name}</Heading>
+          <Text fontSize="lg" color="gray.600">{category?.description}</Text>
+        </Box>
+        
+        {/* Search and filter */}
+        <Flex 
+          direction={{ base: 'column', md: 'row' }} 
+          gap={4} 
+          mb={8} 
+          p={4} 
+          bg="white" 
+          borderRadius="md" 
+          boxShadow="sm"
+        >
+          <Box as="form" onSubmit={handleSearch} flex="1">
+            <InputGroup>
+              <InputLeftElement pointerEvents="none">
+                <SearchIcon color="gray.400" />
+              </InputLeftElement>
+              <Input 
+                placeholder="Search services" 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </InputGroup>
+          </Box>
+          
+          <Select 
+            value={sortOption} 
+            onChange={handleSortChange} 
+            width={{ base: 'full', md: '200px' }}
+          >
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="name_asc">Name: A to Z</option>
+            <option value="newest">Newest First</option>
+          </Select>
+        </Flex>
+        
+        {/* Services grid */}
+        {services.length > 0 ? (
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+            {services.map(service => (
+              <Card key={service.id} overflow="hidden" variant="outline">
+                <Image 
+                  src={service.photos?.[0] || '/images/placeholder-service.jpg'} 
+                  alt={service.name}
+                  h="200px"
+                  objectFit="cover"
+                />
+                <CardBody>
+                  <Heading as="h3" size="md" mb={2}>{service.name}</Heading>
+                  <Text noOfLines={2} mb={3} color="gray.600">{service.description}</Text>
+                  
+                  <Flex justify="space-between" align="center" mb={3}>
+                    <Badge colorScheme="brand" px={2} py={1}>
+                      {service.city?.name}
+                    </Badge>
+                    <Text fontWeight="bold" fontSize="lg">
+                      ${service.price.toFixed(2)}
+                    </Text>
+                  </Flex>
+                  
+                  <Button 
+                    as={Link} 
+                    href={`/services/${service.id}`}
+                    colorScheme="brand" 
+                    variant="outline" 
+                    width="full"
+                  >
+                    View Details
+                  </Button>
+                </CardBody>
+              </Card>
+            ))}
+          </SimpleGrid>
+        ) : (
+          <Box textAlign="center" py={10}>
+            <Heading as="h3" size="md" mb={3}>No services found</Heading>
+            <Text color="gray.600">
+              We couldn't find any {category?.name} services matching your criteria.
+            </Text>
+          </Box>
+        )}
+      </Container>
+    </MainLayout>
+  );
+}

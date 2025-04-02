@@ -78,10 +78,10 @@ export default function ChatsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Check if user is authenticated
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/login');
+      router.push('/auth/signin');
     } else if (status === 'authenticated') {
       fetchChats();
     }

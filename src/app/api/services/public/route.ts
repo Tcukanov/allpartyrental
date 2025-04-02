@@ -1,9 +1,10 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get query parameters
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     const cityId = searchParams.get('cityId');
@@ -31,8 +32,8 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       where.OR = [
-        { name: { contains: search } },
-        { description: { contains: search } }
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -75,19 +76,14 @@ export async function GET(request: NextRequest) {
     const services = await prisma.service.findMany({
       where,
       include: {
-        city: true,
-        category: true,
         provider: {
           select: {
             id: true,
             name: true,
-            profile: {
-              select: {
-                avatar: true
-              }
-            }
-          }
-        }
+          },
+        },
+        category: true,
+        city: true,
       },
       orderBy,
       skip,
@@ -106,15 +102,14 @@ export async function GET(request: NextRequest) {
         limit,
         pages: Math.ceil(total / limit),
       },
-    });
+    }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching services:', error);
+    console.error('Error fetching public services:', error);
     return NextResponse.json(
-      {
+      { 
         success: false,
         error: {
-          message: 'Failed to fetch services',
-          details: error instanceof Error ? error.message : String(error)
+          message: 'Failed to fetch services'
         }
       },
       { status: 500 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Card, CardBody, Image, VStack, HStack, Badge, Button, Icon, Text, Heading } from '@chakra-ui/react';
+import { Box, Card, CardBody, Image, VStack, HStack, Badge, Button, Icon, Text, Heading, Center } from '@chakra-ui/react';
 import { StarIcon, ViewIcon } from '@chakra-ui/icons';
 import { Service, User, Profile, ServiceCategory } from '@prisma/client';
 
@@ -20,10 +20,15 @@ export default function ServiceCard({ service, cityName }: ServiceCardProps) {
   return (
     <Card overflow="hidden">
       <Image
-        src={service.photos[0] || '/images/placeholder.jpg'}
+        src={service.photos?.[0] || ''}
         alt={service.name}
         height="200px"
         objectFit="cover"
+        fallback={
+          <Center height="200px" bg="gray.200">
+            <Text color="gray.500">No Image Available</Text>
+          </Center>
+        }
       />
       <CardBody>
         <VStack align="stretch" spacing={4}>

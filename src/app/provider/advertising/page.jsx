@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Elements } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import PaymentComponent from '@/components/payment/PaymentComponent';
 import {
@@ -21,8 +21,8 @@ import {
   List,
   ListItem,
   ListIcon,
-  CheckIcon,
 } from '@chakra-ui/react';
+import { CheckIcon } from '@chakra-ui/icons';
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);

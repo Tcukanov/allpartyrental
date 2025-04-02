@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from 'react';
-import { Box, Container, Heading, Text, VStack, HStack, FormControl, FormLabel, Input, Select, Textarea, Button, useToast, SimpleGrid, Card, CardBody, Flex, Badge, Grid, GridItem, Tooltip } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, VStack, HStack, FormControl, FormLabel, Input, Select, Textarea, Button, useToast, SimpleGrid, Card, CardBody, Flex, Badge, Grid, GridItem, Tooltip, IconButton } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon, AddIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
 
 // Service types that can be added to the party
 const serviceTypes = [
@@ -117,6 +118,11 @@ export default function PartyConfiguratorPage() {
     notes: ''
   });
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Calculate days to display in the calendar
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   // Handle dropping a service into the droppable area
   const handleDrop = (service, isRemove = false) => {

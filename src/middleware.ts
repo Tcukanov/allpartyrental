@@ -19,30 +19,44 @@ const RESERVED_PATHS = [
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  
+  // Skip all application routes that start with reserved prefixes
+  // These are legitimate application routes, not dynamic routes
+  if (RESERVED_PATHS.some(prefix => pathname.startsWith(`/${prefix}/`))) {
+    return NextResponse.next();
+  }
 
-  // Dynamic route pattern is /:location/:service
+  // Skip API routes and other system routes entirely
+  if (pathname.startsWith('/api/') || 
+      pathname.startsWith('/_next/') || 
+      pathname.startsWith('/static/') ||
+      pathname.startsWith('/socket/') ||
+      pathname.startsWith('/public/')) {
+    return NextResponse.next();
+  }
+
+  // Dynamic route pattern is /:location/:service (only check if not already handled)
   const segments = pathname.split('/').filter(Boolean);
   
   // Only check paths with exactly 2 segments that might be dynamic routes
   if (segments.length === 2) {
     const [location, service] = segments;
 
-    // Check if any segment is a reserved path
+    // Now we only need to check non-routed paths for reserved words
+    // This check has been simplified and will rarely trigger since we exclude paths above
     if (RESERVED_PATHS.includes(location) || RESERVED_PATHS.includes(service)) {
-      console.log(`Blocked access to reserved path: ${pathname}`);
-      
-      // Redirect to 404 page
-      return NextResponse.redirect(new URL('/404', request.url));
+      console.log(`Potential conflict with reserved path: ${pathname}`);
+      // Just log a warning but let it pass through
     }
   }
 
   return NextResponse.next();
 }
 
-// Configure the middleware to only run on specific paths
+// Configure the middleware to run on all paths except specific ones
 export const config = {
   matcher: [
-    // Match all paths except those starting with these prefixes
-    '/((?!_next/|api/|client/|provider/|admin/|auth/|static/|public/|images/|assets/).*)',
+    // Match all paths except special system paths that should be excluded
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }; 

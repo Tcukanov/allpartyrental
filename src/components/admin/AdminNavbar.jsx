@@ -49,7 +49,7 @@ import {
 const NAV_ITEMS = [
   {
     label: 'Dashboard',
-    href: '/admin',
+    href: '/admin/panel',
     icon: FiHome,
   },
   {
@@ -112,7 +112,7 @@ export default function AdminNavbar() {
           
           <HStack spacing={8} alignItems="center">
             <Box fontWeight="bold" fontSize="lg">
-              <Link as={NextLink} href="/admin" _hover={{ textDecoration: 'none' }}>
+              <Link as={NextLink} href="/admin/panel" _hover={{ textDecoration: 'none' }}>
                 Admin Panel
               </Link>
             </Box>

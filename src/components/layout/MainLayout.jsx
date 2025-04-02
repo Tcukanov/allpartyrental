@@ -41,7 +41,9 @@ import NotificationComponent from '@/components/notification/notificationCompone
 const clientLinks = [
   { name: 'Dashboard', href: '/client/dashboard' },
   { name: 'My Party', href: '/client/my-party' },
+  { name: 'Approved Services', href: '/client/approved-services' },
   { name: 'Create Party', href: '/client/create-party' },
+  { name: 'Services', href: '/services' },
   { name: 'Calendar', href: '/client/calendar' },
   { name: 'History', href: '/client/party-history' },
 ];
@@ -49,6 +51,7 @@ const clientLinks = [
 const providerLinks = [
   { name: 'Dashboard', href: '/provider/cabinet' },
   { name: 'My Services', href: '/provider/services' },
+  { name: 'Available Parties', href: '/provider/available-parties' },
   { name: 'Requests', href: '/provider/requests' },
   { name: 'Advertising', href: '/provider/advertising' },
 ];
@@ -119,7 +122,7 @@ export default function MainLayout({ children }) {
             />
             
             <HStack spacing={8} alignItems="center">
-              <Box as={Link} href="#">
+              <Box as={Link} href="/">
                 <Image 
                   src="/images/logo.png" 
                   alt="Party Marketplace" 

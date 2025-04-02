@@ -17,11 +17,63 @@ const nextConfig = {
   compiler: {
     styledComponents: true,
   },
-  // Suppress specific warnings
-  experimental: {
-    // Suppress specific warnings
-    suppressHydrationWarning: true,
-  },
+  // Enhance routing
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // These rewrites run before files in the standard route resolution
+        {
+          source: '/api/:path*',
+          destination: '/api/:path*',
+          has: [
+            {
+              type: 'header',
+              key: 'host',
+            },
+          ],
+        },
+        {
+          source: '/api/provider/:path*',
+          destination: '/api/provider/:path*',
+        },
+        {
+          source: '/api/providers/:path*',
+          destination: '/api/providers/:path*',
+        },
+        {
+          source: '/provider/:path*',
+          destination: '/provider/:path*',
+        },
+        {
+          source: '/client/:path*',
+          destination: '/client/:path*',
+        },
+        {
+          source: '/admin/:path*',
+          destination: '/admin/:path*',
+        },
+        {
+          source: '/_next/:path*',
+          destination: '/_next/:path*',
+        },
+        {
+          source: '/public/:path*',
+          destination: '/public/:path*',
+        },
+        {
+          source: '/static/:path*',
+          destination: '/static/:path*',
+        },
+        {
+          source: '/socket/:path*',
+          destination: '/socket/:path*',
+        },
+      ],
+      // Other rewrites would go here if needed
+      afterFiles: [],
+      fallback: []
+    };
+  }
 }
 
 module.exports = nextConfig 

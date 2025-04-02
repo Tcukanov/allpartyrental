@@ -65,7 +65,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   // Check if user is authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/login');
+      router.push('/auth/signin');
     } else if (status === 'authenticated') {
       fetchChat();
     }

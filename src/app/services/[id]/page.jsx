@@ -201,25 +201,15 @@ export default function ServiceDetailPage({ params }) {
           
           setService(serviceData);
           
-          // Try to fetch similar services
+          // Fetch similar services
           try {
             const similarResponse = await fetch(`/api/services/public?categoryId=${data.data.categoryId}&limit=3&exclude=${params.id}`);
-            if (similarResponse.ok) {
-              const similarData = await similarResponse.json();
-              if (similarData.success) {
-                setSimilarServices(similarData.data);
-              } else {
-                // Use fallback similar services if API fails
-                setSimilarServices(fallbackSimilarServices.filter(s => s.id !== params.id));
-              }
-            } else {
-              // Use fallback similar services if API fails
-              setSimilarServices(fallbackSimilarServices.filter(s => s.id !== params.id));
+            const similarData = await similarResponse.json();
+            if (similarData.success) {
+              setSimilarServices(similarData.data);
             }
           } catch (error) {
             console.error('Error fetching similar services:', error);
-            // Use fallback similar services if API fails
-            setSimilarServices(fallbackSimilarServices.filter(s => s.id !== params.id));
           }
           
           // Check if current user is the service owner
@@ -398,6 +388,19 @@ export default function ServiceDetailPage({ params }) {
             h={{ base: "200px", md: "400px" }}
                   objectFit="cover"
             borderRadius="md"
+                  fallback={
+                    <Box
+                      bg="gray.200"
+                      w="100%"
+                      h={{ base: "200px", md: "400px" }}
+                      borderRadius="md" 
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      <Text color="gray.500">No image available</Text>
+                    </Box>
+                  }
           />
         ) : (
           <Box
@@ -562,6 +565,22 @@ export default function ServiceDetailPage({ params }) {
                   boxSize="80px"
                         borderRadius="full" 
                         mr={4}
+                        fallback={
+                          <Box
+                            bg="blue.100"
+                            color="blue.500"
+                            borderRadius="full"
+                            boxSize="80px"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                            fontSize="2xl"
+                            fontWeight="bold"
+                            mr={4}
+                          >
+                            {service.provider.name?.charAt(0) || "?"}
+                          </Box>
+                        }
                       />
               ) : (
                 <Box
@@ -576,7 +595,7 @@ export default function ServiceDetailPage({ params }) {
                   fontWeight="bold"
                   mr={4}
                 >
-                  {service.provider.name.charAt(0)}
+                  {service.provider.name?.charAt(0) || "?"}
                 </Box>
               )}
                       <Box>

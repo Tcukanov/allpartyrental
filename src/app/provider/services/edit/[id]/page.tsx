@@ -99,7 +99,7 @@ export default function EditServicePage({ params }: { params: { id: string } }) 
   const [imageError, setImageError] = useState<string | null>(null);
   
   useEffect(() => {
-    const fetchServiceAndData = async () => {
+    const fetchServiceDetails = async () => {
       try {
         setIsLoading(true);
         
@@ -168,25 +168,27 @@ export default function EditServicePage({ params }: { params: { id: string } }) 
     };
     
     if (session?.user?.role === 'PROVIDER') {
-      fetchServiceAndData();
+      fetchServiceDetails();
     }
   }, [id, session, toast]);
   
-  // Redirect if not authenticated or not a provider
+  // Check if user is authenticated and has provider role
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/login');
-    } else if (status === 'authenticated' && session?.user?.role !== 'PROVIDER') {
-      router.push('/');
-      toast({
-        title: 'Access Denied',
-        description: 'Only providers can access this page',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      router.push('/auth/signin');
+    } else if (status === 'authenticated') {
+      if (session?.user?.role !== 'PROVIDER') {
+        router.push('/');
+        toast({
+          title: 'Access Denied',
+          description: 'Only service providers can access this page',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
     }
-  }, [session, status, router, toast]);
+  }, [status, session, router, toast]);
   
   if (status === 'loading' || isLoading) {
     return (

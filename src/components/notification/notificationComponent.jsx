@@ -88,11 +88,14 @@ const NotificationComponent = () => {
         setNotifications(prev => [notification, ...prev]);
         setUnreadCount(prev => prev + 1);
         
+        // Determine the status based on notification content
+        const status = isPositiveNotification(notification) ? 'success' : 'info';
+        
         // Show toast for new notification
         toast({
           title: notification.title,
           description: notification.content,
-          status: 'info',
+          status: status,
           duration: 5000,
           isClosable: true,
         });
@@ -167,7 +170,7 @@ const NotificationComponent = () => {
     // Close popover
     setIsOpen(false);
     
-    // Navigate based on notification type
+    // Navigate based on notification type and user role
     switch (notification.type) {
       case 'NEW_OFFER':
         router.push('/client/my-party');
@@ -178,19 +181,46 @@ const NotificationComponent = () => {
       case 'MESSAGE':
         if (notification.chatId) {
           router.push(`/chats/${notification.chatId}`);
+        } else {
+          // Try to extract chat ID from the content
+          const chatIdMatch = notification.content.match(/chat ID: ([a-zA-Z0-9]+)/);
+          if (chatIdMatch && chatIdMatch[1]) {
+            router.push(`/chats/${chatIdMatch[1]}`);
+          } else {
+            router.push('/chats');
+          }
         }
         break;
       case 'PAYMENT':
         router.push('/client/my-party');
         break;
+      case 'SYSTEM':
+        // Handle system notifications based on content
+        if (notification.content.includes('request') && session?.user?.role === 'PROVIDER') {
+          router.push('/provider/requests');
+        } else if (notification.content.includes('approved') && session?.user?.role === 'CLIENT') {
+          router.push('/client/my-party');
+        } else if (notification.content.includes('service') && session?.user?.role === 'PROVIDER') {
+          router.push('/provider/services');
+        }
+        break;
       default:
-        // For SYSTEM or other types, no navigation
+        // For other types, no navigation
         break;
     }
   };
   
   // Get icon for notification type
-  const getNotificationIcon = (type) => {
+  const getNotificationIcon = (notification) => {
+    const type = notification.type;
+    const content = notification.content.toLowerCase();
+    
+    // Check if it's a positive notification
+    const isPositive = content.includes('approved') || 
+                      content.includes('success') ||
+                      content.includes('completed') ||
+                      content.includes('confirmed');
+    
     switch (type) {
       case 'NEW_OFFER':
         return <InfoIcon color="blue.500" />;
@@ -201,10 +231,36 @@ const NotificationComponent = () => {
       case 'PAYMENT':
         return <InfoIcon color="orange.500" />;
       case 'SYSTEM':
-        return <WarningIcon color="red.500" />;
+        return isPositive 
+          ? <CheckIcon color="green.500" /> 
+          : <WarningIcon color="red.500" />;
       default:
         return <InfoIcon color="gray.500" />;
     }
+  };
+  
+  // Get the appropriate background color for notifications
+  const getNotificationBackground = (notification) => {
+    const content = notification.content.toLowerCase();
+    const isPositive = content.includes('approved') || 
+                      content.includes('success') ||
+                      content.includes('completed') ||
+                      content.includes('confirmed');
+    
+    if (!notification.isRead) {
+      return isPositive ? 'green.50' : 'gray.50';
+    }
+    
+    return 'white';
+  };
+  
+  // Check if a notification is positive (success, approval, etc.)
+  const isPositiveNotification = (notification) => {
+    const content = notification.content.toLowerCase();
+    return content.includes('approved') || 
+          content.includes('success') ||
+          content.includes('completed') ||
+          content.includes('confirmed');
   };
   
   return (
@@ -265,14 +321,14 @@ const NotificationComponent = () => {
                 <Box 
                   key={notification.id} 
                   p={3}
-                  bg={notification.isRead ? 'white' : 'gray.50'}
+                  bg={getNotificationBackground(notification)}
                   _hover={{ bg: 'gray.100' }}
                   cursor="pointer"
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <HStack spacing={3} align="start">
                     <Box mt={1}>
-                      {getNotificationIcon(notification.type)}
+                      {getNotificationIcon(notification)}
                     </Box>
                     
                     <Box flex="1">
@@ -289,7 +345,7 @@ const NotificationComponent = () => {
                       </Text>
                       
                       {!notification.isRead && (
-                        <Badge colorScheme="blue" mt={1} size="sm">
+                        <Badge colorScheme={isPositiveNotification(notification) ? "green" : "blue"} mt={1} size="sm">
                           New
                         </Badge>
                       )}

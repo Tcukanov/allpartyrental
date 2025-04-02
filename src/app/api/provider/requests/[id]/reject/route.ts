@@ -31,8 +31,8 @@ export async function POST(
       );
     }
 
-    // Get the request with service data
-    const serviceRequest = await prisma.request.findUnique({
+    // Get the offer with service data
+    const serviceOffer = await prisma.offer.findUnique({
       where: { id },
       include: {
         service: {
@@ -45,25 +45,25 @@ export async function POST(
       }
     });
 
-    if (!serviceRequest) {
+    if (!serviceOffer) {
       return NextResponse.json(
-        { success: false, error: { code: 'NOT_FOUND', message: 'Request not found' } },
+        { success: false, error: { code: 'NOT_FOUND', message: 'Offer not found' } },
         { status: 404 }
       );
     }
 
     // Check if the provider owns the service
-    if (serviceRequest.service.providerId !== user.id) {
+    if (serviceOffer.service.providerId !== user.id) {
       return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'You can only manage requests for your own services' } },
+        { success: false, error: { code: 'FORBIDDEN', message: 'You can only manage offers for your own services' } },
         { status: 403 }
       );
     }
 
-    // Check if the request is in PENDING status
-    if (serviceRequest.status !== 'PENDING') {
+    // Check if the offer is in PENDING status
+    if (serviceOffer.status !== 'PENDING') {
       return NextResponse.json(
-        { success: false, error: { code: 'BAD_REQUEST', message: 'Only pending requests can be rejected' } },
+        { success: false, error: { code: 'BAD_REQUEST', message: 'Only pending offers can be rejected' } },
         { status: 400 }
       );
     }
@@ -77,34 +77,34 @@ export async function POST(
       // No body or invalid JSON, continue without reason
     }
 
-    // Update the request status to REJECTED
-    const updatedRequest = await prisma.request.update({
+    // Update the offer status to REJECTED
+    const updatedOffer = await prisma.offer.update({
       where: { id },
       data: {
         status: 'REJECTED',
-        notes: reasonForRejection ? `Rejection reason: ${reasonForRejection}` : null
+        description: reasonForRejection ? `${serviceOffer.description}\n\nRejection reason: ${reasonForRejection}` : serviceOffer.description
       }
     });
 
     // Create a notification for the client
     await prisma.notification.create({
       data: {
-        userId: serviceRequest.clientId,
-        title: 'Service Request Rejected',
-        content: `Your request for the service "${serviceRequest.service.name}" has been rejected.${
+        userId: serviceOffer.clientId,
+        title: 'Service Offer Rejected',
+        content: `Your request for the service "${serviceOffer.service.name}" has been rejected.${
           reasonForRejection ? ` Reason: ${reasonForRejection}` : ''
         }`,
-        type: 'REQUEST_REJECTED',
+        type: 'SYSTEM',
         isRead: false,
       }
     });
 
     return NextResponse.json({
       success: true,
-      data: updatedRequest
+      data: updatedOffer
     }, { status: 200 });
   } catch (error) {
-    console.error('Reject request error:', error);
+    console.error('Reject offer error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
       { status: 500 }

@@ -23,7 +23,6 @@ import {
 } from '@chakra-ui/react';
 import { EmailIcon, PhoneIcon, InfoIcon } from '@chakra-ui/icons';
 import { FaMapMarkerAlt } from 'react-icons/fa';
-import MainLayout from '@/components/layout/MainLayout';
 
 export default function ContactPage() {
   const toast = useToast();
@@ -89,7 +88,7 @@ export default function ContactPage() {
   };
 
   return (
-    <MainLayout>
+    <>
       <Box bg="brand.600" color="white" py={20}>
         <Container maxW="container.xl">
           <VStack spacing={4} align="center" textAlign="center">
@@ -289,6 +288,6 @@ export default function ContactPage() {
           </SimpleGrid>
         </Container>
       </Box>
-    </MainLayout>
+    </>
   );
 }

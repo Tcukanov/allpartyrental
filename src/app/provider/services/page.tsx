@@ -56,20 +56,22 @@ export default function ProviderServicesPage() {
   // Check if user is authenticated and a provider
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/login');
-    } else if (session?.user?.role !== 'PROVIDER') {
-      router.push('/');
-      toast({
-        title: 'Access Denied',
-        description: 'Only providers can access this page',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    } else {
-      fetchServices();
+      router.push('/auth/signin');
+    } else if (status === 'authenticated') {
+      if (session?.user?.role !== 'PROVIDER') {
+        router.push('/');
+        toast({
+          title: 'Access Denied',
+          description: 'Only service providers can access this page',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        fetchServices();
+      }
     }
-  }, [session, status, router]);
+  }, [session, status, router, toast]);
 
   const fetchServices = async () => {
     try {
