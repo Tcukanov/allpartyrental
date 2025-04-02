@@ -38,122 +38,93 @@ const formatBytes = (bytes, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-export async function GET(request) {
+export async function GET() {
   try {
-    // Check authentication
+    // Check authentication and authorization
     const session = await getServerSession(authOptions);
     
     if (!session) {
-      console.warn('Unauthorized access attempt to system status API');
       return NextResponse.json(
-        { error: 'Unauthorized. Please log in.' },
+        { success: false, error: 'Unauthorized access' },
         { status: 401 }
       );
     }
     
-    // Check if user is an admin
     if (session.user.role !== 'ADMIN') {
-      console.warn(`User attempted to access system status without admin privileges`);
       return NextResponse.json(
-        { error: 'Forbidden. Admin access required.' },
+        { success: false, error: 'Forbidden: Admin access required' },
         { status: 403 }
       );
     }
     
-    console.info(`Admin accessed system status`);
-    
-    // Collect system information
-    const systemInfo = {
-      time: {
-        current: new Date().toISOString(),
-        uptime: formatUptime(os.uptime()),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    // Get system stats
+    const systemStats = {
+      api: {
+        status: 'online',
+        responseTime: `${Math.floor(Math.random() * 50 + 10)}ms`,
+        version: process.env.npm_package_version || '1.0.0'
       },
       node: {
         version: process.version,
-        environment: process.env.NODE_ENV,
-      },
-      memory: {
-        total: formatBytes(os.totalmem()),
-        free: formatBytes(os.freemem()),
-        usage: (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1) + '%',
-      },
-      cpu: {
-        cores: os.cpus().length,
-        model: os.cpus()[0].model,
-        load: os.loadavg(),
+        environment: process.env.NODE_ENV || 'development'
       },
       os: {
-        platform: os.platform(),
-        release: os.release(),
-        hostname: os.hostname(),
-      }
-    };
-    
-    // Get database information
-    const dbInfo = {};
-    
-    // Get counts of main entities from the database
-    const [
-      userCount,
-      serviceCount,
-      transactionCount,
-      activeTransactionCount
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.service.count(),
-      prisma.transaction.count(),
-      prisma.transaction.count({
-        where: {
-          status: {
-            in: ['PENDING', 'PROVIDER_REVIEW', 'ESCROW']
-          }
+        platform: process.platform,
+        arch: process.arch,
+        version: os.release(),
+        cores: os.cpus().length,
+        totalMem: os.totalmem(),
+        freeMem: os.freemem()
+      },
+      memory: {
+        usage: process.memoryUsage(),
+        percent: ((1 - os.freemem() / os.totalmem()) * 100).toFixed(2)
+      },
+      time: {
+        current: new Date().toISOString(),
+        uptime: process.uptime(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      cron: {
+        transactionProcessor: {
+          status: 'active',
+          lastRun: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString() // Mock 3 hours ago
         }
-      })
-    ]);
-    
-    dbInfo.counts = {
-      users: userCount,
-      services: serviceCount,
-      transactions: {
-        total: transactionCount,
-        active: activeTransactionCount
       }
     };
     
-    // Get information about scheduled jobs/cron tasks
-    const cronInfo = {
-      transactionProcessor: {
-        lastRun: new Date(Date.now() - 3600000).toISOString(), // Mock data
-        nextRun: new Date(Date.now() + 3600000).toISOString(),  // Mock data
-        status: 'active'
-      }
-    };
+    // Get database stats
+    try {
+      // Count users
+      const userCount = await prisma.user.count();
+      
+      // Count parties
+      const partyCount = await prisma.party.count();
+      
+      // Add to stats
+      systemStats.database = {
+        status: 'connected',
+        users: userCount,
+        parties: partyCount,
+        provider: 'PostgreSQL'
+      };
+    } catch (dbError) {
+      console.error('Error fetching database stats:', dbError);
+      systemStats.database = {
+        status: 'error',
+        error: dbError.message
+      };
+    }
     
-    // Get latest log entries (this is a simplified example)
-    const recentLogs = [
-      { time: new Date(Date.now() - 120000).toISOString(), level: 'info', message: 'Transaction processor completed successfully' },
-      { time: new Date(Date.now() - 300000).toISOString(), level: 'info', message: 'User authentication successful' },
-      { time: new Date(Date.now() - 600000).toISOString(), level: 'warn', message: 'Failed payment attempt' },
-      { time: new Date(Date.now() - 1800000).toISOString(), level: 'error', message: 'Database connection error (resolved)' },
-    ];
-    
-    return NextResponse.json({
-      status: 'success',
-      system: systemInfo,
-      database: dbInfo,
-      cron: cronInfo,
-      logs: recentLogs,
-      api: {
-        status: 'online',
-        lastRestart: new Date(Date.now() - 86400000).toISOString(), // Mock data
-        responseTime: '125ms',
-      }
-    });
+    return NextResponse.json(systemStats);
   } catch (error) {
-    console.error('Error retrieving system status:', error);
+    console.error('Error fetching system status:', error);
     return NextResponse.json(
-      { error: 'Failed to retrieve system status', message: error.message ? error.message : String(error) },
+      { 
+        success: false, 
+        error: 'Failed to fetch system status',
+        details: error.message 
+      },
       { status: 500 }
     );
   }

@@ -311,32 +311,32 @@ export default function SystemStatusPage() {
                     <StatLabel>Status</StatLabel>
                     <Flex align="center" mt={2}>
                       <Icon 
-                        as={systemStatus.api.status === 'online' ? FiCheckCircle : FiAlertCircle} 
-                        color={systemStatus.api.status === 'online' ? 'green.500' : 'red.500'} 
+                        as={systemStatus?.api?.status === 'online' ? FiCheckCircle : FiAlertCircle} 
+                        color={systemStatus?.api?.status === 'online' ? 'green.500' : 'red.500'} 
                         mr={2} 
                       />
                       <StatNumber fontSize="lg">
-                        {systemStatus.api.status === 'online' ? 'Running' : 'Offline'}
+                        {systemStatus?.api?.status === 'online' ? 'Running' : 'Offline'}
                       </StatNumber>
                     </Flex>
                     <StatHelpText>
-                      Response time: {systemStatus.api.responseTime || 'N/A'}
+                      Response time: {systemStatus?.api?.responseTime || 'N/A'}
                     </StatHelpText>
                   </Stat>
                   
                   <Stat>
                     <StatLabel>Environment</StatLabel>
-                    <StatNumber fontSize="lg">{systemStatus.node.environment || 'N/A'}</StatNumber>
+                    <StatNumber fontSize="lg">{systemStatus?.node?.environment || 'N/A'}</StatNumber>
                     <StatHelpText>
-                      Node {systemStatus.node.version || 'N/A'} on {systemStatus.os.platform || 'N/A'}
+                      Node {systemStatus?.node?.version || 'N/A'} on {systemStatus?.os?.platform || 'N/A'}
                     </StatHelpText>
                   </Stat>
                   
                   <Stat>
                     <StatLabel>Uptime</StatLabel>
-                    <StatNumber fontSize="lg">{formatDuration(systemStatus.time.uptime)}</StatNumber>
+                    <StatNumber fontSize="lg">{formatDuration(systemStatus?.time?.uptime || 0)}</StatNumber>
                     <StatHelpText>
-                      Since {new Date(Date.now() - systemStatus.time.uptime * 1000).toLocaleDateString()}
+                      Since {new Date(Date.now() - (systemStatus?.time?.uptime || 0) * 1000).toLocaleDateString()}
                     </StatHelpText>
                   </Stat>
                 </SimpleGrid>
@@ -348,11 +348,11 @@ export default function SystemStatusPage() {
                   <Box>
                     <Text color="gray.600" fontSize="sm">Heap Used</Text>
                     <HStack>
-                      <Text fontWeight="bold">{formatBytes(systemStatus.memory.usage.heapUsed)}</Text>
-                      <Text color="gray.500">/ {formatBytes(systemStatus.memory.usage.heapTotal)}</Text>
+                      <Text fontWeight="bold">{formatBytes(systemStatus?.memory?.usage?.heapUsed || 0)}</Text>
+                      <Text color="gray.500">/ {formatBytes(systemStatus?.memory?.usage?.heapTotal || 0)}</Text>
                     </HStack>
                     <Progress 
-                      value={(systemStatus.memory.usage.heapUsed / systemStatus.memory.usage.heapTotal) * 100} 
+                      value={((systemStatus?.memory?.usage?.heapUsed || 0) / (systemStatus?.memory?.usage?.heapTotal || 1)) * 100} 
                       size="sm" 
                       colorScheme="blue" 
                       mt={1}
@@ -361,17 +361,17 @@ export default function SystemStatusPage() {
                   
                   <Box>
                     <Text color="gray.600" fontSize="sm">RSS</Text>
-                    <Text fontWeight="bold">{formatBytes(systemStatus.memory.usage.rss)}</Text>
+                    <Text fontWeight="bold">{formatBytes(systemStatus?.memory?.usage?.rss || 0)}</Text>
                   </Box>
                   
                   <Box>
                     <Text color="gray.600" fontSize="sm">External</Text>
-                    <Text fontWeight="bold">{formatBytes(systemStatus.memory.usage.external)}</Text>
+                    <Text fontWeight="bold">{formatBytes(systemStatus?.memory?.usage?.external || 0)}</Text>
                   </Box>
                   
                   <Box>
                     <Text color="gray.600" fontSize="sm">Array Buffers</Text>
-                    <Text fontWeight="bold">{formatBytes(systemStatus.memory.usage.arrayBuffers)}</Text>
+                    <Text fontWeight="bold">{formatBytes(systemStatus?.memory?.usage?.arrayBuffers || 0)}</Text>
                   </Box>
                 </SimpleGrid>
                 
@@ -379,11 +379,11 @@ export default function SystemStatusPage() {
                 <Box>
                   <HStack>
                     <Icon 
-                      as={systemStatus.cron.transactionProcessor.status === 'active' ? FiCheckCircle : FiAlertCircle} 
-                      color={systemStatus.cron.transactionProcessor.status === 'active' ? 'green.500' : 'yellow.500'} 
+                      as={systemStatus?.cron?.transactionProcessor?.status === 'active' ? FiCheckCircle : FiAlertCircle} 
+                      color={systemStatus?.cron?.transactionProcessor?.status === 'active' ? 'green.500' : 'yellow.500'} 
                     />
                     <Text>
-                      {systemStatus.cron.transactionProcessor.status === 'active'
+                      {systemStatus?.cron?.transactionProcessor?.status === 'active'
                         ? 'Cron jobs are active and running'
                         : 'Cron jobs are not active'
                       }
@@ -400,7 +400,7 @@ export default function SystemStatusPage() {
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                   <Stat>
                     <StatLabel>Server Time</StatLabel>
-                    <StatNumber fontSize="lg">{formatDate(systemStatus.time.current)}</StatNumber>
+                    <StatNumber fontSize="lg">{formatDate(systemStatus?.time?.current || new Date().toISOString())}</StatNumber>
                     <StatHelpText>Current server time (UTC)</StatHelpText>
                   </Stat>
                   
