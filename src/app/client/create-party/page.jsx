@@ -252,6 +252,17 @@ const ClickableCategory = ({ category, onAddService, onMobileDragStart }) => {
 const SelectedService = ({ service, index, removeService, handleDragStart, handleDragOver, handleDrop, handleDragEnd }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [description, setDescription] = useState(service.details || '');
+  const [photos, setPhotos] = useState([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState([]);
+  const fileInputRef = useRef(null);
+  
+  useEffect(() => {
+    // Update service details when description changes
+    if (service && description !== service.details) {
+      service.details = description;
+    }
+  }, [description, service]);
   
   const handleLocalDragOver = (e) => {
     e.preventDefault();
@@ -266,6 +277,54 @@ const SelectedService = ({ service, index, removeService, handleDragStart, handl
   const handleLocalDrop = (e, index) => {
     setIsDragOver(false);
     handleDrop(e, index);
+  };
+  
+  const handleDescriptionChange = (e) => {
+    setDescription(e.target.value);
+  };
+  
+  const handlePhotoUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 3) {
+      alert("You can only upload up to 3 photos per service");
+      return;
+    }
+    
+    setPhotos(files);
+    
+    // Create preview URLs
+    const urls = files.map(file => URL.createObjectURL(file));
+    setPhotoPreviewUrls(urls);
+    
+    // Store photos in service object
+    if (service) {
+      service.photoFiles = files;
+      service.photoUrls = urls;
+    }
+  };
+  
+  const triggerFileInput = () => {
+    fileInputRef.current.click();
+  };
+  
+  const removePhoto = (index) => {
+    const newPhotos = [...photos];
+    const newUrls = [...photoPreviewUrls];
+    
+    // Revoke the object URL to avoid memory leaks
+    URL.revokeObjectURL(newUrls[index]);
+    
+    newPhotos.splice(index, 1);
+    newUrls.splice(index, 1);
+    
+    setPhotos(newPhotos);
+    setPhotoPreviewUrls(newUrls);
+    
+    // Update service object
+    if (service) {
+      service.photoFiles = newPhotos;
+      service.photoUrls = newUrls;
+    }
   };
 
   return (
@@ -289,9 +348,8 @@ const SelectedService = ({ service, index, removeService, handleDragStart, handl
         borderColor: "brand.500",
         cursor: "move"
       }}
-      onClick={() => setIsExpanded(!isExpanded)}
     >
-      <Flex p={3} justify="space-between" align="center">
+      <Flex p={3} justify="space-between" align="center" onClick={() => setIsExpanded(!isExpanded)}>
         <HStack>
           <Icon as={DragHandleIcon} color="gray.400" mr={2} />
           <Text fontWeight="bold">{service.category}</Text>
@@ -309,25 +367,87 @@ const SelectedService = ({ service, index, removeService, handleDragStart, handl
         />
       </Flex>
       
-      {isExpanded && service.details && (
-        <Box>
-          <Divider />
-          <Flex p={3}>
-            {service.image && (
-              <Image 
-                src={service.image} 
-                alt={service.category}
-                boxSize="80px"
-                objectFit="cover"
-                borderRadius="md"
-                mr={3}
-                fallbackSrc="https://via.placeholder.com/80"
-              />
+      {isExpanded && (
+        <Box p={3} pt={0}>
+          <Divider mb={3} />
+          
+          <VStack spacing={4} align="stretch">
+            {/* Display existing image if available */}
+            {service.image && !photoPreviewUrls.length && (
+              <Box>
+                <Image 
+                  src={service.image} 
+                  alt={service.category}
+                  maxH="150px"
+                  objectFit="cover"
+                  borderRadius="md"
+                  fallbackSrc="https://via.placeholder.com/150"
+                />
+              </Box>
             )}
-            <Box>
-              <Text fontSize="sm" color="gray.700">{service.details}</Text>
-            </Box>
-          </Flex>
+            
+            {/* Photo upload section */}
+            <FormControl>
+              <FormLabel>Photos (up to 3)</FormLabel>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                style={{ display: 'none' }}
+                ref={fileInputRef}
+              />
+              <Button 
+                leftIcon={<AddIcon />} 
+                onClick={triggerFileInput}
+                size="sm"
+                colorScheme="blue"
+                mb={2}
+              >
+                Upload Photos
+              </Button>
+              
+              {/* Photo previews */}
+              {photoPreviewUrls.length > 0 && (
+                <SimpleGrid columns={3} spacing={2} mt={2}>
+                  {photoPreviewUrls.map((url, idx) => (
+                    <Box key={idx} position="relative">
+                      <Image
+                        src={url}
+                        alt={`Photo ${idx + 1}`}
+                        borderRadius="md"
+                        objectFit="cover"
+                        h="80px"
+                        w="100%"
+                      />
+                      <IconButton
+                        icon={<CloseIcon />}
+                        size="xs"
+                        colorScheme="red"
+                        position="absolute"
+                        top="1"
+                        right="1"
+                        onClick={() => removePhoto(idx)}
+                        aria-label="Remove photo"
+                      />
+                    </Box>
+                  ))}
+                </SimpleGrid>
+              )}
+            </FormControl>
+            
+            {/* Description text area */}
+            <FormControl>
+              <FormLabel>Description</FormLabel>
+              <Textarea
+                value={description}
+                onChange={handleDescriptionChange}
+                placeholder={`Describe what you need for the ${service.category} service...`}
+                size="sm"
+                rows={3}
+              />
+            </FormControl>
+          </VStack>
         </Box>
       )}
     </Box>
@@ -1033,52 +1153,130 @@ export default function PartyConfiguratorPage() {
         isClosable: false,
       });
 
-      // Prepare party data
-      const partyData = {
-        name: eventDetails.name,
-        cityId: eventDetails.cityId, 
-        date: eventDetails.date,
-        startTime: eventDetails.time,
-        duration: eventDetails.duration || 3,
-        guestCount: eventDetails.guestCount || 20,
-        description: eventDetails.description || '',
-        services: services.map(service => ({
-          name: service.category,
-          description: service.details || '',
-          image: service.image || ''
-        }))
-      };
-
-      console.log('Submitting party data:', partyData);
-
-      // Submit the form as JSON instead of FormData
-      const response = await fetch('/api/parties', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(partyData)
-      });
-
-      // Close loading toast
-      toast.close(loadingToast);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to create party');
-      }
-
-      const data = await response.json();
+      // Check if we need to use FormData (if any service has photos)
+      const hasServicePhotos = services.some(service => service.photoFiles && service.photoFiles.length > 0);
+      const hasPartyPhotos = images.length > 0;
       
-      toast({
-        title: 'Party created successfully',
-        description: 'Your party has been created and is pending approval',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
+      if (hasServicePhotos || hasPartyPhotos) {
+        // Use FormData to upload photos
+        const formData = new FormData();
+        
+        // Add basic party data
+        formData.append('name', eventDetails.name);
+        formData.append('cityId', eventDetails.cityId);
+        formData.append('date', eventDetails.date);
+        formData.append('time', eventDetails.time);
+        formData.append('duration', eventDetails.duration || 3);
+        formData.append('guestCount', eventDetails.guestCount || 20);
+        formData.append('description', eventDetails.description || '');
+        
+        // Add party images
+        if (images.length > 0) {
+          images.forEach((image, index) => {
+            formData.append(`partyImages`, image);
+          });
+        }
+        
+        // Add services data with photos
+        const servicesData = services.map((service, serviceIndex) => {
+          const serviceData = {
+            name: service.category,
+            description: service.details || '',
+            defaultImage: service.image || ''
+          };
+          
+          // If this service has photos, add them to formData
+          if (service.photoFiles && service.photoFiles.length > 0) {
+            service.photoFiles.forEach((file, fileIndex) => {
+              formData.append(`servicePhotos_${serviceIndex}_${fileIndex}`, file);
+            });
+            
+            // Add photo count to the service data
+            serviceData.photoCount = service.photoFiles.length;
+          }
+          
+          return serviceData;
+        });
+        
+        // Add services data as a JSON string
+        formData.append('services', JSON.stringify(servicesData));
+        
+        console.log('Submitting party with images...');
+        
+        // Submit with FormData
+        const response = await fetch('/api/parties', {
+          method: 'POST',
+          body: formData
+        });
+        
+        // Close loading toast
+        toast.close(loadingToast);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to create party');
+        }
+        
+        const data = await response.json();
+        
+        toast({
+          title: 'Party created successfully',
+          description: 'Your party has been created and is pending approval',
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+        
+        router.push(`/client/my-party?id=${data.data.id}`);
+      } else {
+        // No photos, use JSON submission
+        // Prepare party data
+        const partyData = {
+          name: eventDetails.name,
+          cityId: eventDetails.cityId, 
+          date: eventDetails.date,
+          startTime: eventDetails.time,
+          duration: eventDetails.duration || 3,
+          guestCount: eventDetails.guestCount || 20,
+          description: eventDetails.description || '',
+          services: services.map(service => ({
+            name: service.category,
+            description: service.details || '',
+            image: service.image || ''
+          }))
+        };
 
-      router.push(`/client/my-party?id=${data.data.id}`);
+        console.log('Submitting party data:', partyData);
+
+        // Submit the form as JSON
+        const response = await fetch('/api/parties', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(partyData)
+        });
+
+        // Close loading toast
+        toast.close(loadingToast);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to create party');
+        }
+
+        const data = await response.json();
+        
+        toast({
+          title: 'Party created successfully',
+          description: 'Your party has been created and is pending approval',
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+
+        router.push(`/client/my-party?id=${data.data.id}`);
+      }
     } catch (error) {
       console.error('Error creating party:', error);
       toast({

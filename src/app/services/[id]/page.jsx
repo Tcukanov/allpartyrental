@@ -517,7 +517,7 @@ export default function ServiceDetailPage({ params }) {
               )}
               
               {!session && (
-                <Button colorScheme="blue" width="full" as="a" href="/api/auth/signin">
+                <Button colorScheme="blue" width="full" as="a" href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/services/${params.id}`)}`}>
                   Login to Request
                 </Button>
               )}

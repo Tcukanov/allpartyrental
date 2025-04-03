@@ -72,6 +72,7 @@ export default function MyPartyPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [party, setParty] = useState(null);
   const [activeOffer, setActiveOffer] = useState(null);
+  const [isPublishing, setIsPublishing] = useState(false);
   
   // Modal states
   const { 
@@ -348,6 +349,57 @@ export default function MyPartyPage() {
     }
   };
   
+  // Handle party publishing with OpenAI verification
+  const handlePublishParty = async () => {
+    if (!party) return;
+    
+    try {
+      setIsPublishing(true);
+      
+      // Call the verify API endpoint which uses OpenAI
+      const response = await fetch(`/api/parties/${party.id}/verify`, {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error?.message || data.error?.details || 'Failed to verify party');
+      }
+      
+      if (data.success) {
+        toast({
+          title: 'Party Published',
+          description: 'Your party has been verified and published successfully!',
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+        
+        // Update party data with the new status
+        const updatedParty = await fetch(`/api/parties/${party.id}`);
+        const updatedData = await updatedParty.json();
+        
+        if (updatedData.success) {
+          setParty(updatedData.data);
+        }
+      } else {
+        throw new Error(data.error?.message || 'Failed to publish party');
+      }
+    } catch (error) {
+      console.error('Publish party error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to publish party. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+  
   if (sessionStatus === 'loading' || isLoading) {
     return (
       <Container maxW="container.xl" py={8}>
@@ -441,9 +493,21 @@ export default function MyPartyPage() {
                 <Button variant="outline" onClick={() => router.push('/client/dashboard')}>
                   Back to Dashboard
                 </Button>
-                <Button colorScheme="brand" onClick={() => router.push(`/client/edit-party?id=${party.id}`)}>
-                  Edit Party
-                </Button>
+                <HStack>
+                  {party.status === 'DRAFT' && (
+                    <Button 
+                      colorScheme="green" 
+                      onClick={handlePublishParty}
+                      isLoading={isPublishing}
+                      loadingText="Publishing"
+                    >
+                      Publish Party
+                    </Button>
+                  )}
+                  <Button colorScheme="brand" onClick={() => router.push(`/client/edit-party?id=${party.id}`)}>
+                    Edit Party
+                  </Button>
+                </HStack>
               </Flex>
             </VStack>
           </CardBody>

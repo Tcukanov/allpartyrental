@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,6 +5,275 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String          @id @default(cuid())
+  email            String          @unique
+  password         String?
+  name             String
+  role             UserRole
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  emailVerified    DateTime?
+  accounts         Account[]
+  advertisements   Advertisement[]
+  calendar         Calendar[]
+  receivedMessages Message[]       @relation("ReceivedMessages")
+  sentMessages     Message[]       @relation("SentMessages")
+  notifications    Notification[]
+  receivedOffers   Offer[]         @relation("ClientOffers")
+  offers           Offer[]         @relation("ProviderOffers")
+  clientParties    Party[]         @relation("ClientParties")
+  profile          Profile?
+  services         Service[]
+  sessions         Session[]
+}
+
+model Profile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  avatar                String?
+  phone                 String?
+  address               String?
+  website               String?
+  socialLinks           Json?
+  isProStatus           Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  googleBusinessRating  Float?
+  googleBusinessReviews Int?
+  googleBusinessUrl     String?
+  description           String?
+  contactPerson         String?
+  user                  User     @relation(fields: [userId], references: [id])
+}
+
+model Calendar {
+  id            String   @id @default(cuid())
+  userId        String
+  childName     String
+  birthDate     DateTime
+  sendReminders Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model ServiceCategory {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  slug        String    @unique
+  services    Service[]
+}
+
+model City {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  state     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  parties   Party[]
+  services  Service[]
+}
+
+model Service {
+  id                  String          @id @default(cuid())
+  providerId          String
+  categoryId          String
+  cityId              String
+  name                String
+  description         String
+  price               Decimal
+  photos              String[]
+  status              ServiceStatus   @default(ACTIVE)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  availableDays       String[]
+  availableHoursEnd   String?
+  availableHoursStart String?
+  maxRentalHours      Int?
+  minRentalHours      Int?
+  offers              Offer[]
+  partyServices       PartyService[]
+  category            ServiceCategory @relation(fields: [categoryId], references: [id])
+  city                City            @relation(fields: [cityId], references: [id])
+  provider            User            @relation(fields: [providerId], references: [id])
+}
+
+model Party {
+  id            String         @id @default(cuid())
+  clientId      String
+  cityId        String
+  name          String
+  date          DateTime
+  startTime     String
+  duration      Int
+  guestCount    Int
+  status        PartyStatus    @default(DRAFT)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  city          City           @relation(fields: [cityId], references: [id])
+  client        User           @relation("ClientParties", fields: [clientId], references: [id])
+  partyServices PartyService[]
+  transactions  Transaction[]
+}
+
+model PartyService {
+  id              String   @id @default(cuid())
+  partyId         String
+  serviceId       String
+  specificOptions Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  offers          Offer[]
+  party           Party    @relation(fields: [partyId], references: [id])
+  service         Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Offer {
+  id             String       @id @default(cuid())
+  providerId     String
+  clientId       String
+  serviceId      String
+  partyServiceId String
+  price          Decimal
+  description    String
+  photos         String[]
+  status         OfferStatus  @default(PENDING)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  chat           Chat?
+  client         User         @relation("ClientOffers", fields: [clientId], references: [id])
+  partyService   PartyService @relation(fields: [partyServiceId], references: [id])
+  provider       User         @relation("ProviderOffers", fields: [providerId], references: [id])
+  service        Service      @relation(fields: [serviceId], references: [id])
+  transaction    Transaction?
+}
+
+model Transaction {
+  id                 String            @id @default(cuid())
+  partyId            String
+  offerId            String            @unique
+  amount             Decimal
+  status             TransactionStatus @default(PENDING)
+  paymentIntentId    String?
+  paymentMethodId    String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  clientFeePercent   Float             @default(5.0)
+  escrowEndTime      DateTime?
+  escrowStartTime    DateTime?
+  providerFeePercent Float             @default(10.0)
+  reviewDeadline     DateTime?
+  dispute            Dispute?
+  offer              Offer             @relation(fields: [offerId], references: [id])
+  party              Party             @relation(fields: [partyId], references: [id])
+}
+
+model Dispute {
+  id            String      @id @default(cuid())
+  transactionId String      @unique
+  reason        String
+  description   String
+  resolution    String?
+  isResolved    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+}
+
+model Chat {
+  id        String    @id @default(cuid())
+  offerId   String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  offer     Offer     @relation(fields: [offerId], references: [id])
+  messages  Message[]
+}
+
+model Message {
+  id              String   @id @default(cuid())
+  chatId          String
+  senderId        String
+  receiverId      String
+  content         String
+  originalContent String?
+  isFlagged       Boolean  @default(false)
+  flagReason      String?
+  createdAt       DateTime @default(now())
+  chat            Chat     @relation(fields: [chatId], references: [id])
+  receiver        User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  sender          User     @relation("SentMessages", fields: [senderId], references: [id])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  content   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id])
+}
+
+model Advertisement {
+  id        String            @id @default(cuid())
+  userId    String
+  type      AdvertisementType
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  user      User              @relation(fields: [userId], references: [id])
+}
+
+model SystemSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 enum UserRole {
@@ -39,13 +305,13 @@ enum OfferStatus {
 
 enum TransactionStatus {
   PENDING
-  ESCROW           // Funds held in escrow
-  PROVIDER_REVIEW  // Provider reviewing request
-  APPROVED         // Provider approved the service request
-  DECLINED         // Provider declined the service request
-  COMPLETED        // Service completed and payment released
-  REFUNDED         // Payment refunded to client
-  DISPUTED         // Transaction in dispute
+  ESCROW
+  COMPLETED
+  REFUNDED
+  DISPUTED
+  PROVIDER_REVIEW
+  APPROVED
+  DECLINED
 }
 
 enum NotificationType {
@@ -59,307 +325,4 @@ enum NotificationType {
 enum AdvertisementType {
   HOMEPAGE
   FIRST_WAVE
-}
-
-model User {
-  id                String            @id @default(cuid())
-  email             String            @unique
-  password          String?
-  name              String
-  role              UserRole
-  emailVerified     DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  profile           Profile?
-  clientParties     Party[]           @relation("ClientParties")
-  services          Service[]
-  offers            Offer[]           @relation("ProviderOffers")
-  receivedOffers    Offer[]           @relation("ClientOffers")
-  sentMessages      Message[]         @relation("SentMessages")
-  receivedMessages  Message[]         @relation("ReceivedMessages")
-  notifications     Notification[]
-  advertisements    Advertisement[]
-  calendar          Calendar[]
-  
-  // NextAuth.js models
-  accounts          Account[]
-  sessions          Session[]
-}
-
-model Profile {
-  id                String            @id @default(cuid())
-  userId            String            @unique
-  avatar            String?
-  phone             String?
-  address           String?
-  website           String?
-  googleBusinessUrl String?
-  googleBusinessRating Float?
-  googleBusinessReviews Int?
-  description       String?
-  contactPerson     String?
-  socialLinks       Json?
-  isProStatus       Boolean           @default(false)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  user              User              @relation(fields: [userId], references: [id])
-}
-
-model Calendar {
-  id                String            @id @default(cuid())
-  userId            String
-  childName         String
-  birthDate         DateTime
-  sendReminders     Boolean           @default(false)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  user              User              @relation(fields: [userId], references: [id])
-}
-
-model ServiceCategory {
-  id                String            @id @default(cuid())
-  name              String
-  slug              String            @unique
-  description       String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  services          Service[]
-}
-
-model City {
-  id                String            @id @default(cuid())
-  name              String
-  slug              String            @unique
-  state             String
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  services          Service[]
-  parties           Party[]
-}
-
-model Service {
-  id                String            @id @default(cuid())
-  providerId        String
-  categoryId        String
-  cityId            String
-  name              String
-  description       String
-  price             Decimal
-  photos            String[]
-  status            ServiceStatus     @default(ACTIVE)
-  availableDays     String[]          // Days of the week when service is available
-  availableHoursStart String?         // Start time of availability (e.g., "09:00")
-  availableHoursEnd String?           // End time of availability (e.g., "17:00")
-  minRentalHours    Int?              // Minimum rental duration in hours
-  maxRentalHours    Int?              // Maximum rental duration in hours
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  provider          User              @relation(fields: [providerId], references: [id])
-  category          ServiceCategory   @relation(fields: [categoryId], references: [id])
-  city              City              @relation(fields: [cityId], references: [id])
-  offers            Offer[]
-  partyServices     PartyService[]
-}
-
-model Party {
-  id                String            @id @default(cuid())
-  clientId          String
-  cityId            String
-  name              String
-  date              DateTime
-  startTime         String
-  duration          Int
-  guestCount        Int
-  status            PartyStatus       @default(DRAFT)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  client            User              @relation("ClientParties", fields: [clientId], references: [id])
-  city              City              @relation(fields: [cityId], references: [id])
-  partyServices     PartyService[]
-  transactions      Transaction[]
-}
-
-model PartyService {
-  id                String            @id @default(cuid())
-  partyId           String
-  serviceId         String
-  specificOptions   Json?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  party             Party             @relation(fields: [partyId], references: [id])
-  service           Service           @relation(fields: [serviceId], references: [id])
-  offers            Offer[]
-}
-
-model Offer {
-  id                String            @id @default(cuid())
-  providerId        String
-  clientId          String
-  serviceId         String
-  partyServiceId    String
-  price             Decimal
-  description       String
-  photos            String[]
-  status            OfferStatus       @default(PENDING)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  provider          User              @relation("ProviderOffers", fields: [providerId], references: [id])
-  client            User              @relation("ClientOffers", fields: [clientId], references: [id])
-  service           Service           @relation(fields: [serviceId], references: [id])
-  partyService      PartyService      @relation(fields: [partyServiceId], references: [id])
-  transaction       Transaction?
-  chat              Chat?
-}
-
-model Transaction {
-  id                String            @id @default(cuid())
-  partyId           String
-  offerId           String            @unique
-  amount            Decimal
-  status            TransactionStatus @default(PENDING)
-  paymentIntentId   String?
-  paymentMethodId   String?
-  clientFeePercent  Float             @default(5.0)    // 5% fee charged to client
-  providerFeePercent Float            @default(10.0)   // 10% fee charged to provider
-  escrowStartTime   DateTime?         // When funds were placed in escrow
-  escrowEndTime     DateTime?         // When funds should be released or refunded
-  reviewDeadline    DateTime?         // Deadline for provider to approve/decline
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  party             Party             @relation(fields: [partyId], references: [id])
-  offer             Offer             @relation(fields: [offerId], references: [id])
-  dispute           Dispute?
-}
-
-model Dispute {
-  id                String            @id @default(cuid())
-  transactionId     String            @unique
-  reason            String
-  description       String
-  resolution        String?
-  isResolved        Boolean           @default(false)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  transaction       Transaction       @relation(fields: [transactionId], references: [id])
-}
-
-model Chat {
-  id                String            @id @default(cuid())
-  offerId           String            @unique
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  offer             Offer             @relation(fields: [offerId], references: [id])
-  messages          Message[]
-}
-
-model Message {
-  id                String            @id @default(cuid())
-  chatId            String
-  senderId          String
-  receiverId        String
-  content           String
-  originalContent   String?
-  isFlagged         Boolean           @default(false)
-  flagReason        String?
-  createdAt         DateTime          @default(now())
-  
-  // Relations
-  chat              Chat              @relation(fields: [chatId], references: [id])
-  sender            User              @relation("SentMessages", fields: [senderId], references: [id])
-  receiver          User              @relation("ReceivedMessages", fields: [receiverId], references: [id])
-}
-
-model Notification {
-  id                String            @id @default(cuid())
-  userId            String
-  type              NotificationType
-  title             String
-  content           String
-  isRead            Boolean           @default(false)
-  createdAt         DateTime          @default(now())
-  
-  // Relations
-  user              User              @relation(fields: [userId], references: [id])
-}
-
-model Advertisement {
-  id                String            @id @default(cuid())
-  userId            String
-  type              AdvertisementType
-  startDate         DateTime
-  endDate           DateTime
-  isActive          Boolean           @default(true)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Relations
-  user              User              @relation(fields: [userId], references: [id])
-}
-
-model SystemSettings {
-  id                String            @id @default(cuid())
-  key               String            @unique
-  value             String
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-}
-
-// NextAuth.js required models
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
 }

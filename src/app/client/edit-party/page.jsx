@@ -44,7 +44,6 @@ import {
 } from '@chakra-ui/react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import MainLayout from '@/components/layout/MainLayout';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import { format } from 'date-fns';
 
@@ -110,9 +109,29 @@ export default function EditPartyPage() {
             description: party.description || '',
           });
           
-          // Set party services
-          console.log('Party services:', party.partyServices);
-          setPartyServices(party.partyServices || []);
+          // Add more detailed logging
+          console.log('API Response Party Data:', party);
+          console.log('Party services array:', party.partyServices);
+          
+          if (party.partyServices && party.partyServices.length > 0) {
+            console.log(`Found ${party.partyServices.length} services for this party`);
+            console.log('First party service:', party.partyServices[0]);
+            console.log('Service details of first party service:', party.partyServices[0]?.service);
+            
+            // Validate that services have all required data
+            const validServices = party.partyServices.filter(ps => ps.service && ps.service.name);
+            const invalidServices = party.partyServices.filter(ps => !ps.service || !ps.service.name);
+            
+            if (invalidServices.length > 0) {
+              console.warn(`Found ${invalidServices.length} invalid services with missing data:`, invalidServices);
+            }
+            
+            console.log(`Setting ${validServices.length} valid party services`);
+            setPartyServices(validServices);
+          } else {
+            console.log('No party services found for this party');
+            setPartyServices([]);
+          }
         } else {
           throw new Error(data.error?.message || 'Failed to fetch party details');
         }
@@ -209,7 +228,7 @@ export default function EditPartyPage() {
     
     try {
       setIsLoadingServices(true);
-      const response = await fetch(`/api/services?categoryId=${categoryId}`);
+      const response = await fetch(`/api/services/client?categoryId=${categoryId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch services');
@@ -218,8 +237,10 @@ export default function EditPartyPage() {
       const data = await response.json();
       
       if (data.success && Array.isArray(data.data)) {
+        console.log('Services loaded successfully:', data.data.length, 'services found');
         setAvailableServices(data.data);
       } else {
+        console.log('No services found or invalid response format');
         setAvailableServices([]);
       }
     } catch (error) {
@@ -492,13 +513,11 @@ export default function EditPartyPage() {
   
   if (sessionStatus === 'loading' || isLoading) {
     return (
-      <MainLayout>
-        <Container maxW="container.md" py={8}>
-          <Flex justify="center" align="center" h="60vh">
-            <Spinner size="xl" color="brand.500" />
-          </Flex>
-        </Container>
-      </MainLayout>
+      <Container maxW="container.md" py={8}>
+        <Flex justify="center" align="center" h="60vh">
+          <Spinner size="xl" color="brand.500" />
+        </Flex>
+      </Container>
     );
   }
   
@@ -508,7 +527,7 @@ export default function EditPartyPage() {
   }
   
   return (
-    <MainLayout>
+    <>
       <Container maxW="container.md" py={8}>
         <VStack spacing={8} align="stretch">
           <Box>
@@ -661,12 +680,46 @@ export default function EditPartyPage() {
                   
                   {partyServices.length === 0 ? (
                     <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
-                      <Text color="gray.500">No services added yet. Click the button above to add services to your party.</Text>
+                      <Text color="gray.500">No services found to display. Try adding some services.</Text>
                     </Box>
                   ) : (
                     <SimpleGrid columns={{ base: 1, md: 1 }} spacing={4}>
+                      {console.log('Rendering partyServices array:', partyServices)}
                       {partyServices.map((partyService) => {
-                        console.log('Rendering party service:', partyService);
+                        console.log('Rendering party service object:', partyService);
+                        console.log('Service within partyService:', partyService.service);
+                        console.log('Service name:', partyService.service?.name);
+                        console.log('Service category:', partyService.service?.category?.name);
+                        
+                        if (!partyService.service) {
+                          // Render placeholder for invalid service
+                          return (
+                            <Card key={partyService.id} variant="outline" bg="red.50">
+                              <CardBody>
+                                <Flex justify="space-between" align="center">
+                                  <VStack align="start" spacing={1}>
+                                    <Heading size="sm">Invalid Service</Heading>
+                                    <Text fontSize="sm" color="red.600">
+                                      This service has incomplete data and may need to be removed
+                                    </Text>
+                                    <Badge colorScheme="red">ERROR</Badge>
+                                  </VStack>
+                                  <IconButton
+                                    aria-label="Remove service"
+                                    icon={<DeleteIcon />}
+                                    variant="ghost"
+                                    colorScheme="red"
+                                    onClick={() => {
+                                      console.log('Clicked remove for invalid service:', partyService);
+                                      handleRemoveService(partyService);
+                                    }}
+                                  />
+                                </Flex>
+                              </CardBody>
+                            </Card>
+                          );
+                        }
+                        
                         return (
                           <Card key={partyService.id} variant="outline">
                             <CardBody>
@@ -790,6 +843,6 @@ export default function EditPartyPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
-    </MainLayout>
+    </>
   );
 } 
