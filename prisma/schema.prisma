@@ -26,6 +26,7 @@ model User {
   offers           Offer[]         @relation("ProviderOffers")
   clientParties    Party[]         @relation("ClientParties")
   profile          Profile?
+  provider         Provider?
   services         Service[]
   sessions         Session[]
 }
@@ -47,6 +48,38 @@ model Profile {
   description           String?
   contactPerson         String?
   user                  User     @relation(fields: [userId], references: [id])
+}
+
+model Provider {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  businessName        String
+  businessDescription String?
+  businessAddress     String?
+  businessCity        String?
+  businessState       String?
+  businessZip         String?
+  businessPhone       String?
+  businessEmail       String?
+  businessWebsite     String?
+  businessLogo        String?
+  ein                 String?   // Employer Identification Number (Tax ID)
+  taxIdVerified       Boolean   @default(false)
+  bankAccountVerified Boolean   @default(false)
+  stripeAccountId     String?
+  paymentTerms        String?
+  commissionRate      Float     @default(10.0)
+  isApproved          Boolean   @default(false)
+  approvedAt          DateTime?
+  rejectionReason     String?
+  businessType        String?   // LLC, Corporation, Sole Proprietor, etc.
+  foundedYear         Int?
+  employeeCount       Int?
+  insuranceProvider   String?
+  insurancePolicyNum  String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  user                User      @relation(fields: [userId], references: [id])
 }
 
 model Calendar {

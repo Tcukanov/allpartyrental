@@ -30,13 +30,16 @@ import {
   Avatar,
   Spinner,
   Icon,
-  Tooltip
+  Tooltip,
+  CardHeader,
+  Progress
 } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon, ChatIcon } from '@chakra-ui/icons';
 import { useSession } from 'next-auth/react';
-import { FaComment, FaEye } from 'react-icons/fa';
+import { FaComment, FaEye, FaBuilding, FaIdCard } from 'react-icons/fa';
 import { BsChatDots } from 'react-icons/bs';
+import NextLink from 'next/link';
 
 // Mock data for service provider dashboard
 const mockServices = [
@@ -267,6 +270,10 @@ export default function ProviderCabinetPage() {
     socialLinks: {}
   });
   const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [profileCompletionPercent, setProfileCompletionPercent] = useState(0);
+  const [businessVerified, setBusinessVerified] = useState(false);
+  const [hasEIN, setHasEIN] = useState(false);
+  const [serviceCount, setServiceCount] = useState(0);
 
   // Clear any outdated localStorage values
   useEffect(() => {
@@ -1084,6 +1091,53 @@ export default function ProviderCabinetPage() {
     });
   };
 
+  const onProfileSectionOpen = () => {
+    // Implement the logic to open the profile section
+    console.log("Opening profile section");
+  };
+
+  // Calculate profile completion percentage
+  useEffect(() => {
+    const calculateProfileCompletion = () => {
+      const { companyName, contactPerson, email, phone, address, website, googleBusinessUrl, description, avatar } = profileData;
+      let completion = 0;
+
+      if (companyName) completion += 10;
+      if (contactPerson) completion += 10;
+      if (email) completion += 10;
+      if (phone) completion += 10;
+      if (address) completion += 10;
+      if (website) completion += 10;
+      if (googleBusinessUrl) completion += 10;
+      if (description) completion += 10;
+      if (avatar) completion += 10;
+
+      setProfileCompletionPercent(completion);
+    };
+
+    calculateProfileCompletion();
+  }, [profileData]);
+
+  // Calculate business verification status
+  useEffect(() => {
+    const calculateBusinessVerification = () => {
+      const { googleBusinessUrl } = profileData;
+      setBusinessVerified(googleBusinessUrl.startsWith('https://g.page/'));
+      setHasEIN(googleBusinessUrl.includes('EIN'));
+    };
+
+    calculateBusinessVerification();
+  }, [profileData]);
+
+  // Calculate service count
+  useEffect(() => {
+    const calculateServiceCount = () => {
+      setServiceCount(services.filter(s => s.status === 'ACTIVE').length);
+    };
+
+    calculateServiceCount();
+  }, [services]);
+
   return (
       <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
@@ -1698,6 +1752,94 @@ export default function ProviderCabinetPage() {
             )}
           </Button>
         </Tooltip>
+      </Box>
+
+      {/* Main Content Area */}
+      <Box flex="1" p={6}>
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+          
+          {/* Profile Completion Card */}
+          <Card>
+            <CardHeader>
+              <Heading size="md">Profile Completion</Heading>
+            </CardHeader>
+            <CardBody>
+              <Text mb={4}>Complete your profile to attract more clients</Text>
+              
+              <Progress 
+                value={profileCompletionPercent} 
+                size="sm" 
+                colorScheme="green" 
+                mb={3} 
+                borderRadius="md"
+              />
+              
+              <Text fontSize="sm" mb={3}>
+                {profileCompletionPercent}% Complete
+              </Text>
+              
+              <Button 
+                colorScheme="blue" 
+                variant="outline" 
+                size="sm" 
+                onClick={onProfileSectionOpen}
+              >
+                Complete Profile
+              </Button>
+            </CardBody>
+          </Card>
+          
+          {/* Business Information Card */}
+          <Card>
+            <CardHeader bg="blue.50" _dark={{ bg: "blue.900" }}>
+              <HStack>
+                <Icon as={FaBuilding} boxSize="6" color="blue.500" />
+                <Heading size="md">Business Information</Heading>
+              </HStack>
+            </CardHeader>
+            <CardBody>
+              <Text mb={4}>Complete your business details including Tax ID (EIN) to receive payments</Text>
+              
+              <HStack spacing={2} mb={4}>
+                <Badge colorScheme={businessVerified ? "green" : "yellow"}>
+                  {businessVerified ? "Verified" : "Verification Needed"}
+                </Badge>
+                {hasEIN && <Badge colorScheme="blue">EIN Provided</Badge>}
+              </HStack>
+              
+              <Button 
+                as={NextLink}
+                href="/provider/cabinet/business"
+                colorScheme="blue" 
+                leftIcon={<FaIdCard />}
+                size="sm"
+                width="full"
+              >
+                Manage Business Info
+              </Button>
+            </CardBody>
+          </Card>
+          
+          {/* Services Card */}
+          <Card>
+            <CardHeader>
+              <Heading size="md">Your Services</Heading>
+            </CardHeader>
+            <CardBody>
+              <Text mb={4}>You have {serviceCount} active services</Text>
+              
+              <Button 
+                as={NextLink}
+                href="/provider/services" 
+                colorScheme="blue" 
+                size="sm"
+                width="full"
+              >
+                Manage Services
+              </Button>
+            </CardBody>
+          </Card>
+        </SimpleGrid>
       </Box>
     </Container>
   );

@@ -1,9 +1,9 @@
 "use client";
 
-import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useColorModeValue, Center, Icon, Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon, Avatar, Stack, Flex, Divider } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useColorModeValue, Center, Icon, Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon, Avatar, Stack, Flex, Divider, Circle } from '@chakra-ui/react';
 import LocationServiceSearch from '@/components/search/LocationServiceSearch';
 import Link from 'next/link';
-import { FiSearch, FiCheckCircle, FiClock } from 'react-icons/fi';
+import { FiSearch, FiCheckCircle, FiClock, FiPackage, FiShield } from 'react-icons/fi';
 import { useState, useEffect, useCallback } from 'react';
 
 export default function HomeContent() {
@@ -325,39 +325,20 @@ export default function HomeContent() {
               bg="white" 
               _dark={{ bg: 'gray.700' }}
               transition="all 0.3s"
-              _hover={{ 
-                transform: 'translateY(-8px)',
-                boxShadow: '2xl'
-              }}
-              position="relative"
-              overflow="hidden"
-              _before={{
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '5px',
-                bg: 'brand.500',
-              }}
+              _hover={{ transform: "translateY(-5px)" }}
+              textAlign="center"
             >
-              <Center 
-                w={20} 
-                h={20} 
-                borderRadius="full" 
-                bg="brand.500"
-                color="white"
-                mb={6}
-                mx="auto"
-              >
-                <Icon as={FiSearch} boxSize={10} />
-              </Center>
-              <Heading as="h3" size="md" textAlign="center" mb={4}>All in One Place</Heading>
-              <Text textAlign="center" fontSize="md" color="gray.600" _dark={{ color: 'gray.300' }}>
+              <Circle size="80px" bg="brand.100" color="brand.500" mx="auto" mb={6}>
+                <Icon as={FiPackage} boxSize={8} />
+              </Circle>
+              <Heading as="h3" size="md" mb={4}>
+                All in one place
+              </Heading>
+              <Text color="gray.600" _dark={{ color: 'gray.300' }}>
                 Find everything you need in one place - from rentals to entertainers.
               </Text>
             </Box>
-            
+
             <Box 
               p={8} 
               borderRadius="xl" 
@@ -365,39 +346,20 @@ export default function HomeContent() {
               bg="white" 
               _dark={{ bg: 'gray.700' }}
               transition="all 0.3s"
-              _hover={{ 
-                transform: 'translateY(-8px)',
-                boxShadow: '2xl'
-              }}
-              position="relative"
-              overflow="hidden"
-              _before={{
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '5px',
-                bg: 'brand.500',
-              }}
+              _hover={{ transform: "translateY(-5px)" }}
+              textAlign="center"
             >
-              <Center 
-                w={20} 
-                h={20} 
-                borderRadius="full" 
-                bg="brand.500"
-                color="white"
-                mb={6}
-                mx="auto"
-              >
-                <Icon as={FiCheckCircle} boxSize={10} />
-              </Center>
-              <Heading as="h3" size="md" textAlign="center" mb={4}>Verified Local Vendors</Heading>
-              <Text textAlign="center" fontSize="md" color="gray.600" _dark={{ color: 'gray.300' }}>
+              <Circle size="80px" bg="brand.100" color="brand.500" mx="auto" mb={6}>
+                <Icon as={FiShield} boxSize={8} />
+              </Circle>
+              <Heading as="h3" size="md" mb={4}>
+                Verified Local Vendors
+              </Heading>
+              <Text color="gray.600" _dark={{ color: 'gray.300' }}>
                 Verified providers with reviews and safety checks.
               </Text>
             </Box>
-            
+
             <Box 
               p={8} 
               borderRadius="xl" 
@@ -405,114 +367,18 @@ export default function HomeContent() {
               bg="white" 
               _dark={{ bg: 'gray.700' }}
               transition="all 0.3s"
-              _hover={{ 
-                transform: 'translateY(-8px)',
-                boxShadow: '2xl'
-              }}
-              position="relative"
-              overflow="hidden"
-              _before={{
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '5px',
-                bg: 'brand.500',
-              }}
+              _hover={{ transform: "translateY(-5px)" }}
+              textAlign="center"
             >
-              <Center 
-                w={20} 
-                h={20} 
-                borderRadius="full" 
-                bg="brand.500"
-                color="white"
-                mb={6}
-                mx="auto"
-              >
-                <Icon as={FiClock} boxSize={10} />
-              </Center>
-              <Heading as="h3" size="md" textAlign="center" mb={4}>Fast & Easy</Heading>
-              <Text textAlign="center" fontSize="md" color="gray.600" _dark={{ color: 'gray.300' }}>
+              <Circle size="80px" bg="brand.100" color="brand.500" mx="auto" mb={6}>
+                <Icon as={FiClock} boxSize={8} />
+              </Circle>
+              <Heading as="h3" size="md" mb={4}>
+                Fast & Easy
+              </Heading>
+              <Text color="gray.600" _dark={{ color: 'gray.300' }}>
                 Book online in minutes. No back-and-forth quotes.
               </Text>
-            </Box>
-          </SimpleGrid>
-        </Container>
-      </Box>
-
-      {/* Custom Vision Section */}
-      <Box 
-        py={24} 
-        bgGradient="linear(to-br, blue.50, purple.50)" 
-        _dark={{ bgGradient: "linear(to-br, gray.900, purple.900)" }}
-        position="relative"
-        overflow="hidden"
-      >
-        {/* Abstract shapes background */}
-        <Box
-          position="absolute"
-          top="0"
-          left="0"
-          right="0"
-          bottom="0"
-          opacity="0.2"
-          bgImage="url('data:image/svg+xml;charset=utf-8,%3Csvg width=%27600%27 height=%27600%27 viewBox=%270 0 800 800%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27none%27 fill-rule=%27evenodd%27%3E%3Ccircle stroke=%27%23E2E8F0%27 stroke-width=%274%27 cx=%27400%27 cy=%27400%27 r=%27200%27/%3E%3Ccircle stroke=%27%23E2E8F0%27 stroke-width=%274%27 cx=%27400%27 cy=%27400%27 r=%27300%27/%3E%3Ccircle stroke=%27%23E2E8F0%27 stroke-width=%274%27 cx=%27400%27 cy=%27400%27 r=%27400%27/%3E%3C/g%3E%3C/svg%3E')"
-          bgSize="cover"
-          bgRepeat="no-repeat"
-          bgPosition="center"
-          _dark={{
-            filter: "invert(1) brightness(0.2)"
-          }}
-        />
-
-        <Container maxW="container.xl" position="relative">
-          <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={10} alignItems="center" w="full">
-            <Box>
-              <Heading 
-                as="h2" 
-                size="xl" 
-                mb={4}
-                bgGradient="linear(to-r, brand.500, purple.500)"
-                bgClip="text"
-                _dark={{
-                  bgGradient: "linear(to-r, brand.200, purple.200)",
-                }}
-              >
-                Have a Special Vision in Mind?
-              </Heading>
-              <Text fontSize="lg" color="gray.600" _dark={{ color: 'gray.300' }} mb={8}>
-                Looking for something unique and personalized? Upload your own pictures and let our service providers bring your vision to life.
-              </Text>
-              <Button
-                as={Link}
-                href="/client/create-party"
-                size="lg"
-                colorScheme="brand"
-                px={8}
-                py={7}
-                boxShadow="md"
-                _hover={{
-                  transform: "translateY(-2px)",
-                  boxShadow: "lg"
-                }}
-              >
-                Create Your Custom Party
-              </Button>
-            </Box>
-            <Box>
-              <Image
-                src="/images/girl.png"
-                alt="Girl with party vision"
-                borderRadius="2xl"
-                shadow="2xl"
-                objectFit="contain"
-                maxH="500px"
-                width="100%"
-                mx="auto"
-                display="block"
-                transform="rotate(2deg)"
-              />
             </Box>
           </SimpleGrid>
         </Container>
