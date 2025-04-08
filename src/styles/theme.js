@@ -85,7 +85,30 @@ const components = {
   Heading: {
     baseStyle: {
       fontWeight: 'bold',
+      letterSpacing: '-0.02em',
     },
+    sizes: {
+      '2xl': {
+        fontSize: ['4xl', null, '5xl'],
+        lineHeight: 1.2,
+        fontWeight: 800,
+      },
+      xl: {
+        fontSize: ['3xl', null, '4xl'],
+        lineHeight: 1.2,
+        fontWeight: 700,
+      },
+      lg: {
+        fontSize: ['2xl', null, '3xl'],
+        lineHeight: 1.3,
+        fontWeight: 700,
+      },
+      md: {
+        fontSize: 'xl',
+        lineHeight: 1.4,
+        fontWeight: 700,
+      }
+    }
   },
 };
 
@@ -101,7 +124,7 @@ const styles = {
 
 // Fonts
 const fonts = {
-  heading: '"Inter", sans-serif',
+  heading: 'var(--font-nunito), sans-serif',
   body: '"Inter", sans-serif',
 };
 

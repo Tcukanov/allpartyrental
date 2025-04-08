@@ -30,3 +30,27 @@ body {
     text-wrap: balance;
   }
 }
+
+/* Apply Nunito font to all heading elements */
+h1, h2, h3, h4, h5, h6,
+.chakra-heading {
+  font-family: var(--font-nunito), sans-serif;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-weight: 800;
+}
+
+h2, h3 {
+  font-weight: 700;
+}
+
+h4, h5, h6 {
+  font-weight: 600;
+}
+
+/* Add specific class overrides */
+.css-q3q75b {
+  background-color: #fdf9ed !important;
+}
