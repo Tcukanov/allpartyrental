@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '../../../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 import OpenAI from 'openai';
 
 // Initialize OpenAI client
@@ -11,7 +11,7 @@ const openai = new OpenAI({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -23,8 +23,9 @@ export async function POST(
       );
     }
 
-    const { id } = params;
-
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
     // Get party by ID with all its details
     const party = await prisma.party.findUnique({
       where: {

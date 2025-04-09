@@ -66,7 +66,7 @@ interface Service {
   maxRentalHours: number;
 }
 
-export default function EditServicePage({ params }: { params: { id: string } }) {
+export default function EditServicePage({ params }: { params: Promise<{ id: string }> }) {
   // Use React.use() to unwrap the params promise
   const unwrappedParams = React.use(params);
   const { id } = unwrappedParams;

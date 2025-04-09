@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 
 /**
  * Cancel a transaction (when payment fails)
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
@@ -20,7 +24,7 @@ export async function POST(
       );
     }
 
-    const transactionId = params.id;
+    const transactionId = id;
 
     // Get the transaction
     const transaction = await prisma.transaction.findUnique({

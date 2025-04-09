@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '../../../../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string, serviceId: string } }
+  { params }: { params: Promise<{ id: string, serviceId: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id, serviceId } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
@@ -16,8 +20,6 @@ export async function GET(
         { status: 401 }
       );
     }
-
-    const { id, serviceId } = params;
 
     // Get party service
     const partyService = await prisma.partyService.findFirst({
@@ -94,9 +96,13 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string, serviceId: string } }
+  { params }: { params: Promise<{ id: string, serviceId: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id, serviceId } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
@@ -106,7 +112,6 @@ export async function PUT(
       );
     }
 
-    const { id, serviceId } = params;
     const body = await request.json();
     const { specificOptions } = body;
 
@@ -176,9 +181,13 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string, serviceId: string } }
+  { params }: { params: Promise<{ id: string, serviceId: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id, serviceId } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
@@ -187,8 +196,6 @@ export async function DELETE(
         { status: 401 }
       );
     }
-
-    const { id, serviceId } = params;
 
     // Get party service
     const partyService = await prisma.partyService.findFirst({

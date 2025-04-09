@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
@@ -19,7 +23,7 @@ export async function GET(
 
     const chat = await prisma.chat.findFirst({
       where: {
-        id: params.id,
+        id: id,
         offer: {
           OR: [
             { partyService: { party: { clientId: session.user.id } } },
@@ -122,9 +126,13 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id) {
@@ -145,7 +153,7 @@ export async function POST(
 
     const chat = await prisma.chat.findUnique({
       where: {
-        id: params.id
+        id: id
       },
       include: {
         offer: true
@@ -175,7 +183,7 @@ export async function POST(
     const message = await prisma.message.create({
       data: {
         content,
-        chatId: params.id,
+        chatId: id,
         senderId: session.user.id,
         receiverId
       },
@@ -197,7 +205,7 @@ export async function POST(
     // Update chat's updatedAt timestamp
     await prisma.chat.update({
       where: {
-        id: params.id
+        id: id
       },
       data: {
         updatedAt: new Date()

@@ -18,11 +18,11 @@ type ProviderWithProfile = User & {
   services: ServiceWithCategory[];
 };
 
-// Generate metadata for SEO
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  // Use React.use() to unwrap the params
-  const unwrappedParams = React.use(params);
-  const { id } = unwrappedParams;
+// Update for Next.js 15
+export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  // Unwrap the params promise
+  const params = await props.params;
+  const { id } = params;
   
   try {
     // Try to find the provider by ID
@@ -59,10 +59,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   }
 }
 
-export default async function ProviderProfilePage({ params }: { params: { id: string } }) {
-  // Use React.use() to unwrap the params
-  const unwrappedParams = React.use(params);
-  const { id } = unwrappedParams;
+export default async function ProviderProfilePage(props: { params: Promise<{ id: string }> }) {
+  // Unwrap the params promise
+  const params = await props.params;
+  const { id } = params;
   
   try {
     // Get provider details

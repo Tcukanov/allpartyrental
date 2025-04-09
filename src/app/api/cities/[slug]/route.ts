@@ -3,10 +3,13 @@ import { prisma } from '@/lib/prisma/client';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { slug } = params;
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { slug } = unwrappedParams;
+    
     console.log(`Fetching city with slug: ${slug}`);
     
     // Try to find by id first

@@ -53,6 +53,7 @@ export default function LocationServiceSearch() {
   const focusBg = useColorModeValue('white', 'gray.800');
   const suggestionsBg = useColorModeValue('white', 'gray.800');
   const suggestionHoverBg = useColorModeValue('gray.50', 'gray.700');
+  const modalSelectionBg = useColorModeValue('gray.50', 'gray.700');
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
@@ -267,7 +268,7 @@ export default function LocationServiceSearch() {
             </Tabs>
 
             {(selectedLocation || selectedService) && (
-              <Box mt={4} p={4} bg={useColorModeValue('gray.50', 'gray.700')} borderRadius="md">
+              <Box mt={4} p={4} bg={modalSelectionBg} borderRadius="md">
                 <Text fontWeight="bold" mb={2}>Selected:</Text>
                 <HStack spacing={2}>
                   {selectedLocation && (

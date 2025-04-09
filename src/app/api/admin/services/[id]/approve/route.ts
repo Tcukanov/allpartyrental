@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 import { ServiceStatus, NotificationType } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
@@ -27,8 +31,6 @@ export async function PUT(
         { status: 403 }
       );
     }
-
-    const { id } = params;
 
     // Check if service exists and is pending approval
     const service = await prisma.service.findUnique({

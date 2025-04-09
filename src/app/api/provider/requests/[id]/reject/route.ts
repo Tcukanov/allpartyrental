@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma/client';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession();
@@ -16,8 +16,9 @@ export async function POST(
       );
     }
 
-    const { id } = params;
-
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
     // Check if user is a provider
     const user = await prisma.user.findUnique({
       where: { email: session.user.email as string },

@@ -138,7 +138,7 @@ export default function ServiceDetailPage({ params }) {
   const [userRole, setUserRole] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   
-  // Use React.use() to unwrap the params promise
+  // For client components, use React.use() to unwrap the params Promise
   const unwrappedParams = React.use(params);
   const { id } = unwrappedParams;
   

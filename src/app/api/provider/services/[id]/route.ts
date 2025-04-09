@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/prisma/client';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession();
     
     if (!session || !session.user) {
@@ -16,8 +20,6 @@ export async function GET(
         { status: 401 }
       );
     }
-
-    const { id } = params;
 
     // Get the service
     const service = await prisma.service.findUnique({
@@ -59,9 +61,13 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session?.user || session.user.role !== 'PROVIDER') {
@@ -75,7 +81,7 @@ export async function PUT(
     
     const service = await prisma.service.update({
       where: {
-        id: params.id,
+        id: id,
         providerId: session.user.id
       },
       data,
@@ -97,9 +103,13 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session?.user || session.user.role !== 'PROVIDER') {
@@ -111,7 +121,7 @@ export async function DELETE(
 
     await prisma.service.delete({
       where: {
-        id: params.id,
+        id: id,
         providerId: session.user.id
       }
     });

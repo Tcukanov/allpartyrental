@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
 
     // Get service by ID
     const service = await prisma.service.findUnique({
@@ -58,9 +60,13 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
@@ -71,7 +77,6 @@ export async function PUT(
     }
 
     // Get service by ID 
-    const { id } = params;
     const existingService = await prisma.service.findUnique({
       where: { id },
       select: {
@@ -175,9 +180,13 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session?.user || session.user.role !== 'PROVIDER') {
@@ -189,7 +198,7 @@ export async function DELETE(
 
     await prisma.service.delete({
       where: {
-        id: params.id,
+        id: id,
         providerId: session.user.id
       }
     });

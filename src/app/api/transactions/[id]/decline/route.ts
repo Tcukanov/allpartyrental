@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/auth-options';
 import { paymentService } from '@/lib/payment/service';
 import { Prisma } from '@prisma/client';
 
@@ -12,9 +12,13 @@ import { Prisma } from '@prisma/client';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
@@ -24,7 +28,7 @@ export async function POST(
       );
     }
     
-    const transactionId = params.id;
+    const transactionId = id;
     
     // Get the body for decline reason
     const body = await request.json();

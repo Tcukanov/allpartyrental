@@ -41,12 +41,12 @@ export default function CategoryServicesPage({ params }) {
   const [sortOption, setSortOption] = useState('price_asc');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Use React.use() to unwrap the params promise
+  // For client components, use React.use() to unwrap the params Promise
   const unwrappedParams = React.use(params);
-  const { category: unwrappedCategory } = unwrappedParams;
+  const { category: categorySlug } = unwrappedParams;
   
   // Update all params.category references to just category
-  const categoryName = unwrappedCategory;
+  const categoryName = categorySlug;
   
   // Fetch category and services data
   useEffect(() => {

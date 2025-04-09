@@ -11,11 +11,11 @@ type ServiceWithProvider = Service & {
   };
 };
 
-// Generate metadata for SEO
-export async function generateMetadata({ params }: { params: { location: string; service: string } }): Promise<Metadata> {
-  // Use React.use() to unwrap the params
-  const unwrappedParams = React.use(params);
-  const { location, service } = unwrappedParams;
+// Metadata is now a function that returns a Promise
+export async function generateMetadata(props: { params: Promise<{ location: string; service: string }> }): Promise<Metadata> {
+  // Use React.use() to unwrap the params promise
+  const params = await props.params;
+  const { location, service } = params;
   
   try {
     // Find the city by slug
@@ -75,10 +75,10 @@ export async function generateStaticParams() {
   }
 }
 
-export default async function LocationServicePage({ params }: { params: { location: string; service: string } }) {
-  // Use React.use() to unwrap the params
-  const unwrappedParams = React.use(params);
-  const { location, service } = unwrappedParams;
+export default async function LocationServicePage(props: { params: Promise<{ location: string; service: string }> }) {
+  // Unwrap params promise
+  const params = await props.params;
+  const { location, service } = params;
   
   // Reserved paths that should not be handled by this route
   const reservedPaths = ['api', 'auth', 'admin', 'client', 'provider', 'services'];

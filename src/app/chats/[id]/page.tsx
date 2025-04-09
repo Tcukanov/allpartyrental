@@ -52,8 +52,8 @@ interface Chat {
   messages: Message[];
 }
 
-export default function ChatPage({ params }: { params: { id: string } }) {
-  // Use React.use() to unwrap the params promise
+export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
+  // For client components, use React.use() to unwrap the params Promise
   const unwrappedParams = React.use(params);
   const { id } = unwrappedParams;
   
