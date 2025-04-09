@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import React from 'react';
 import {
   Box,
   Container,
@@ -52,6 +53,10 @@ interface Chat {
 }
 
 export default function ChatPage({ params }: { params: { id: string } }) {
+  // Use React.use() to unwrap the params promise
+  const unwrappedParams = React.use(params);
+  const { id } = unwrappedParams;
+  
   const { data: session, status } = useSession();
   const router = useRouter();
   const toast = useToast();
@@ -69,15 +74,15 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     } else if (status === 'authenticated') {
       fetchChat();
     }
-  }, [status, router, params.id]);
+  }, [status, router, id]);
 
   // Fetch chat data
   const fetchChat = async () => {
     try {
       setLoading(true);
-      console.log('Fetching chat with ID:', params.id);
+      console.log('Fetching chat with ID:', id);
       
-      const response = await fetch(`/api/chats/${params.id}`);
+      const response = await fetch(`/api/chats/${id}`);
       const responseData = await response.json();
       
       console.log('Chat API response:', responseData);
@@ -126,7 +131,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     setSending(true);
     
     try {
-      const response = await fetch(`/api/chats/${params.id}/messages`, {
+      const response = await fetch(`/api/chats/${id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

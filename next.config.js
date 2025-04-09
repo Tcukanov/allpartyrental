@@ -73,6 +73,17 @@ const nextConfig = {
       afterFiles: [],
       fallback: []
     };
+  },
+  // Next.js 15 specific settings
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb', // Adjust according to your needs
+    },
+    optimizePackageImports: [
+      '@chakra-ui/react',
+      '@chakra-ui/icons',
+      'react-icons',
+    ],
   }
 }
 

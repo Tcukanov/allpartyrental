@@ -1,3 +1,4 @@
+import React from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma/client';
@@ -12,39 +13,37 @@ type ServiceWithProvider = Service & {
 
 // Generate metadata for SEO
 export async function generateMetadata({ params }: { params: { location: string; service: string } }): Promise<Metadata> {
+  // Use React.use() to unwrap the params
+  const unwrappedParams = React.use(params);
+  const { location, service } = unwrappedParams;
+  
   try {
-    // Find the city and category from the database
-    const city = await prisma.city.findFirst({
-      where: { slug: params.location.toLowerCase() },
-      select: { name: true }
+    // Find the city by slug
+    const city = await prisma.city.findUnique({
+      where: { slug: location.toLowerCase() },
     });
 
-    const category = await prisma.serviceCategory.findFirst({
-      where: { slug: params.service.toLowerCase() },
-      select: { name: true }
+    // Find the service category by slug
+    const category = await prisma.serviceCategory.findUnique({
+      where: { slug: service.toLowerCase() },
     });
 
     if (!city || !category) {
       return {
-        title: 'Page Not Found',
-        description: 'The requested page could not be found.',
+        title: 'Not Found',
+        description: 'This page could not be found.'
       };
     }
 
     return {
-      title: `${category.name} Rental in ${city.name} | All Party Rental`,
-      description: `Find the best ${category.name.toLowerCase()} rental services in ${city.name}. Compare prices, read reviews, and book your party equipment today!`,
-      openGraph: {
-        title: `${category.name} Rental in ${city.name} | All Party Rental`,
-        description: `Find the best ${category.name.toLowerCase()} rental services in ${city.name}. Compare prices, read reviews, and book your party equipment today!`,
-        type: 'website',
-      },
+      title: `${category.name} in ${city.name} | All Party Rent`,
+      description: `Find the best ${category.name} services in ${city.name} - All Party Rent helps you find quality party ${category.name.toLowerCase()} services in your area.`
     };
   } catch (error) {
     console.error('Error generating metadata:', error);
     return {
-      title: 'All Party Rental',
-      description: 'Find and book party services in your area.',
+      title: 'Error',
+      description: 'There was an error loading this page.'
     };
   }
 }
@@ -77,42 +76,47 @@ export async function generateStaticParams() {
 }
 
 export default async function LocationServicePage({ params }: { params: { location: string; service: string } }) {
-  // Pre-flight check: Quickly abort for obvious API routes without database queries
-  if (params.location === 'api' || params.location === 'socket') {
-    console.error(`API/Socket route incorrectly routed to location/service page: ${params.location}/${params.service}`);
+  // Use React.use() to unwrap the params
+  const unwrappedParams = React.use(params);
+  const { location, service } = unwrappedParams;
+  
+  // Reserved paths that should not be handled by this route
+  const reservedPaths = ['api', 'auth', 'admin', 'client', 'provider', 'services'];
+  
+  // Handle cases where the route was incorrectly matched to API routes
+  if (location === 'api' || location === 'socket') {
+    console.error(`API/Socket route incorrectly routed to location/service page: ${location}/${service}`);
     return notFound();
+  }
+  
+  // If it's a system path, return 404
+  if (reservedPaths.includes(location.toLowerCase()) ||
+      reservedPaths.includes(service.toLowerCase()) ||
+      location.includes('/') ||
+      service.includes('/')) {
+    console.error(`Reserved or invalid path used as location/service slug: location=${location}, service=${service}`);
+    return notFound();
+  }
+  
+  // If either parameter is empty, return 404
+  if (!location || !service ||
+      location.trim() === '' || service.trim() === '') {
+    console.error(`Invalid params: location=${location}, service=${service}`);
+    return notFound();
+  }
+  
+  // Extract slugs for city and service
+  const locationSlug = location.toLowerCase();
+  const serviceSlug = service.toLowerCase();
+
+  // Check if slugs contain special characters (only allow alphanumeric, dash, underscore)
+  const validSlugPattern = /^[a-z0-9-_]+$/;
+  if (!validSlugPattern.test(locationSlug) || !validSlugPattern.test(serviceSlug)) {
+    console.error(`Invalid slug format: location=${locationSlug}, service=${serviceSlug}`);
+    notFound();
   }
 
   try {
-    // Make sure we're not trying to render an API route or other reserved paths as a location page
-    const reservedPaths = ['api', 'client', 'provider', 'admin', '_next', 'next', 'static', 'auth', 'socket', 'public'];
-    
-    if (reservedPaths.includes(params.location.toLowerCase()) || 
-        reservedPaths.includes(params.service.toLowerCase()) ||
-        params.location.includes('/') || 
-        params.service.includes('/')) {
-      console.error(`Reserved or invalid path used as location/service slug: location=${params.location}, service=${params.service}`);
-      notFound();
-    }
-
-    // Validate params to ensure they're not empty or invalid
-    if (!params.location || !params.service || 
-        params.location.trim() === '' || params.service.trim() === '') {
-      console.error(`Invalid params: location=${params.location}, service=${params.service}`);
-      notFound();
-    }
-
-    // Convert slugs to lowercase for consistent matching
-    const locationSlug = params.location.toLowerCase();
-    const serviceSlug = params.service.toLowerCase();
-
-    // Check if slugs contain special characters (only allow alphanumeric, dash, underscore)
-    const validSlugPattern = /^[a-z0-9-_]+$/;
-    if (!validSlugPattern.test(locationSlug) || !validSlugPattern.test(serviceSlug)) {
-      console.error(`Invalid slug format: location=${locationSlug}, service=${serviceSlug}`);
-      notFound();
-    }
-
     // Find the city first
     const city = await prisma.city.findFirst({
       where: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Input,
@@ -46,6 +46,14 @@ interface Category {
 export default function LocationServiceSearch() {
   const router = useRouter();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  
+  // Move color mode values to the top to maintain consistent hook order
+  const inputBg = useColorModeValue('white', 'gray.800');
+  const hoverBg = useColorModeValue('gray.50', 'gray.700');
+  const focusBg = useColorModeValue('white', 'gray.800');
+  const suggestionsBg = useColorModeValue('white', 'gray.800');
+  const suggestionHoverBg = useColorModeValue('gray.50', 'gray.700');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<string | null>(null);
@@ -168,9 +176,9 @@ export default function LocationServiceSearch() {
             onClick={onOpen}
             size="lg"
             borderRadius="full"
-            bg={useColorModeValue('white', 'gray.800')}
-            _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
-            _focus={{ bg: useColorModeValue('white', 'gray.800') }}
+            bg={inputBg}
+            _hover={{ bg: hoverBg }}
+            _focus={{ bg: focusBg }}
           />
         </InputGroup>
 
@@ -181,7 +189,7 @@ export default function LocationServiceSearch() {
             left={0}
             right={0}
             mt={2}
-            bg={useColorModeValue('white', 'gray.800')}
+            bg={suggestionsBg}
             borderRadius="md"
             boxShadow="lg"
             zIndex={1000}
@@ -198,7 +206,7 @@ export default function LocationServiceSearch() {
                   variant="ghost"
                   justifyContent="flex-start"
                   onClick={() => handleSuggestionClick(suggestion.location, suggestion.service)}
-                  _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}
+                  _hover={{ bg: suggestionHoverBg }}
                 >
                   <HStack spacing={2}>
                     <StarIcon color="gray.400" />

@@ -1,5 +1,6 @@
 "use client";
 
+import React from 'react';
 import { useEffect, useState } from 'react';
 import {
   Box,
@@ -36,7 +37,7 @@ import {
 import { StarIcon, CheckIcon, ChevronRightIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import { FaMapMarkerAlt, FaCalendarAlt, FaUser, FaPhoneAlt, FaEnvelope, FaGlobe } from 'react-icons/fa';
 import { FiClock, FiCalendar, FiDollarSign, FiMapPin } from 'react-icons/fi';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
 import { useSession } from 'next-auth/react';
@@ -137,6 +138,10 @@ export default function ServiceDetailPage({ params }) {
   const [userRole, setUserRole] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   
+  // Use React.use() to unwrap the params promise
+  const unwrappedParams = React.use(params);
+  const { id } = unwrappedParams;
+  
   // Set user role from session
   useEffect(() => {
     if (session?.user) {
@@ -154,21 +159,21 @@ export default function ServiceDetailPage({ params }) {
         let data = null;
         
         // Try to fetch from API
-        const response = await fetch(`/api/services/${params.id}`);
+        const response = await fetch(`/api/services/${id}`);
         
         // If API fails, use fallback data
         if (!response.ok) {
           // Check if we have fallback data for this ID
-          if (params.id === '6') {
+          if (id === '6') {
             console.log('Using fallback data for service ID 6');
             setService(fallbackService);
             setSimilarServices(fallbackSimilarServices);
             
             // Set isOwner to false for fallback data
             setIsOwner(false);
-          } else if (fallbackSimilarServices.find(s => s.id === params.id)) {
+          } else if (fallbackSimilarServices.find(s => s.id === id)) {
             // If we have this ID in our fallback similar services
-            const fallbackService = fallbackSimilarServices.find(s => s.id === params.id);
+            const fallbackService = fallbackSimilarServices.find(s => s.id === id);
             setService({
               ...fallbackService,
               category: { id: 'category-7', name: 'Bounce Houses', slug: 'bounce-houses' },
@@ -178,7 +183,7 @@ export default function ServiceDetailPage({ params }) {
             });
             
             // Use other services as similar
-            setSimilarServices(fallbackSimilarServices.filter(s => s.id !== params.id));
+            setSimilarServices(fallbackSimilarServices.filter(s => s.id !== id));
             
             // Set isOwner to false for fallback data
             setIsOwner(false);
@@ -203,7 +208,7 @@ export default function ServiceDetailPage({ params }) {
           
           // Fetch similar services
           try {
-            const similarResponse = await fetch(`/api/services/public?categoryId=${data.data.categoryId}&limit=3&exclude=${params.id}`);
+            const similarResponse = await fetch(`/api/services/public?categoryId=${data.data.categoryId}&limit=3&exclude=${id}`);
             const similarData = await similarResponse.json();
             if (similarData.success) {
               setSimilarServices(similarData.data);
@@ -232,10 +237,10 @@ export default function ServiceDetailPage({ params }) {
       }
     };
     
-    if (params.id) {
+    if (id) {
       fetchServiceData();
     }
-  }, [params.id, toast, session]);
+  }, [id, toast, session]);
   
   // Handle booking request
   const handleSendRequest = async (e) => {
@@ -250,7 +255,7 @@ export default function ServiceDetailPage({ params }) {
           duration: 3000,
           isClosable: true
         });
-        router.push(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/services/${service.id}`)}`);
+        router.push(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/services/${id}`)}`);
         return;
       }
 
@@ -346,9 +351,9 @@ export default function ServiceDetailPage({ params }) {
         canonicalLink.rel = 'canonical';
         document.head.appendChild(canonicalLink);
       }
-      canonicalLink.href = `${window.location.origin}/services/${params.id}`;
+      canonicalLink.href = `${window.location.origin}/services/${id}`;
     }
-  }, [service, params.id]);
+  }, [service, id]);
   
   if (isLoading) {
     return (
@@ -517,7 +522,7 @@ export default function ServiceDetailPage({ params }) {
               )}
               
               {!session && (
-                <Button colorScheme="blue" width="full" as="a" href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/services/${params.id}`)}`}>
+                <Button colorScheme="blue" width="full" as="a" href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/services/${id}`)}`}>
                   Login to Request
                 </Button>
               )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Container,
@@ -26,12 +26,11 @@ import {
   useToast
 } from '@chakra-ui/react';
 import { StarIcon, SearchIcon, ChevronRightIcon } from '@chakra-ui/icons';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
 
-export default function CategoryPage() {
-  const params = useParams();
+export default function CategoryServicesPage({ params }) {
   const router = useRouter();
   const toast = useToast();
   
@@ -42,6 +41,13 @@ export default function CategoryPage() {
   const [sortOption, setSortOption] = useState('price_asc');
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Use React.use() to unwrap the params promise
+  const unwrappedParams = React.use(params);
+  const { category: unwrappedCategory } = unwrappedParams;
+  
+  // Update all params.category references to just category
+  const categoryName = unwrappedCategory;
+  
   // Fetch category and services data
   useEffect(() => {
     const fetchCategoryData = async () => {
@@ -49,7 +55,7 @@ export default function CategoryPage() {
         setIsLoading(true);
         
         // Fetch the category details
-        const categoryResponse = await fetch(`/api/categories/${params.category}`);
+        const categoryResponse = await fetch(`/api/categories/${categoryName}`);
         if (!categoryResponse.ok) {
           throw new Error('Category not found');
         }
@@ -100,16 +106,16 @@ export default function CategoryPage() {
       }
     };
     
-    if (params.category) {
+    if (categoryName) {
       fetchCategoryData();
     }
-  }, [params.category, sortOption, toast]);
+  }, [categoryName, sortOption, toast]);
   
   // Handle search form submission
   const handleSearch = (e) => {
     e.preventDefault();
     // Update the search query parameter
-    router.push(`/services/categories/${params.category}?search=${searchQuery}`);
+    router.push(`/services/categories/${categoryName}?search=${searchQuery}`);
   };
   
   // Handle sort change
@@ -139,9 +145,9 @@ export default function CategoryPage() {
         canonicalLink.rel = 'canonical';
         document.head.appendChild(canonicalLink);
       }
-      canonicalLink.href = `${window.location.origin}/services/categories/${params.category}`;
+      canonicalLink.href = `${window.location.origin}/services/categories/${categoryName}`;
     }
-  }, [category, params.category]);
+  }, [category, categoryName]);
   
   if (isLoading) {
     return (

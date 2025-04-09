@@ -1,3 +1,4 @@
+import React from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma/client';
@@ -19,58 +20,69 @@ type ProviderWithProfile = User & {
 
 // Generate metadata for SEO
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  // Use React.use() to unwrap the params
+  const unwrappedParams = React.use(params);
+  const { id } = unwrappedParams;
+  
   try {
+    // Try to find the provider by ID
     const provider = await prisma.user.findUnique({
-      where: { id: params.id },
-      include: { profile: true }
-    });
-
-    if (!provider) {
-      return {
-        title: 'Provider Not Found',
-        description: 'The requested provider could not be found.',
-      };
-    }
-
-    return {
-      title: `${provider.name} | Party Service Provider`,
-      description: provider.profile?.description || `Find and book party services from ${provider.name}.`,
-      openGraph: {
-        title: `${provider.name} | Party Service Provider`,
-        description: provider.profile?.description || `Find and book party services from ${provider.name}.`,
-        type: 'profile',
-      },
-    };
-  } catch (error) {
-    console.error('Error generating metadata:', error);
-    return {
-      title: 'Provider Profile',
-      description: 'View provider details and services.',
-    };
-  }
-}
-
-export default async function ProviderProfilePage({ params }: { params: { id: string } }) {
-  try {
-    const provider = await prisma.user.findUnique({
-      where: { id: params.id },
-      include: {
-        profile: true,
-        services: {
-          include: {
-            category: {
-              select: {
-                name: true,
-                slug: true
-              }
-            }
+      where: { id },
+      select: {
+        name: true,
+        profile: {
+          select: {
+            description: true
           }
         }
       }
     });
 
     if (!provider) {
-      notFound();
+      return {
+        title: 'Provider Not Found',
+        description: 'This provider does not exist.'
+      };
+    }
+
+    return {
+      title: `${provider.name} | Party Service Provider`,
+      description: provider.profile?.description?.substring(0, 150) || 
+        `${provider.name} offers party services. Check out their profile and services.`
+    };
+  } catch (error) {
+    console.error('Error generating provider page metadata:', error);
+    return {
+      title: 'Provider Profile',
+      description: 'View this provider\'s profile and services.'
+    };
+  }
+}
+
+export default async function ProviderProfilePage({ params }: { params: { id: string } }) {
+  // Use React.use() to unwrap the params
+  const unwrappedParams = React.use(params);
+  const { id } = unwrappedParams;
+  
+  try {
+    // Get provider details
+    const provider = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        profile: true,
+        services: {
+          include: {
+            category: true,
+            city: true
+          }
+        }
+      }
+    });
+
+    if (!provider) {
+      return (
+        <div>Provider not found</div>
+      );
     }
 
     return (

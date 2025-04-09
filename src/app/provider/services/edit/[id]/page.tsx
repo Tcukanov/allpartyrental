@@ -3,6 +3,7 @@
 import { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import React from 'react';
 import {
   Box,
   Button,
@@ -66,7 +67,10 @@ interface Service {
 }
 
 export default function EditServicePage({ params }: { params: { id: string } }) {
-  const { id } = params;
+  // Use React.use() to unwrap the params promise
+  const unwrappedParams = React.use(params);
+  const { id } = unwrappedParams;
+  
   const { data: session, status } = useSession();
   const router = useRouter();
   const toast = useToast();

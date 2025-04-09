@@ -30,9 +30,11 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { CheckCircleIcon, WarningIcon } from '@chakra-ui/icons';
 import { formatCurrency } from '@/lib/utils/formatters';
+import React from 'react';
 
 export default function DeclineTransactionPage({ params }) {
-  const { id } = params;
+  const unwrappedParams = React.use(params);
+  const { id } = unwrappedParams;
   const { data: session, status } = useSession();
   const router = useRouter();
   const toast = useToast();
