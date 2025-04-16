@@ -205,19 +205,7 @@ export default function ClientDashboardPage() {
       <VStack spacing={8} align="stretch">
         <Heading as="h1" size="xl">Client Dashboard</Heading>
         
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
-          <Card cursor="pointer" onClick={() => router.push('/client/create-party')}>
-            <CardBody>
-              <VStack spacing={4} align="center">
-                <Icon as={MdCelebration} w={8} h={8} color="brand.500" />
-                <Text fontWeight="bold">Create New Party</Text>
-                <Text fontSize="sm" color="gray.600" textAlign="center">
-                  Start planning your next event
-                </Text>
-              </VStack>
-            </CardBody>
-          </Card>
-          
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 2 }} spacing={6}>
           <Card cursor="pointer" onClick={() => router.push('/client/my-party')}>
             <CardBody>
               <VStack spacing={4} align="center">
@@ -237,18 +225,6 @@ export default function ClientDashboardPage() {
                 <Text fontWeight="bold">Approved Services</Text>
                 <Text fontSize="sm" color="gray.600" textAlign="center">
                   View your approved service requests
-                </Text>
-              </VStack>
-            </CardBody>
-          </Card>
-          
-          <Card cursor="pointer" onClick={() => router.push('/client/party-history')}>
-            <CardBody>
-              <VStack spacing={4} align="center">
-                <Icon as={MdHistory} w={8} h={8} color="brand.500" />
-                <Text fontWeight="bold">Party History</Text>
-                <Text fontSize="sm" color="gray.600" textAlign="center">
-                  View your past events
                 </Text>
               </VStack>
             </CardBody>

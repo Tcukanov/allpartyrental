@@ -51,7 +51,7 @@ export default function Navbar() {
   ];
 
   const clientItems = [
-    { label: 'My Parties', href: '/client/parties' },
+    // { label: 'My Parties', href: '/client/parties' },
     { label: 'My Profile', href: '/client/profile' },
     { label: 'Calendar', href: '/client/calendar' },
   ];
@@ -59,8 +59,9 @@ export default function Navbar() {
   const providerItems = [
     { label: 'My Services', href: '/provider/services' },
     { label: 'Requests', href: '/provider/requests' },
+    { label: 'Calendar', href: '/provider/calendar' },
     { label: 'My Profile', href: '/provider/profile' },
-    { label: 'Advertising', href: '/provider/advertising' },
+    // { label: 'Advertising', href: '/provider/advertising' },
   ];
 
   const adminItems = [
@@ -95,6 +96,7 @@ export default function Navbar() {
           {isLoggedIn ? (
             <>
               {isClient && (
+                /* 
                 <Button 
                   colorScheme="brand" 
                   variant="solid" 
@@ -102,6 +104,8 @@ export default function Navbar() {
                 >
                   Organize My Party!
                 </Button>
+                */
+                <></>
               )}
               
               <Menu>

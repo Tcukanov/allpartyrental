@@ -440,6 +440,49 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
     });
   };
   
+  useEffect(() => {
+    async function loadCategoriesAndCities() {
+      try {
+        // Fetch both cities and categories in parallel
+        const [cityResponse, categoryResponse] = await Promise.all([
+          fetch('/api/cities'),
+          fetch('/api/categories')
+        ]);
+
+        if (!cityResponse.ok || !categoryResponse.ok) {
+          throw new Error('Failed to load data');
+        }
+
+        const cityData = await cityResponse.json();
+        const categoryData = await categoryResponse.json();
+
+        setCities(cityData.data || []);
+        setCategories(categoryData.data || []);
+
+        // Make sure the service's category is selected even if it's the only option
+        if (formData && categoryData.data && formData.categoryId) {
+          setFormData(prev => ({
+            ...prev,
+            categoryId: formData.categoryId
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load necessary data.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    }
+
+    if (formData) {
+      loadCategoriesAndCities();
+    }
+  }, [formData, toast]);
+  
   return (
     <Container maxW="container.md" py={8}>
       <VStack spacing={8} align="stretch">
@@ -592,30 +635,21 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
                 <FormErrorMessage>{errors.price}</FormErrorMessage>
               </FormControl>
               
-              <FormControl isRequired isInvalid={!!errors.categoryId}>
-                <FormLabel>Category</FormLabel>
-                <Select 
-                  name="categoryId"
-                  value={formData.categoryId}
-                  onChange={handleChange}
-                  placeholder="Select category"
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </Select>
-                <FormErrorMessage>{errors.categoryId}</FormErrorMessage>
-              </FormControl>
+              {/* Category Field - Hidden since we now just have "Soft play" */}
+              <input 
+                type="hidden"
+                name="categoryId"
+                value={formData.categoryId}
+              />
               
+              {/* City Field */}
               <FormControl isRequired isInvalid={!!errors.cityId}>
-                <FormLabel>City</FormLabel>
-                <Select 
+                <FormLabel>Borough</FormLabel>
+                <Select
                   name="cityId"
                   value={formData.cityId}
                   onChange={handleChange}
-                  placeholder="Select city"
+                  placeholder="Select borough"
                 >
                   {cities.map((city) => (
                     <option key={city.id} value={city.id}>

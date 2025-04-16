@@ -63,7 +63,7 @@ model Provider {
   businessEmail       String?
   businessWebsite     String?
   businessLogo        String?
-  ein                 String?   // Employer Identification Number (Tax ID)
+  ein                 String?
   taxIdVerified       Boolean   @default(false)
   bankAccountVerified Boolean   @default(false)
   stripeAccountId     String?
@@ -72,7 +72,7 @@ model Provider {
   isApproved          Boolean   @default(false)
   approvedAt          DateTime?
   rejectionReason     String?
-  businessType        String?   // LLC, Corporation, Sole Proprietor, etc.
+  businessType        String?
   foundedYear         Int?
   employeeCount       Int?
   insuranceProvider   String?

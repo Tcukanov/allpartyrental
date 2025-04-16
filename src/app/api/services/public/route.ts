@@ -1,7 +1,7 @@
-export const dynamic = 'force-dynamic';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,17 +9,15 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('categoryId');
     const cityId = searchParams.get('cityId');
     const search = searchParams.get('search');
-    const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice') as string) : undefined;
-    const maxPrice = searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice') as string) : undefined;
-    const sort = searchParams.get('sort') || 'price_asc';
+    const minPrice = searchParams.get('minPrice');
+    const maxPrice = searchParams.get('maxPrice');
+    const limit = parseInt(searchParams.get('limit') || '50');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const exclude = searchParams.get('exclude');
     const skip = (page - 1) * limit;
 
-    // Build the where clause
+    // Build query conditions
     const where: any = {
-      status: 'ACTIVE'
+      status: 'ACTIVE', // Only return active services
     };
 
     if (categoryId) {
@@ -37,60 +35,43 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    if (minPrice !== undefined) {
-      where.price = {
-        ...where.price,
-        gte: minPrice,
-      };
+    // Initialize price filter if needed
+    if (minPrice || maxPrice) {
+      where.price = {};
+      
+      if (minPrice) {
+        where.price.gte = parseFloat(minPrice);
+      }
+      
+      if (maxPrice) {
+        where.price.lte = parseFloat(maxPrice);
+      }
     }
 
-    if (maxPrice !== undefined) {
-      where.price = {
-        ...where.price,
-        lte: maxPrice,
-      };
-    }
-
-    // Exclude a specific service (for similar services queries)
-    if (exclude) {
-      where.id = { not: exclude };
-    }
-
-    // Define ordering based on sort parameter
-    let orderBy: any = {};
-    switch (sort) {
-      case 'price_asc':
-        orderBy = { price: 'asc' };
-        break;
-      case 'price_desc':
-        orderBy = { price: 'desc' };
-        break;
-      case 'newest':
-        orderBy = { createdAt: 'desc' };
-        break;
-      default:
-        orderBy = { price: 'asc' };
-    }
-
-    // Fetch services
+    // Get services with pagination
     const services = await prisma.service.findMany({
       where,
       include: {
+        category: true,
+        city: true,
         provider: {
           select: {
             id: true,
             name: true,
+            email: true,
+            role: true,
+            profile: true
           },
         },
-        category: true,
-        city: true,
       },
-      orderBy,
+      orderBy: {
+        createdAt: 'desc',
+      },
       skip,
       take: limit,
     });
 
-    // Count total matching services
+    // Get total count for pagination
     const total = await prisma.service.count({ where });
 
     return NextResponse.json({
@@ -102,15 +83,22 @@ export async function GET(request: NextRequest) {
         limit,
         pages: Math.ceil(total / limit),
       },
-    }, { status: 200 });
-  } catch (error) {
+    });
+  } catch (error: any) {
     console.error('Error fetching public services:', error);
+    console.error('Query parameters:', request.url);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    
     return NextResponse.json(
-      { 
+      {
         success: false,
         error: {
-          message: 'Failed to fetch services'
-        }
+          message: error.message || 'Failed to fetch services',
+        },
       },
       { status: 500 }
     );

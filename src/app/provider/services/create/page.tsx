@@ -73,6 +73,8 @@ export default function CreateServicePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     const fetchCategoriesAndCities = async () => {
@@ -127,6 +129,47 @@ export default function CreateServicePage() {
     
     fetchCategoriesAndCities();
   }, [toast, router, session, status]);
+  
+  useEffect(() => {
+    async function loadData() {
+      setIsLoadingData(true);
+      try {
+        // Fetch both cities and categories in parallel
+        const [cityResponse, categoryResponse] = await Promise.all([
+          fetch('/api/cities'),
+          fetch('/api/categories')
+        ]);
+
+        if (!cityResponse.ok || !categoryResponse.ok) {
+          throw new Error('Failed to load data');
+        }
+
+        const cityData = await cityResponse.json();
+        const categoryData = await categoryResponse.json();
+
+        setCities(cityData.data || []);
+        setCategories(categoryData.data || []);
+
+        // Auto-select the Soft play category if available
+        if (categoryData.data && categoryData.data.length > 0) {
+          const softPlayCategory = categoryData.data.find(cat => cat.name === 'Soft play') || categoryData.data[0];
+          
+          setFormData(prev => ({
+            ...prev,
+            categoryId: softPlayCategory.id
+          }));
+        }
+
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setError('Failed to load necessary data. Please try again later.');
+      } finally {
+        setIsLoadingData(false);
+      }
+    }
+
+    loadData();
+  }, []);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -428,32 +471,22 @@ export default function CreateServicePage() {
               <FormErrorMessage>{errors.name}</FormErrorMessage>
             </FormControl>
             
-            <FormControl isRequired isInvalid={!!errors.categoryId}>
-              <FormLabel>Category</FormLabel>
-              <Select
-                name="categoryId"
-                value={formData.categoryId}
-                onChange={handleChange}
-                placeholder="Select category"
-              >
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </Select>
-              <FormErrorMessage>{errors.categoryId}</FormErrorMessage>
-            </FormControl>
+            {/* Category Field - Hidden since we now just have "Soft play" */}
+            <input 
+              type="hidden"
+              name="categoryId"
+              value={formData.categoryId}
+            />
             
             <FormControl isRequired isInvalid={!!errors.cityId}>
-              <FormLabel>City</FormLabel>
+              <FormLabel>Borough</FormLabel>
               <Select
                 name="cityId"
                 value={formData.cityId}
                 onChange={handleChange}
-                placeholder="Select city"
+                placeholder="Select borough"
               >
-                {cities.map(city => (
+                {cities.map((city) => (
                   <option key={city.id} value={city.id}>
                     {city.name}
                   </option>

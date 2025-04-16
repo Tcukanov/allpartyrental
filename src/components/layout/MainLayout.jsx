@@ -40,20 +40,18 @@ import NotificationComponent from '@/components/notification/notificationCompone
 // Navigation links
 const clientLinks = [
   { name: 'Dashboard', href: '/client/dashboard' },
-  { name: 'My Party', href: '/client/my-party' },
+  // { name: 'My Party', href: '/client/my-party' },
   { name: 'Approved Services', href: '/client/approved-services' },
-  { name: 'Create Party', href: '/client/create-party' },
+  // { name: 'Create Party', href: '/client/create-party' },
   { name: 'Services', href: '/services' },
   { name: 'Calendar', href: '/client/calendar' },
-  { name: 'History', href: '/client/party-history' },
 ];
 
 const providerLinks = [
   { name: 'Dashboard', href: '/provider/cabinet' },
   { name: 'My Services', href: '/provider/services' },
-  { name: 'Available Parties', href: '/provider/available-parties' },
   { name: 'Requests', href: '/provider/requests' },
-  { name: 'Advertising', href: '/provider/advertising' },
+  { name: 'Calendar', href: '/provider/calendar' },
 ];
 
 const adminLinks = [
@@ -151,12 +149,13 @@ export default function MainLayout({ children }) {
             </HStack>
             
             <HStack spacing={4}>
-              <IconButton
+              {/* Dark Mode Toggle Button - Commented out */}
+              {/* <IconButton
                 aria-label={`Switch to ${colorMode === 'light' ? 'dark' : 'light'} mode`}
                 icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
                 variant="ghost"
                 onClick={toggleColorMode}
-              />
+              /> */}
               
               {status === 'authenticated' && (
                 <NotificationComponent />

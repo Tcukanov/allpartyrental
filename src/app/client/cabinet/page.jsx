@@ -383,7 +383,7 @@ export default function ClientCabinetPage() {
             </Box>
             
         <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
-          <Card cursor="pointer" onClick={() => router.push('/client/create-party')}>
+          <Card cursor="pointer" onClick={() => handleCreateParty()}>
             <CardBody>
               <VStack spacing={4} align="center">
                 <Icon as={FaGift} w={8} h={8} color="brand.500" />
@@ -407,18 +407,6 @@ export default function ClientCabinetPage() {
                     </CardBody>
                   </Card>
                   
-          <Card cursor="pointer" onClick={() => router.push('/client/party-history')}>
-                    <CardBody>
-              <VStack spacing={4} align="center">
-                <Icon as={FaHistory} w={8} h={8} color="brand.500" />
-                <Text fontWeight="bold">Party History</Text>
-                <Text fontSize="sm" color="gray.600" textAlign="center">
-                  View your past events
-                </Text>
-              </VStack>
-                    </CardBody>
-                  </Card>
-                  
           <Card cursor="pointer" onClick={() => router.push('/client/profile')}>
                     <CardBody>
               <VStack spacing={4} align="center">
@@ -436,7 +424,6 @@ export default function ClientCabinetPage() {
           <TabList>
             <Tab><Icon as={FaGift} mr={2} /> My Parties</Tab>
             <Tab><Icon as={FaCalendarAlt} mr={2} /> Calendar</Tab>
-            <Tab><Icon as={FaHistory} mr={2} /> Party History</Tab>
             <Tab><Icon as={FaComment} mr={2} /> Messages</Tab>
             <Tab><Icon as={FaMoneyBillWave} mr={2} /> Transactions</Tab>
             <Tab><Icon as={FaCog} mr={2} /> Settings</Tab>
@@ -452,12 +439,6 @@ export default function ClientCabinetPage() {
             {/* Calendar Tab */}
             <TabPanel>
               {/* Existing Calendar content */}
-              {/* ... */}
-            </TabPanel>
-            
-            {/* Party History Tab */}
-            <TabPanel>
-              {/* Existing Party History content */}
               {/* ... */}
             </TabPanel>
             

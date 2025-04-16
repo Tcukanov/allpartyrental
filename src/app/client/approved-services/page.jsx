@@ -26,6 +26,9 @@ import { FaCalendarAlt, FaUser, FaMoneyBillWave, FaMapMarkerAlt } from 'react-ic
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
+import { MdHistory } from 'react-icons/md';
+import { Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon } from '@chakra-ui/react';
+import { TimeIcon } from '@chakra-ui/icons';
 
 export default function ApprovedServicesPage() {
   const { data: session, status: sessionStatus } = useSession();
@@ -35,6 +38,8 @@ export default function ApprovedServicesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [approvedServices, setApprovedServices] = useState([]);
   const [error, setError] = useState(null);
+  const [completedParties, setCompletedParties] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   
   useEffect(() => {
     const fetchApprovedServices = async () => {
@@ -109,6 +114,56 @@ export default function ApprovedServicesPage() {
     fetchApprovedServices();
   }, [sessionStatus, toast]);
   
+  useEffect(() => {
+    const fetchCompletedParties = async () => {
+      if (sessionStatus !== 'authenticated') return;
+      
+      try {
+        setLoadingHistory(true);
+        
+        const response = await fetch('/api/parties');
+        const data = await response.json();
+        
+        if (data.success) {
+          // Filter for completed parties
+          const completed = data.data.filter(
+            party => party.status === 'COMPLETED'
+          );
+          
+          // Fetch detailed info for each completed party
+          const completedWithDetails = await Promise.all(
+            completed.map(async (party) => {
+              const detailResponse = await fetch(`/api/parties/${party.id}`);
+              const detailData = await detailResponse.json();
+              
+              if (detailData.success) {
+                return detailData.data;
+              }
+              return party;
+            })
+          );
+          
+          setCompletedParties(completedWithDetails);
+        } else {
+          throw new Error(data.error.message || 'Failed to fetch parties');
+        }
+      } catch (error) {
+        console.error('Fetch completed parties error:', error);
+        toast({
+          title: 'Error',
+          description: 'An error occurred while loading the party history. Please try again later.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    
+    fetchCompletedParties();
+  }, [sessionStatus, toast]);
+  
   const handleOpenChat = (chatId, offerId) => {
     if (chatId) {
       router.push(`/chats/${chatId}`);
@@ -175,6 +230,15 @@ export default function ApprovedServicesPage() {
     }
   };
   
+  // Format date for display
+  const formatPartyDate = (dateString) => {
+    try {
+      return format(new Date(dateString), 'MMMM d, yyyy');
+    } catch (error) {
+      return dateString;
+    }
+  };
+  
   if (sessionStatus === 'loading' || isLoading) {
     return (
       <Container maxW="container.xl" py={8}>
@@ -215,12 +279,6 @@ export default function ApprovedServicesPage() {
                 <Text color="gray.500" textAlign="center">
                   You don't have any approved services yet. Create a party and request services to get started.
                 </Text>
-                <Button 
-                  colorScheme="brand" 
-                  onClick={() => router.push('/client/create-party')}
-                >
-                  Create a Party
-                </Button>
               </VStack>
             </CardBody>
           </Card>
@@ -237,34 +295,13 @@ export default function ApprovedServicesPage() {
                   </Badge>
                 </Box>
                 
-                {item.servicePhoto ? (
+                {item.servicePhoto && (
                   <Image 
                     src={item.servicePhoto} 
                     alt={item.serviceName}
                     height="150px"
                     objectFit="cover"
-                    fallback={
-                      <Box
-                        height="150px"
-                        bg="gray.200"
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                      >
-                        <Text color="gray.500">No image available</Text>
-                      </Box>
-                    }
                   />
-                ) : (
-                  <Box
-                    height="150px"
-                    bg="gray.200"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    <Text color="gray.500">No image available</Text>
-                  </Box>
                 )}
                 
                 <CardBody>
@@ -326,6 +363,121 @@ export default function ApprovedServicesPage() {
             ))}
           </SimpleGrid>
         )}
+        
+        {/* Party History Section */}
+        <Box mt={12}>
+          <Heading as="h2" size="lg" mb={4}>Party History</Heading>
+          <Text color="gray.600" mb={6}>
+            View your past events and completed parties
+          </Text>
+          
+          {loadingHistory ? (
+            <Flex justify="center" py={8}>
+              <VStack spacing={4}>
+                <Spinner size="xl" color="brand.500" />
+                <Text>Loading your party history...</Text>
+              </VStack>
+            </Flex>
+          ) : completedParties.length === 0 ? (
+            <Box p={8} textAlign="center" borderWidth="1px" borderRadius="lg">
+              <Heading size="md" mb={4}>No completed parties yet</Heading>
+              <Text mb={6}>You don't have any completed parties in your history.</Text>
+            </Box>
+          ) : (
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+              {completedParties.map((party) => (
+                <Card key={party.id} borderWidth="1px">
+                  <CardBody>
+                    <VStack spacing={4} align="stretch">
+                      <Flex justify="space-between" align="center">
+                        <Heading size="md">{party.name}</Heading>
+                        <Badge colorScheme="green" px={2} py={1}>
+                          Completed
+                        </Badge>
+                      </Flex>
+                      
+                      <HStack spacing={4}>
+                        <HStack>
+                          <Icon as={CalendarIcon} color="brand.500" />
+                          <Text>{formatPartyDate(party.date)}</Text>
+                        </HStack>
+                        <HStack>
+                          <Icon as={TimeIcon} color="brand.500" />
+                          <Text>{party.startTime} ({party.duration}h)</Text>
+                        </HStack>
+                      </HStack>
+                      
+                      <Divider />
+                      
+                      <Accordion allowToggle>
+                        <AccordionItem border="none">
+                          <AccordionButton px={0}>
+                            <Box flex="1" textAlign="left" fontWeight="medium">
+                              Services & Providers
+                            </Box>
+                            <AccordionIcon />
+                          </AccordionButton>
+                          <AccordionPanel pb={4} px={0}>
+                            <VStack spacing={3} align="stretch">
+                              {party.partyServices && party.partyServices.map((service) => {
+                                // Find approved offer for this service
+                                const approvedOffer = service.offers && service.offers.find(
+                                  offer => offer.status === 'APPROVED'
+                                );
+                                
+                                return (
+                                  <Box 
+                                    key={service.id} 
+                                    p={3} 
+                                    borderWidth="1px" 
+                                    borderRadius="md"
+                                  >
+                                    <HStack justify="space-between" mb={2}>
+                                      <Text fontWeight="bold">
+                                        {service.service?.name || 'Service'}
+                                      </Text>
+                                      <Badge colorScheme="green">
+                                        <HStack spacing={1}>
+                                          <CheckCircleIcon />
+                                          <Text>Completed</Text>
+                                        </HStack>
+                                      </Badge>
+                                    </HStack>
+                                    
+                                    {approvedOffer && (
+                                      <HStack spacing={3} mt={2}>
+                                        <Avatar 
+                                          size="sm" 
+                                          src={approvedOffer.provider?.profile?.avatar} 
+                                          name={approvedOffer.provider?.name} 
+                                        />
+                                        <Text>{approvedOffer.provider?.name}</Text>
+                                      </HStack>
+                                    )}
+                                  </Box>
+                                );
+                              })}
+                            </VStack>
+                          </AccordionPanel>
+                        </AccordionItem>
+                      </Accordion>
+                      
+                      <Divider />
+                      
+                      <Button
+                        variant="outline"
+                        colorScheme="brand"
+                        onClick={() => router.push(`/client/my-party?id=${party.id}`)}
+                      >
+                        View Details
+                      </Button>
+                    </VStack>
+                  </CardBody>
+                </Card>
+              ))}
+            </SimpleGrid>
+          )}
+        </Box>
       </VStack>
     </Container>
   );

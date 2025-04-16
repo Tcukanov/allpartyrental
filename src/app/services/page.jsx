@@ -17,32 +17,34 @@ export default function ServicesPage() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [minPrice, setMinPrice] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(10000);
+  const [errorMessage, setErrorMessage] = useState('');
   
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [servicesRes, categoriesRes, citiesRes] = await Promise.all([
-          fetch('/api/services/public'),
+        // Only fetch categories and cities here
+        const [categoriesRes, citiesRes] = await Promise.all([
           fetch('/api/categories'),
           fetch('/api/cities')
         ]);
 
-        if (!servicesRes.ok || !categoriesRes.ok || !citiesRes.ok) {
+        if (!categoriesRes.ok || !citiesRes.ok) {
           throw new Error('Failed to fetch data');
         }
 
-        const servicesData = await servicesRes.json();
         const categoriesData = await categoriesRes.json();
         const citiesData = await citiesRes.json();
 
-        if (!servicesData.success) {
-          throw new Error(servicesData.error?.message || 'Failed to load services');
+        setCategories(categoriesData.data || []);
+        setCities(citiesData.data || []);
+        
+        // If categories are available, automatically select the first one
+        if (categoriesData.data && categoriesData.data.length > 0) {
+          setSelectedCategory(categoriesData.data[0].id);
         }
-
-        setServices(servicesData.data);
-        setCategories(categoriesData.data);
-        setCities(citiesData.data);
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
@@ -60,21 +62,75 @@ export default function ServicesPage() {
     fetchData();
   }, [toast]);
 
-  // Filter services based on selections and search
-  const filteredServices = services.filter(service => {
-    const matchesCategory = selectedCategory ? service.categoryId === selectedCategory : true;
-    const matchesCity = selectedCity ? service.cityId === selectedCity : true;
-    const matchesSearch = searchTerm.trim() === '' ? true : 
-      service.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      service.description.toLowerCase().includes(searchTerm.toLowerCase());
+  // Function to fetch services with filters
+  const fetchServices = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
     
-    return matchesCategory && matchesCity && matchesSearch;
-  });
-  
-  const handleCategoryChange = (e) => {
-    setSelectedCategory(e.target.value);
+    try {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      
+      if (selectedCategory) {
+        queryParams.append('categoryId', selectedCategory);
+      }
+      
+      if (selectedCity) {
+        queryParams.append('cityId', selectedCity);
+      }
+      
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.append('search', searchTerm.trim());
+      }
+      
+      if (minPrice > 0) {
+        queryParams.append('minPrice', minPrice.toString());
+      }
+      
+      if (maxPrice < 10000) {
+        queryParams.append('maxPrice', maxPrice.toString());
+      }
+
+      // Log the query params for debugging
+      console.log('Fetching services with params:', queryParams.toString());
+
+      // Use public API endpoint
+      const response = await fetch(`/api/services/public?${queryParams.toString()}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'No error details available');
+        console.error(`API error: ${response.status}`, errorText);
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setServices(data.data || []);
+        if (data.data.length === 0) {
+          setErrorMessage('No services found matching your criteria.');
+        }
+      } else {
+        console.error('Failed to fetch services:', data.error);
+        setErrorMessage('Failed to load services. Please try again later.');
+        setServices([]);
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      setErrorMessage('Failed to load services. Please try again later.');
+      setServices([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
-  
+
+  // Use effect to fetch services when filters change
+  useEffect(() => {
+    if (!isLoading || categories.length > 0 || cities.length > 0) {
+      fetchServices();
+    }
+  }, [selectedCategory, selectedCity, searchTerm, minPrice, maxPrice]);
+
   const handleCityChange = (e) => {
     setSelectedCity(e.target.value);
   };
@@ -89,7 +145,7 @@ export default function ServicesPage() {
         <Box>
           <Heading as="h1" size="xl">Browse Our Services</Heading>
           <Text color="gray.600" mt={2}>
-            Discover our range of party and event services for all your needs
+            Discover our range of soft play services for all your needs
           </Text>
         </Box>
 
@@ -107,13 +163,6 @@ export default function ServicesPage() {
                   onChange={handleSearchChange}
                 />
               </InputGroup>
-              <Select placeholder="All Categories" value={selectedCategory} onChange={handleCategoryChange}>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </Select>
               <Select placeholder="All Locations" value={selectedCity} onChange={handleCityChange}>
                 {cities.map(city => (
                   <option key={city.id} value={city.id}>
@@ -129,16 +178,21 @@ export default function ServicesPage() {
           <Box display="flex" justifyContent="center" py={12}>
             <Spinner size="xl" color="brand.500" />
           </Box>
-        ) : filteredServices.length === 0 ? (
+        ) : services.length === 0 ? (
           <Box p={8} textAlign="center" borderWidth="1px" borderRadius="md">
-            <Text fontSize="lg">No services found matching your criteria.</Text>
+            <Text fontSize="lg">{errorMessage}</Text>
             <Text mt={2} color="gray.600">
               Try changing your filters or search term.
             </Text>
+            {errorMessage.includes('Failed to load') && (
+              <Button mt={4} colorScheme="brand" onClick={fetchServices}>
+                Try Again
+              </Button>
+            )}
           </Box>
         ) : (
           <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
-            {filteredServices.map((service) => (
+            {services.map((service) => (
               <Card key={service.id} cursor="pointer" overflow="hidden" transition="transform 0.3s" _hover={{ transform: 'translateY(-5px)' }}>
                 <Box position="relative" h="200px">
                   <Image 

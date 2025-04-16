@@ -496,20 +496,7 @@ export default function ProviderCabinetPage() {
       const profileData = await profileResponse.json();
       
       if (profileData.success) {
-        // Ensure all fields have default values
-        const data = profileData.data || {};
-        setProfileData({
-          companyName: data.companyName || '',
-          contactPerson: data.contactPerson || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          address: data.address || '',
-          website: data.website || '',
-          googleBusinessUrl: data.googleBusinessUrl || '',
-          description: data.description || '',
-          avatar: data.avatar || '',
-          socialLinks: data.socialLinks || {}
-        });
+        setProfileData(profileData.data || {});
       }
       
       // Fetch requests data with chats
@@ -995,7 +982,7 @@ export default function ProviderCabinetPage() {
     const { name, value } = e.target;
     setProfileData(prev => ({
       ...prev,
-      [name]: value || '' // Ensure value is never undefined
+      [name]: value
     }));
   };
   
@@ -1081,7 +1068,7 @@ export default function ProviderCabinetPage() {
       }
     });
     
-    // Reset profile to defaults with proper empty values
+    // Reset profile to defaults
     setProfileData({
       companyName: session?.user?.name || '',
       contactPerson: '',
@@ -1092,7 +1079,7 @@ export default function ProviderCabinetPage() {
       googleBusinessUrl: '',
       description: '',
       avatar: '',
-      socialLinks: { instagram: '', facebook: '' }
+      socialLinks: {}
     });
     
     toast({
@@ -1187,11 +1174,11 @@ export default function ProviderCabinetPage() {
         <Tabs variant="enclosed" colorScheme="brand">
           <TabList>
             <Tab>Profile</Tab>
-            {/* Services Tab */}
-            {/* Requests Tab */}
+            {/* <Tab>Services</Tab> */}
+            {/* <Tab>Requests</Tab> */}
             <Tab>Party History</Tab>
             <Tab>Chats</Tab>
-            {/* Advertising Tab */}
+            {/* <Tab>Advertising</Tab> */}
           </TabList>
           
           <TabPanels>
@@ -1308,7 +1295,7 @@ export default function ProviderCabinetPage() {
                               ...prev,
                               socialLinks: {
                                 ...prev.socialLinks,
-                                instagram: value || ""
+                                instagram: value
                               }
                             }));
                           }}
@@ -1324,7 +1311,7 @@ export default function ProviderCabinetPage() {
                               ...prev,
                               socialLinks: {
                                 ...prev.socialLinks,
-                                facebook: value || ""
+                                facebook: value
                               }
                             }));
                           }}
@@ -1358,9 +1345,8 @@ export default function ProviderCabinetPage() {
               </VStack>
             </TabPanel>
             
-            {/* Services Tab */}
-            {/*
-            <TabPanel>
+            {/* Services Tab - Commented Out */}
+            {/* <TabPanel>
               <VStack spacing={6} align="stretch">
                 <Heading as="h2" size="lg">Manage Services</Heading>
                 
@@ -1408,12 +1394,10 @@ export default function ProviderCabinetPage() {
                   </VStack>
                 )}
               </VStack>
-            </TabPanel>
-            */}
+            </TabPanel> */}
             
-            {/* Requests Tab */}
-            {/*
-            <TabPanel>
+            {/* Requests Tab - Commented Out */}
+            {/* <TabPanel>
               <VStack spacing={6} align="stretch">
                 <Flex justify="space-between" align="center">
                   <Heading as="h2" size="lg">Incoming Requests</Heading>
@@ -1432,7 +1416,7 @@ export default function ProviderCabinetPage() {
                   </Select>
                 </Flex>
                 
-                <!-- Message about chat functionality -->
+                {/* Message about chat functionality */}
                 <Box p={4} bg="blue.50" borderRadius="md" mb={4}>
                   <Flex align="center">
                     <Icon as={BsChatDots} color="blue.500" mr={3} boxSize={6} />
@@ -1466,7 +1450,7 @@ export default function ProviderCabinetPage() {
                               <Flex justify="space-between" align="center">
                                 <Text><strong>Client:</strong> {request.clientName}</Text>
                                 
-                                <!-- Chat Button -->
+                                {/* Chat Button - Always displayed next to client name */}
                                 <Tooltip label={request.chatId ? "Go to conversation" : "Start conversation"}>
                                   <Button
                                     size="xs"
@@ -1485,7 +1469,7 @@ export default function ProviderCabinetPage() {
                               <Text><strong>Service Type:</strong> {request.serviceType}</Text>
                               
                               <Flex mt={2}>
-                                <!-- View Party Button -->
+                                {/* View Party Button */}
                                 <Button
                                   size="sm"
                                   colorScheme="blue"
@@ -1528,8 +1512,7 @@ export default function ProviderCabinetPage() {
                   ))
                 )}
               </VStack>
-            </TabPanel>
-            */}
+            </TabPanel> */}
             
             {/* Party History Tab */}
             <TabPanel>
@@ -1695,9 +1678,8 @@ export default function ProviderCabinetPage() {
               </VStack>
             </TabPanel>
             
-            {/* Advertising Tab */}
-            {/*
-            <TabPanel>
+            {/* Advertising Tab - Commented Out */}
+            {/* <TabPanel>
               <VStack spacing={6} align="stretch">
                 <Heading as="h2" size="lg">Advertising Options</Heading>
                 <Text>
@@ -1731,8 +1713,7 @@ export default function ProviderCabinetPage() {
                   ))}
                 </SimpleGrid>
               </VStack>
-            </TabPanel>
-            */}
+            </TabPanel> */}
           </TabPanels>
         </Tabs>
       </VStack>
