@@ -123,7 +123,12 @@ export default function SignInPage() {
       });
       
       if (result?.error) {
-        throw new Error(result.error);
+        // Provide more user-friendly error messages
+        if (result.error === 'Invalid credentials') {
+          throw new Error('The email or password you entered is incorrect. Please try again.');
+        } else {
+          throw new Error(result.error);
+        }
       }
       
       toast({

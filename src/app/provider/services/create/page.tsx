@@ -62,6 +62,7 @@ export default function CreateServicePage() {
     availableHoursEnd: '17:00',
     minRentalHours: 1,
     maxRentalHours: 8,
+    colors: [] as string[],
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -223,6 +224,10 @@ export default function CreateServicePage() {
     
     if (!formData.cityId) {
       newErrors.cityId = 'City is required';
+    }
+    
+    if (formData.colors.length === 0) {
+      newErrors.colors = 'At least one color must be selected';
     }
     
     setErrors(newErrors);
@@ -453,6 +458,18 @@ export default function CreateServicePage() {
     });
   };
   
+  // Add a handler for the colors checkboxes
+  const handleColorsChange = (color: string) => {
+    setFormData(prev => {
+      const colors = [...prev.colors];
+      if (colors.includes(color)) {
+        return { ...prev, colors: colors.filter(c => c !== color) };
+      } else {
+        return { ...prev, colors: [...colors, color] };
+      }
+    });
+  };
+  
   return (
     <Container maxW="container.md" py={8}>
       <VStack spacing={8} align="stretch">
@@ -522,6 +539,37 @@ export default function CreateServicePage() {
                 minH="150px"
               />
               <FormErrorMessage>{errors.description}</FormErrorMessage>
+            </FormControl>
+            
+            {/* Colors Selection */}
+            <FormControl isRequired isInvalid={!!errors.colors}>
+              <FormLabel>Available Colors</FormLabel>
+              <Text fontSize="sm" color="gray.600" mb={3}>
+                Select all colors available for your soft play equipment
+              </Text>
+              <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+                {['Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple', 'Orange', 'White'].map(color => (
+                  <Box 
+                    key={color} 
+                    borderWidth="1px" 
+                    borderRadius="md" 
+                    p={3}
+                    bg={formData.colors.includes(color) ? `${color.toLowerCase()}.100` : 'white'}
+                    borderColor={formData.colors.includes(color) ? `${color.toLowerCase()}.300` : 'gray.200'}
+                  >
+                    <Flex align="center">
+                      <input 
+                        type="checkbox" 
+                        style={{ marginRight: '12px' }}
+                        checked={formData.colors.includes(color)}
+                        onChange={() => handleColorsChange(color)}
+                      />
+                      <Text>{color}</Text>
+                    </Flex>
+                  </Box>
+                ))}
+              </SimpleGrid>
+              <FormErrorMessage>{errors.colors}</FormErrorMessage>
             </FormControl>
             
             {/* Availability Days */}

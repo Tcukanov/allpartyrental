@@ -65,16 +65,7 @@ async function cleanDatabase() {
 
 async function createServiceCategories() {
   const categories = [
-    { name: 'Decoration', slug: 'decoration', description: 'Decorations for all types of parties' },
-    { name: 'Catering', slug: 'catering', description: 'Food and beverage services' },
-    { name: 'Entertainment', slug: 'entertainment', description: 'DJs, bands, and other entertainment services' },
-    { name: 'Venue', slug: 'venue', description: 'Locations to host your event' },
-    { name: 'Photography', slug: 'photography', description: 'Professional photography services' },
-    { name: 'Videography', slug: 'videography', description: 'Professional video services' },
-    { name: 'Bounce Houses', slug: 'bounce-houses', description: 'Inflatable play structures for kids' },
-    { name: 'Party Supplies', slug: 'party-supplies', description: 'Plates, cups, napkins, and other supplies' },
-    { name: 'Furniture Rental', slug: 'furniture-rental', description: 'Tables, chairs, and other furniture' },
-    { name: 'Cakes & Desserts', slug: 'cakes-desserts', description: 'Custom cakes and dessert tables' },
+    { name: 'Soft play', slug: 'soft-play', description: 'Soft play equipment and services for children' },
   ];
 
   return Promise.all(
@@ -88,11 +79,11 @@ async function createServiceCategories() {
 
 async function createCities() {
   const cities = [
-    { name: 'New York', state: 'NY', slug: 'new-york' },
-    { name: 'San Diego', state: 'CA', slug: 'san-diego' },
-    { name: 'Los Angeles', state: 'CA', slug: 'los-angeles' },
-    { name: 'Chicago', state: 'IL', slug: 'chicago' },
-    { name: 'Houston', state: 'TX', slug: 'houston' },
+    { name: 'Manhattan', state: 'NY', slug: 'manhattan' },
+    { name: 'Brooklyn', state: 'NY', slug: 'brooklyn' },
+    { name: 'Queens', state: 'NY', slug: 'queens' },
+    { name: 'The Bronx', state: 'NY', slug: 'the-bronx' },
+    { name: 'Staten Island', state: 'NY', slug: 'staten-island' },
   ];
 
   return Promise.all(
@@ -286,64 +277,41 @@ async function createServices(providers, categories, cities) {
 
   // Create services for each city
   cities.forEach(city => {
-    // Decoration services
+    // Soft play services
     services.push({
       providerId: providers[0].id,
-      categoryId: categoryMap['Decoration'],
+      categoryId: categoryMap['Soft play'],
       cityId: city.id,
-      name: `Premium Decoration Package in ${city.name}`,
-      description: `Complete decoration setup with balloons, banners, table settings, and themed decorations in ${city.name}.`,
-      price: 299.99,
-      photos: ['https://images.unsplash.com/photo-1530103862676-de8c9debad1d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
+      name: `Kids Soft Play Set in ${city.name}`,
+      description: `Safe and colorful soft play equipment for young children. Perfect for parties and events in ${city.name}.`,
+      price: 249.99,
+      photos: ['https://images.unsplash.com/photo-1566140967404-b8b3932483f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
+      colors: ['blue', 'red', 'yellow'],
     });
 
-    // Catering services
     services.push({
       providerId: providers[1].id,
-      categoryId: categoryMap['Catering'],
+      categoryId: categoryMap['Soft play'],
       cityId: city.id,
-      name: `Full-Service Catering in ${city.name}`,
-      description: `Complete catering service including appetizers, main course, desserts, and service staff in ${city.name}.`,
-      price: 35.99,
-      photos: ['https://images.unsplash.com/photo-1555244162-803834f70033?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
+      name: `Toddler Play Area in ${city.name}`,
+      description: `Complete soft play setup for toddlers including ball pit, soft blocks, and climbing structures in ${city.name}.`,
+      price: 299.99,
+      photos: ['https://images.unsplash.com/photo-1596461639144-dea8e88c9dab?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
+      colors: ['green', 'purple', 'orange'],
     });
 
-    // Entertainment services
     services.push({
       providerId: providers[2].id,
-      categoryId: categoryMap['Entertainment'],
+      categoryId: categoryMap['Soft play'],
       cityId: city.id,
-      name: `Professional DJ Services in ${city.name}`,
-      description: `Professional DJ with sound equipment. Will play requested songs and keep the party going in ${city.name}.`,
+      name: `Deluxe Soft Play Package in ${city.name}`,
+      description: `Premium soft play equipment including slides, tunnels, ball pits and more. Professional setup in ${city.name}.`,
       price: 399.99,
-      photos: ['https://images.unsplash.com/photo-1571266028243-5c6d8c2a0d6e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
+      photos: ['https://images.unsplash.com/photo-1607453998774-d533f65dac99?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
-    });
-
-    // Bounce house services
-    services.push({
-      providerId: providers[3].id,
-      categoryId: categoryMap['Bounce Houses'],
-      cityId: city.id,
-      name: `Standard Bounce House in ${city.name}`,
-      description: `Colorful bounce house for up to 6 children. Includes setup and takedown in ${city.name}.`,
-      price: 199.99,
-      photos: ['https://images.unsplash.com/photo-1573982680571-f6e9a8a5850b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
-      status: 'ACTIVE',
-    });
-
-    // Photography services
-    services.push({
-      providerId: providers[4].id,
-      categoryId: categoryMap['Photography'],
-      cityId: city.id,
-      name: `Party Photography Package in ${city.name}`,
-      description: `Professional photography for your event in ${city.name}. Includes editing and digital delivery.`,
-      price: 349.99,
-      photos: ['https://images.unsplash.com/photo-1516035069371-29a1b244cc32?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
-      status: 'ACTIVE',
+      colors: ['pink', 'blue', 'white'],
     });
   });
 
@@ -375,7 +343,7 @@ async function createParties(clients, cities) {
         connect: { id: clients[0].id }
       },
       city: {
-        connect: { id: cityMap['New York'] }
+        connect: { id: cityMap['Manhattan'] }
       }
     },
     {
@@ -389,7 +357,7 @@ async function createParties(clients, cities) {
         connect: { id: clients[0].id }
       },
       city: {
-        connect: { id: cityMap['San Diego'] }
+        connect: { id: cityMap['Brooklyn'] }
       }
     },
     {
@@ -403,7 +371,7 @@ async function createParties(clients, cities) {
         connect: { id: clients[0].id }
       },
       city: {
-        connect: { id: cityMap['Los Angeles'] }
+        connect: { id: cityMap['Manhattan'] }
       }
     }
   ];
@@ -511,7 +479,7 @@ async function createCompletedParties(clients, providers, categories, cities) {
   const pastParties = [
     {
       clientId: clients[0].id,
-      cityId: cityMap['New York'],
+      cityId: cityMap['Manhattan'],
       name: 'New Year\'s Eve Party',
       date: new Date('2023-12-31T19:00:00Z'),
       startTime: '19:00',
@@ -521,7 +489,7 @@ async function createCompletedParties(clients, providers, categories, cities) {
     },
     {
       clientId: clients[0].id,
-      cityId: cityMap['New York'],
+      cityId: cityMap['Brooklyn'],
       name: 'Valentine\'s Day Dinner',
       date: new Date('2024-02-14T18:00:00Z'),
       startTime: '18:00',
@@ -537,15 +505,11 @@ async function createCompletedParties(clients, providers, categories, cities) {
       data: partyData,
     });
 
-    // Create 3-4 services for each party
-    const serviceCount = Math.floor(Math.random() * 2) + 3;
-    
-    // Create different types of services
-    const serviceTypes = ['Decoration', 'Catering', 'Entertainment', 'Photography'];
+    // Create 2-3 services for each party
+    const serviceCount = Math.floor(Math.random() * 2) + 2;
     
     for (let i = 0; i < serviceCount; i++) {
-      const serviceType = serviceTypes[i % serviceTypes.length];
-      const categoryId = categoryMap[serviceType];
+      const softPlayCategoryId = categoryMap['Soft play'];
       
       // Find a provider that offers this type of service
       const provider = providers[i % providers.length];
@@ -554,13 +518,14 @@ async function createCompletedParties(clients, providers, categories, cities) {
       const service = await prisma.service.create({
         data: {
           providerId: provider.id,
-          categoryId,
+          categoryId: softPlayCategoryId,
           cityId: party.cityId,
-          name: `${serviceType} for ${party.name}`,
-          description: `Special ${serviceType.toLowerCase()} service provided for ${party.name}`,
-          price: 100 + Math.floor(Math.random() * 200),
-          photos: ['https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80'],
+          name: `Soft Play Setup for ${party.name}`,
+          description: `Special soft play equipment provided for ${party.name}`,
+          price: 150 + Math.floor(Math.random() * 200),
+          photos: ['https://images.unsplash.com/photo-1596461639144-dea8e88c9dab?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80'],
           status: 'ACTIVE',
+          colors: ['blue', 'red', 'yellow', 'green'][i % 4] ? [['blue', 'red', 'yellow', 'green'][i % 4]] : [],
         },
       });
       
@@ -570,7 +535,7 @@ async function createCompletedParties(clients, providers, categories, cities) {
           partyId: party.id,
           serviceId: service.id,
           specificOptions: {
-            notes: `Specific requirements for ${serviceType}`,
+            notes: `Specific requirements for soft play equipment`,
           },
         },
       });

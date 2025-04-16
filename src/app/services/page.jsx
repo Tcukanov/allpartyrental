@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useToast, HStack, Badge, Icon, Spinner, Select, InputGroup, InputLeftElement, Input } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useToast, HStack, Badge, Icon, Spinner, Select, InputGroup, InputLeftElement, Input, RangeSlider, RangeSliderTrack, RangeSliderFilledTrack, RangeSliderThumb, Flex, Divider, Checkbox, CheckboxGroup, Stack } from '@chakra-ui/react';
 import { StarIcon, ViewIcon, SearchIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import LocationServiceSearch from '@/components/search/LocationServiceSearch';
@@ -19,7 +19,10 @@ export default function ServicesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(10000);
+  const [selectedColor, setSelectedColor] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  
+  const availableColors = ['Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple', 'Orange', 'White'];
   
   useEffect(() => {
     const fetchData = async () => {
@@ -91,6 +94,10 @@ export default function ServicesPage() {
         queryParams.append('maxPrice', maxPrice.toString());
       }
 
+      if (selectedColor) {
+        queryParams.append('color', selectedColor);
+      }
+
       // Log the query params for debugging
       console.log('Fetching services with params:', queryParams.toString());
 
@@ -129,7 +136,7 @@ export default function ServicesPage() {
     if (!isLoading || categories.length > 0 || cities.length > 0) {
       fetchServices();
     }
-  }, [selectedCategory, selectedCity, searchTerm, minPrice, maxPrice]);
+  }, [selectedCategory, selectedCity, searchTerm, minPrice, maxPrice, selectedColor]);
 
   const handleCityChange = (e) => {
     setSelectedCity(e.target.value);
@@ -137,6 +144,15 @@ export default function ServicesPage() {
   
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
+  };
+
+  const handleColorChange = (e) => {
+    setSelectedColor(e.target.value);
+  };
+
+  const handlePriceChange = (values) => {
+    setMinPrice(values[0]);
+    setMaxPrice(values[1]);
   };
   
   return (
@@ -171,6 +187,46 @@ export default function ServicesPage() {
                 ))}
               </Select>
             </HStack>
+
+            <Divider my={3} />
+            
+            <Flex w="full" direction={{ base: 'column', md: 'row' }} gap={6}>
+              {/* Color filter */}
+              <Box flex="1">
+                <Text fontWeight="medium" mb={2}>Filter by Color</Text>
+                <Select 
+                  placeholder="All Colors" 
+                  value={selectedColor} 
+                  onChange={handleColorChange}
+                >
+                  {availableColors.map(color => (
+                    <option key={color} value={color}>
+                      {color}
+                    </option>
+                  ))}
+                </Select>
+              </Box>
+              
+              {/* Price range slider */}
+              <Box flex="2">
+                <Text fontWeight="medium" mb={2}>Price Range: ${minPrice} - ${maxPrice}</Text>
+                <RangeSlider
+                  aria-label={['min', 'max']}
+                  defaultValue={[0, 10000]}
+                  min={0}
+                  max={10000}
+                  step={50}
+                  value={[minPrice, maxPrice]}
+                  onChange={handlePriceChange}
+                >
+                  <RangeSliderTrack>
+                    <RangeSliderFilledTrack />
+                  </RangeSliderTrack>
+                  <RangeSliderThumb index={0} />
+                  <RangeSliderThumb index={1} />
+                </RangeSlider>
+              </Box>
+            </Flex>
           </VStack>
         </Box>
         
@@ -216,6 +272,30 @@ export default function ServicesPage() {
                   >
                     ${Number(service.price).toFixed(2)}
                   </Badge>
+                  {service.colors && service.colors.length > 0 && (
+                    <HStack
+                      position="absolute"
+                      bottom={2}
+                      left={2}
+                      spacing={1}
+                    >
+                      {service.colors.slice(0, 3).map(color => (
+                        <Box
+                          key={color}
+                          w="15px"
+                          h="15px"
+                          borderRadius="full"
+                          bg={color.toLowerCase()}
+                          border="1px solid white"
+                        />
+                      ))}
+                      {service.colors.length > 3 && (
+                        <Badge bg="white" color="gray.500" fontSize="xs">
+                          +{service.colors.length - 3}
+                        </Badge>
+                      )}
+                    </HStack>
+                  )}
                 </Box>
                 
                 <CardBody>

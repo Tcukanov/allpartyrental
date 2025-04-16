@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
+    const color = searchParams.get('color');
     const limit = parseInt(searchParams.get('limit') || '50');
     const page = parseInt(searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
@@ -33,6 +34,13 @@ export async function GET(request: NextRequest) {
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
+    }
+
+    // Filter by color if provided
+    if (color) {
+      where.colors = {
+        has: color
+      };
     }
 
     // Initialize price filter if needed

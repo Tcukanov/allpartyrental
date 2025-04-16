@@ -45,6 +45,7 @@ import {
   FiUser,
   FiHelpCircle,
   FiZap,
+  FiFilter,
 } from 'react-icons/fi';
 import { MdDashboard } from 'react-icons/md';
 
@@ -68,6 +69,11 @@ const NAV_ITEMS = [
     label: 'Finances',
     href: '/admin/finances',
     icon: FiActivity,
+  },
+  {
+    label: 'Category Filters',
+    href: '/admin/category-filters',
+    icon: FiFilter,
   },
   {
     label: 'System Status',
@@ -153,7 +159,7 @@ export default function AdminNavbar() {
               variant="ghost"
               aria-label="Notifications"
               icon={
-                <>
+                <Box position="relative">
                   <FiBell />
                   <Badge
                     position="absolute"
@@ -167,7 +173,7 @@ export default function AdminNavbar() {
                   >
                     3
                   </Badge>
-                </>
+                </Box>
               }
               mr={2}
             />

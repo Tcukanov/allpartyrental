@@ -94,13 +94,26 @@ model Calendar {
 }
 
 model ServiceCategory {
-  id          String    @id @default(cuid())
+  id          String          @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  slug        String    @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  slug        String          @unique
   services    Service[]
+  filters     CategoryFilter[]
+}
+
+model CategoryFilter {
+  id          String          @id @default(cuid())
+  categoryId  String
+  name        String
+  type        String          // "color", "size", "material", etc.
+  options     String[]        // possible values for the filter
+  isRequired  Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  category    ServiceCategory @relation(fields: [categoryId], references: [id])
 }
 
 model City {
@@ -123,6 +136,7 @@ model Service {
   description         String
   price               Decimal
   photos              String[]
+  colors              String[]        @default([])
   status              ServiceStatus   @default(ACTIVE)
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
