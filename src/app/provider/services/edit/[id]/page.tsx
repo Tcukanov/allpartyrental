@@ -194,6 +194,50 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
     }
   }, [status, session, router, toast]);
   
+  // Load categories and cities
+  useEffect(() => {
+    async function loadCategoriesAndCities() {
+      try {
+        // Fetch both cities and categories in parallel
+        const [cityResponse, categoryResponse] = await Promise.all([
+          fetch('/api/cities'),
+          fetch('/api/categories')
+        ]);
+
+        if (!cityResponse.ok || !categoryResponse.ok) {
+          throw new Error('Failed to load data');
+        }
+
+        const cityData = await cityResponse.json();
+        const categoryData = await categoryResponse.json();
+
+        setCities(cityData.data || []);
+        setCategories(categoryData.data || []);
+
+        // Make sure the service's category is selected even if it's the only option
+        if (formData && categoryData.data && formData.categoryId) {
+          setFormData(prev => ({
+            ...prev,
+            categoryId: formData.categoryId
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load necessary data.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    }
+
+    if (formData) {
+      loadCategoriesAndCities();
+    }
+  }, [formData, toast]);
+  
   if (status === 'loading' || isLoading) {
     return (
       <Flex justify="center" align="center" height="100vh">
@@ -439,49 +483,6 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
       }
     });
   };
-  
-  useEffect(() => {
-    async function loadCategoriesAndCities() {
-      try {
-        // Fetch both cities and categories in parallel
-        const [cityResponse, categoryResponse] = await Promise.all([
-          fetch('/api/cities'),
-          fetch('/api/categories')
-        ]);
-
-        if (!cityResponse.ok || !categoryResponse.ok) {
-          throw new Error('Failed to load data');
-        }
-
-        const cityData = await cityResponse.json();
-        const categoryData = await categoryResponse.json();
-
-        setCities(cityData.data || []);
-        setCategories(categoryData.data || []);
-
-        // Make sure the service's category is selected even if it's the only option
-        if (formData && categoryData.data && formData.categoryId) {
-          setFormData(prev => ({
-            ...prev,
-            categoryId: formData.categoryId
-          }));
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load necessary data.',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    }
-
-    if (formData) {
-      loadCategoriesAndCities();
-    }
-  }, [formData, toast]);
   
   return (
     <Container maxW="container.md" py={8}>

@@ -93,13 +93,42 @@ export default function ProviderRequestsPage() {
   const fetchOffers = async () => {
     try {
       setLoading(true);
+      
+      // First, try a simple data endpoint to check authentication
+      try {
+        const simpleResponse = await fetch('/api/health');
+        const simpleData = await simpleResponse.json();
+        
+        // Log success for debugging
+        console.log('Health check:', simpleData);
+      } catch (healthError) {
+        console.error('Health check failed:', healthError);
+        // Continue with main request even if health check fails
+      }
+      
       const response = await fetch('/api/provider/requests');
       
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+        throw new Error(`Error fetching requests: ${response.status} ${response.statusText}`);
       }
       
-      const data = await response.json();
+      // Try to parse response as text first for debugging
+      const responseText = await response.text();
+      
+      // Check if response looks like HTML
+      if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+        console.error('Received HTML instead of JSON:', responseText.substring(0, 200));
+        throw new Error('Server returned HTML instead of JSON. You may need to log in again.');
+      }
+      
+      // Parse the text as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError, 'Response:', responseText.substring(0, 200));
+        throw new Error('Failed to parse server response as JSON');
+      }
       
       if (data.success) {
         setOffers(data.data || []);
@@ -111,9 +140,9 @@ export default function ProviderRequestsPage() {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       toast({
         title: 'Error',
-        description: 'Failed to load offers',
+        description: err instanceof Error ? err.message : 'Failed to load offers',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
     } finally {

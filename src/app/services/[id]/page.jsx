@@ -198,6 +198,17 @@ export default function ServiceDetailPage({ params }) {
             throw new Error(data.error?.message || 'Failed to load service');
           }
           
+          // Log provider data for debugging
+          console.log('Service provider data:', data.data.provider);
+          if (data.data.provider && data.data.provider.googleBusinessUrl) {
+            console.log('Google Business URL:', data.data.provider.googleBusinessUrl);
+            console.log('URL format check:', {
+              isGPage: data.data.provider.googleBusinessUrl.startsWith('https://g.page/'),
+              isGCo: data.data.provider.googleBusinessUrl.startsWith('https://g.co/'),
+              raw: data.data.provider.googleBusinessUrl
+            });
+          }
+          
           // Ensure the service object has the correct providerId
           const serviceData = {
             ...data.data,
@@ -476,14 +487,24 @@ export default function ServiceDetailPage({ params }) {
               </Box>
           
           <Box width={{ base: "100%", md: "auto" }} mb={4}>
-            <Stack spacing={4} bg="gray.50" p={4} borderRadius="md" width={{ base: "100%", md: "300px" }}>
-                    <Flex align="center">
-                <Icon as={FiDollarSign} fontSize="xl" mr={2} color="green.500" />
-                <Heading size="md">${Number(service.price).toFixed(2)}</Heading>
-                <Text fontSize="sm" ml={1} color="gray.600">
-                  {service.priceType === 'HOURLY' ? '/ hour' : service.priceType === 'DAILY' ? '/ day' : ''}
-                </Text>
-                    </Flex>
+            <Stack spacing={4} bg="" p={6} borderRadius="md" width={{ base: "100%", md: "300px" }} boxShadow="sm">
+              <Box mb={2}>
+                <Flex justifyContent="center" alignItems="center">
+                  <Box
+                    bg="brand.50"
+                    px={4} 
+                    py={3} 
+                    borderRadius="lg"
+                    width="100%"
+                    textAlign="center"
+                  >
+                    <Heading size="lg" color="brand.600">${Number(service.price).toFixed(2)}</Heading>
+                    <Text fontSize="sm" color="gray.600" mt={1}>
+                      {service.priceType === 'HOURLY' ? 'per hour' : service.priceType === 'DAILY' ? 'per day' : 'flat rate'}
+                    </Text>
+                  </Box>
+                </Flex>
+              </Box>
                     
               {service.location && (
                 <Flex align="center">
@@ -564,29 +585,29 @@ export default function ServiceDetailPage({ params }) {
             </Heading>
             <Flex align="center" mb={4}>
               {service.provider.profile?.avatar ? (
-                      <Image 
+                <Image 
                   src={service.provider.profile.avatar} 
-                        alt={service.provider.name} 
+                  alt={service.provider.name} 
                   boxSize="80px"
-                        borderRadius="full" 
-                        mr={4}
-                        fallback={
-                          <Box
-                            bg="blue.100"
-                            color="blue.500"
-                            borderRadius="full"
-                            boxSize="80px"
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                            fontSize="2xl"
-                            fontWeight="bold"
-                            mr={4}
-                          >
-                            {service.provider.name?.charAt(0) || "?"}
-                          </Box>
-                        }
-                      />
+                  borderRadius="full" 
+                  mr={4}
+                  fallback={
+                    <Box
+                      bg="blue.100"
+                      color="blue.500"
+                      borderRadius="full"
+                      boxSize="80px"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      fontSize="2xl"
+                      fontWeight="bold"
+                      mr={4}
+                    >
+                      {service.provider.name?.charAt(0) || "?"}
+                    </Box>
+                  }
+                />
               ) : (
                 <Box
                   bg="blue.100"
@@ -603,22 +624,27 @@ export default function ServiceDetailPage({ params }) {
                   {service.provider.name?.charAt(0) || "?"}
                 </Box>
               )}
-                      <Box>
-                <Heading size="md" mb={1}>{service.provider.name}</Heading>
+              <Box>
+                <Heading size="md" mb={1}>
+                  {service.provider.profile?.contactPerson || service.provider.name}
+                </Heading>
+                <Text fontSize="sm" color="gray.600" mb={1}>
+                  {service.provider.name}
+                </Text>
                 <HStack spacing={2} mb={1}>
                   {service.provider.isVerified && (
                     <Badge colorScheme="green">Verified</Badge>
                   )}
                   {service.provider.isPro && (
                     <Badge colorScheme="purple">Pro</Badge>
-                            )}
-                          </HStack>
+                  )}
+                </HStack>
                 {service.provider.since && (
                   <Text fontSize="sm" color="gray.600">Member since {service.provider.since}</Text>
-                        )}
-                      </Box>
-                    </Flex>
-                    
+                )}
+              </Box>
+            </Flex>
+            
             {service.provider.rating && (
               <Flex align="center" mb={2}>
                 <Flex align="center" mr={2}>
@@ -637,55 +663,47 @@ export default function ServiceDetailPage({ params }) {
                       </Flex>
                     )}
                     
-            {service.provider.googleBusinessRating && (
-              <Flex align="center" mb={3} bg="gray.50" p={2} borderRadius="md">
-                <Image src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_74x24dp.png" h="20px" mr={2} alt="Google" />
-                <Flex align="center" mr={2}>
-                  {Array(5).fill('').map((_, i) => (
-                    <StarIcon
-                      key={i}
-                      color={i < Math.floor(service.provider.googleBusinessRating) ? 'yellow.400' : 'gray.300'}
-                      mr={0.5}
-                      boxSize={3}
-                    />
-                  ))}
+            {/* Google Business Rating */}
+            {service.provider && (
+              <Box mb={3} bg="gray.50" p={2} borderRadius="md">
+                <Flex align="center">
+                  <Image src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_74x24dp.png" h="20px" mr={2} alt="Google" />
+                  
+                  {service.provider.profile?.googleBusinessUrl && service.provider.profile?.googleBusinessRating ? (
+                    <>
+                      <Flex align="center" mr={2}>
+                        {Array(5).fill('').map((_, i) => (
+                          <StarIcon
+                            key={i}
+                            color={i < Math.floor(service.provider.profile.googleBusinessRating) ? 'yellow.400' : 'gray.300'}
+                            mr={0.5}
+                            boxSize={3}
+                          />
+                        ))}
+                      </Flex>
+                      <Text fontWeight="medium" fontSize="sm">{service.provider.profile.googleBusinessRating}</Text>
+                      {service.provider.profile.googleBusinessReviews && (
+                        <Text fontSize="xs" ml={1} color="gray.600">({service.provider.profile.googleBusinessReviews} Google reviews)</Text>
+                      )}
+                    </>
+                  ) : (
+                    <Text fontSize="sm" color="gray.600">Rating: N/A</Text>
+                  )}
                 </Flex>
-                <Text fontWeight="medium" fontSize="sm">{service.provider.googleBusinessRating}</Text>
-                {service.provider.googleBusinessReviews && (
-                  <Text fontSize="xs" ml={1} color="gray.600">({service.provider.googleBusinessReviews} Google reviews)</Text>
-                )}
-                {service.provider.googleBusinessUrl && (
-                  <Text as="a" fontSize="xs" ml={2} color="blue.500" href={service.provider.googleBusinessUrl} target="_blank" rel="noopener noreferrer">
-                    See reviews
-                  </Text>
-                )}
-              </Flex>
+              </Box>
             )}
             
             <Flex gap={2} mt={2}>
               <Button 
-                      as={Link} 
+                as={Link} 
                 href={`/providers/${service.provider.id}`}
                 colorScheme="blue" 
                 variant="outline"
                 leftIcon={<FaUser />}
+                w="full"
               >
                 View Provider Profile
               </Button>
-              
-              {(service.provider.location || service.city) && (
-                <Button
-                  as="a"
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(service.provider.location || service.city.name + ', ' + service.city.state)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  colorScheme="red"
-                  variant="outline"
-                  leftIcon={<FaMapMarkerAlt />}
-                >
-                  View on Map
-                </Button>
-              )}
             </Flex>
                         </Box>
         )}

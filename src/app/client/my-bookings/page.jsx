@@ -30,7 +30,7 @@ import { MdHistory } from 'react-icons/md';
 import { Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon } from '@chakra-ui/react';
 import { TimeIcon } from '@chakra-ui/icons';
 
-export default function ApprovedServicesPage() {
+export default function MyBookingsPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const toast = useToast();
@@ -258,9 +258,9 @@ export default function ApprovedServicesPage() {
     <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
         <Box>
-          <Heading as="h1" size="xl">Approved Services</Heading>
+          <Heading as="h1" size="xl">My Bookings</Heading>
           <Text color="gray.600" mt={2}>
-            View all services that have been approved for your parties
+            View all services that have been booked for your parties
           </Text>
         </Box>
         
@@ -275,9 +275,9 @@ export default function ApprovedServicesPage() {
             <CardBody>
               <VStack spacing={4} py={10} align="center">
                 <Icon as={CheckCircleIcon} boxSize={12} color="gray.300" />
-                <Heading as="h3" size="md">No Approved Services</Heading>
+                <Heading as="h3" size="md">No Bookings</Heading>
                 <Text color="gray.500" textAlign="center">
-                  You don't have any approved services yet. Create a party and request services to get started.
+                  You don't have any booked services yet. Create a party and request services to get started.
                 </Text>
               </VStack>
             </CardBody>
@@ -290,7 +290,7 @@ export default function ApprovedServicesPage() {
                   <Badge colorScheme="green" fontSize="sm" px={2} py={1} borderRadius="full">
                     <HStack spacing={1}>
                       <CheckCircleIcon />
-                      <Text>Approved</Text>
+                      <Text>Booked</Text>
                     </HStack>
                   </Badge>
                 </Box>

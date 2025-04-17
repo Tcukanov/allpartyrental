@@ -128,7 +128,8 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
             body: JSON.stringify({
               serviceId: service.id,
               bookingDate: bookingDetails?.isoDateTime,
-              duration: bookingDetails?.duration
+              duration: bookingDetails?.duration,
+              comments: bookingDetails?.comments
             }),
           });
           
@@ -217,6 +218,7 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
           providerId: offer?.providerId || service?.providerId,
           bookingDate: bookingDetails?.isoDateTime,
           duration: bookingDetails?.duration,
+          comments: bookingDetails?.comments,
           isFixedPrice: true
         }),
       });
@@ -401,6 +403,36 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
     return new Date(date).toLocaleDateString(undefined, options);
   };
 
+  const BookingSummary = ({ bookingInfo }) => (
+    <VStack align="stretch" spacing={3} w="100%" bg="gray.50" p={4} borderRadius="md">
+      <Heading size="md">Booking Summary</Heading>
+      <Box>
+        <Text fontWeight="bold">Date:</Text>
+        <Text>{bookingInfo.formattedDate}</Text>
+      </Box>
+      <Box>
+        <Text fontWeight="bold">Time:</Text>
+        <Text>{bookingInfo.time}</Text>
+      </Box>
+      <Box>
+        <Text fontWeight="bold">Duration:</Text>
+        <Text>{bookingInfo.duration} hours</Text>
+      </Box>
+      {bookingInfo.address && (
+        <Box>
+          <Text fontWeight="bold">Address:</Text>
+          <Text>{bookingInfo.address}</Text>
+        </Box>
+      )}
+      {bookingInfo.comments && (
+        <Box>
+          <Text fontWeight="bold">Comments:</Text>
+          <Text>{bookingInfo.comments}</Text>
+        </Box>
+      )}
+    </VStack>
+  );
+
   return (
     <Card borderRadius="lg" overflow="hidden" variant="outline">
       <CardBody>
@@ -419,24 +451,7 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
             <Heading as="h3" size="sm" mb={3}>Order Summary</Heading>
             
             {bookingDetails && (
-              <Box mb={4} pb={3} borderBottomWidth="1px">
-                <Heading as="h4" size="xs" mb={2}>Booking Details</Heading>
-                <HStack fontSize="sm" mb={1}>
-                  <Text fontWeight="medium">Date:</Text>
-                  <Text>{bookingDetails.formattedDate}</Text>
-                </HStack>
-                <HStack fontSize="sm" mb={1}>
-                  <Text fontWeight="medium">Time:</Text>
-                  <Text>{bookingDetails.time}</Text>
-                </HStack>
-                <HStack fontSize="sm">
-                  <Text fontWeight="medium">Duration:</Text>
-                  <Text>{bookingDetails.duration} hour{bookingDetails.duration !== 1 ? 's' : ''}</Text>
-                </HStack>
-                <Text fontSize="xs" color="gray.600" mt={2}>
-                  Note: This service has a fixed price regardless of rental duration.
-                </Text>
-              </Box>
+              <BookingSummary bookingInfo={bookingDetails} />
             )}
             
             <HStack justify="space-between" mb={1}>

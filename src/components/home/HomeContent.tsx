@@ -78,23 +78,23 @@ export default function HomeContent() {
 
         <Container maxW="container.xl" position="relative" zIndex="1">
           <VStack spacing={8} align="center">
-            <Box textAlign="center" maxW="800px">
+          <Box textAlign="center" maxW="800px">
               <Heading 
                 as="h1" 
                 size="2xl" 
                 mb={6} 
                 color="gray.800"
               >
-                Find Party Services in Your Area
-              </Heading>
+              Find Party Services in Your Area
+            </Heading>
               <Text 
                 fontSize="xl" 
                 color="gray.600" 
                 mb={8}
               >
-                Discover and book the best party services in your location. From bounce houses to catering, we've got everything you need for your next celebration.
-              </Text>
-              
+              Discover and book the best party services in your location. From bounce houses to catering, we've got everything you need for your next celebration.
+            </Text>
+            
               <Box 
                 bg="white" 
                 p={6} 
@@ -103,9 +103,9 @@ export default function HomeContent() {
                 _dark={{ bg: 'gray.800' }}
                 mb={6}
               >
-                <LocationServiceSearch />
-              </Box>
-              
+            <LocationServiceSearch />
+          </Box>
+
               <Box w="full" mt={4} position="relative">
                 <Image
                   src="/images/back.png"
@@ -121,6 +121,7 @@ export default function HomeContent() {
       </Box>
 
       {/* Services Section with Subtle Pattern */}
+       {/*
       <Box 
         py={20} 
         bg="gray.50" 
@@ -128,7 +129,6 @@ export default function HomeContent() {
         position="relative"
         overflow="hidden"
       >
-        {/* Subtle background pattern */}
         <Box
           position="absolute"
           top="0"
@@ -162,7 +162,7 @@ export default function HomeContent() {
               Popular Services
             </Heading>
 
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8} w="full">
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8} w="full">
               <Card 
                 bg={bgColor} 
                 borderWidth="1px" 
@@ -176,11 +176,11 @@ export default function HomeContent() {
                 }}
               >
                 <Box position="relative">
-                  <Image
-                    src="https://www.deluxebouncehouse.com/cdn/shop/products/white-bounce-house.jpg?v=1725278985"
-                    alt="Bounce House"
-                    height="200px"
-                    objectFit="cover"
+                <Image
+                  src="https://www.deluxebouncehouse.com/cdn/shop/products/white-bounce-house.jpg?v=1725278985"
+                  alt="Bounce House"
+                  height="200px"
+                  objectFit="cover"
                     w="full"
                   />
                   <Box 
@@ -197,15 +197,15 @@ export default function HomeContent() {
                   </Box>
                 </Box>
                 <CardBody>
-                  <Heading size="md" mb={2}>Bounce Houses</Heading>
-                  <Text color="gray.600" mb={4}>
-                    Find the perfect bounce house for your party. We offer a wide selection of sizes and themes.
-                  </Text>
-                  <Button as={Link} href="/new-york/bounce-houses" colorScheme="brand">
-                    View in New York
-                  </Button>
-                </CardBody>
-              </Card>
+                <Heading size="md" mb={2}>Bounce Houses</Heading>
+                <Text color="gray.600" mb={4}>
+                  Find the perfect bounce house for your party. We offer a wide selection of sizes and themes.
+                </Text>
+                <Button as={Link} href="/new-york/bounce-houses" colorScheme="brand">
+                  View in New York
+                </Button>
+              </CardBody>
+            </Card>
 
               <Card 
                 bg={bgColor} 
@@ -226,15 +226,15 @@ export default function HomeContent() {
                   objectFit="cover"
                 />
                 <CardBody>
-                  <Heading size="md" mb={2}>Catering</Heading>
-                  <Text color="gray.600" mb={4}>
-                    Professional catering services for all your party needs. From appetizers to full meals.
-                  </Text>
-                  <Button as={Link} href="/san-diego/catering" colorScheme="brand">
-                    View in San Diego
-                  </Button>
-                </CardBody>
-              </Card>
+                <Heading size="md" mb={2}>Catering</Heading>
+                <Text color="gray.600" mb={4}>
+                  Professional catering services for all your party needs. From appetizers to full meals.
+                </Text>
+                <Button as={Link} href="/san-diego/catering" colorScheme="brand">
+                  View in San Diego
+                </Button>
+              </CardBody>
+            </Card>
 
               <Card 
                 bg={bgColor} 
@@ -255,20 +255,20 @@ export default function HomeContent() {
                   objectFit="cover"
                 />
                 <CardBody>
-                  <Heading size="md" mb={2}>Decoration</Heading>
-                  <Text color="gray.600" mb={4}>
-                    Transform your venue with our professional decoration services. Custom themes available.
-                  </Text>
-                  <Button as={Link} href="/los-angeles/decoration" colorScheme="brand">
-                    View in Los Angeles
-                  </Button>
-                </CardBody>
-              </Card>
-            </SimpleGrid>
+                <Heading size="md" mb={2}>Decoration</Heading>
+                <Text color="gray.600" mb={4}>
+                  Transform your venue with our professional decoration services. Custom themes available.
+                </Text>
+                <Button as={Link} href="/los-angeles/decoration" colorScheme="brand">
+                  View in Los Angeles
+                </Button>
+              </CardBody>
+            </Card>
+          </SimpleGrid>
           </VStack>
         </Container>
       </Box>
-
+*/}
       {/* How It Works Section */}
       <Box 
         py={24} 
@@ -452,7 +452,7 @@ export default function HomeContent() {
                     opacity={currentPhoto === index ? 1 : 0}
                     transition="opacity 1s ease-in-out"
                   >
-                    <Image 
+              <Image
                       src={photo}
                       alt={`Customer party photo ${index + 1}`}
                       objectFit="cover"
@@ -466,7 +466,7 @@ export default function HomeContent() {
                 <Flex 
                   position="absolute" 
                   bottom="4" 
-                  width="100%" 
+                width="100%"
                   justify="center" 
                   zIndex="1"
                 >
@@ -760,7 +760,7 @@ export default function HomeContent() {
               Contact Us
             </Button>
           </Box>
-        </Container>
+      </Container>
       </Box>
     </Box>
   );

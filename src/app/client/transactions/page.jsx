@@ -242,7 +242,7 @@ export default function ClientTransactionsPage() {
               {transaction.offer?.partyService?.party && (
                 <Button
                   as={Link}
-                  href={`/client/my-party/${transaction.offer.partyService.party.id}`}
+                  href={`/client/my-party?id=${transaction.offer.partyService.party.id}`}
                   size="sm"
                   variant="outline"
                   colorScheme="purple"

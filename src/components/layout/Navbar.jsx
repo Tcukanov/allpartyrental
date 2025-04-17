@@ -54,6 +54,7 @@ export default function Navbar() {
     // { label: 'My Parties', href: '/client/parties' },
     { label: 'My Profile', href: '/client/profile' },
     { label: 'Calendar', href: '/client/calendar' },
+    { label: 'My bookings', href: '/client/my-bookings' },
   ];
 
   const providerItems = [

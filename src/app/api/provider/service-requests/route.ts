@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 import { NotificationType } from '@prisma/client';
+import { getSocketServer } from '@/lib/socket/socket';
 
 // Create a new service request
 export async function POST(req: NextRequest) {
@@ -113,18 +114,19 @@ export async function POST(req: NextRequest) {
     });
     
     // Create notification for the message
-    await prisma.notification.create({
+    const messageNotification = await prisma.notification.create({
       data: {
         userId: service.providerId,
         type: NotificationType.MESSAGE,
         title: 'New Message',
         content: `You have a new message regarding ${service.name}. Click to view chat ID: ${chat.id}`,
-        isRead: false
+        isRead: false,
+        chatId: chat.id
       }
     });
     
     // Create a separate notification for the service request
-    await prisma.notification.create({
+    const requestNotification = await prisma.notification.create({
       data: {
         userId: service.providerId,
         type: NotificationType.SYSTEM,
@@ -133,6 +135,20 @@ export async function POST(req: NextRequest) {
         isRead: false,
       }
     });
+    
+    // Emit notifications via socket.io for real-time updates
+    try {
+      const io = getSocketServer();
+      if (io) {
+        // Emit to the provider's specific room
+        io.to(`user:${service.providerId}`).emit('notification:new', messageNotification);
+        io.to(`user:${service.providerId}`).emit('notification:new', requestNotification);
+        console.log('Service request notifications emitted via socket.io');
+      }
+    } catch (socketError) {
+      console.error('Failed to emit socket notifications:', socketError);
+      // Continue with the API response even if socket emission fails
+    }
     
     const responseData = { 
       success: true, 

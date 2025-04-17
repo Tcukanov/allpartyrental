@@ -106,10 +106,19 @@ export default function MyPartyPage() {
         
         // If partyId is specified, fetch that party
         if (partyId) {
+          console.log('Fetching party with ID:', partyId);
           const response = await fetch(`/api/parties/${partyId}`);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to fetch party:', response.status, errorText);
+            throw new Error(`Failed to fetch party: ${response.status}`);
+          }
+          
           const data = await response.json();
           
           if (data.success) {
+            console.log('Fetched party data:', data.data);
             setParty(data.data);
           } else {
             throw new Error(data.error.message || 'Failed to fetch party details');
@@ -484,6 +493,54 @@ export default function MyPartyPage() {
                       </Badge>
                     </Flex>
                   ))}
+                </VStack>
+              </Box>
+              
+              <Divider />
+              
+              <Box>
+                <Text fontWeight="bold" mb={4}>Service Offers</Text>
+                <VStack spacing={4} align="stretch">
+                  {party.partyServices.flatMap(service => 
+                    service.offers.map(offer => (
+                      <Card key={offer.id} variant="outline" p={3}>
+                        <Flex justify="space-between" align="center">
+                          <VStack align="start" spacing={1}>
+                            <Text fontWeight="bold">
+                              {service.service.name} - {offer.provider.name}
+                            </Text>
+                            <Text fontSize="sm" color="green.500">
+                              Price: ${Number(offer.price).toFixed(2)}
+                            </Text>
+                            <Badge colorScheme={
+                              offer.status === 'APPROVED' ? 'green' : 
+                              offer.status === 'REJECTED' ? 'red' : 'yellow'
+                            }>
+                              {offer.status}
+                            </Badge>
+                          </VStack>
+                          <HStack>
+                            <Button 
+                              size="sm" 
+                              leftIcon={<ChatIcon />} 
+                              onClick={() => handleOpenChat(offer)}
+                            >
+                              Chat
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleViewOffer(offer)}
+                            >
+                              View Details
+                            </Button>
+                          </HStack>
+                        </Flex>
+                      </Card>
+                    ))
+                  )}
+                  {party.partyServices.every(service => service.offers.length === 0) && (
+                    <Text color="gray.500" textAlign="center">No offers received yet</Text>
+                  )}
                 </VStack>
               </Box>
               

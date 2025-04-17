@@ -35,7 +35,7 @@ import {
   Progress
 } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
-import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon, ChatIcon } from '@chakra-ui/icons';
+import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon, ChatIcon, StarIcon } from '@chakra-ui/icons';
 import { useSession } from 'next-auth/react';
 import { FaComment, FaEye, FaBuilding, FaIdCard } from 'react-icons/fa';
 import { BsChatDots } from 'react-icons/bs';
@@ -493,22 +493,29 @@ export default function ProviderCabinetPage() {
     try {
       // Fetch profile data
       const profileResponse = await fetch('/api/provider/profile');
-      const profileData = await profileResponse.json();
+      const profileResult = await profileResponse.json();
       
-      if (profileData.success) {
+      console.log('Profile fetch response:', JSON.stringify(profileResult, null, 2));
+      
+      if (profileResult.success) {
+        // Get profile data from response
+        const profileData = profileResult.data || {};
+        
+        // Get user name from session or profile for company name
+        const companyName = session?.user?.name || '';
+        
         // Ensure all fields have default values
-        const data = profileData.data || {};
         setProfileData({
-          companyName: data.companyName || '',
-          contactPerson: data.contactPerson || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          address: data.address || '',
-          website: data.website || '',
-          googleBusinessUrl: data.googleBusinessUrl || '',
-          description: data.description || '',
-          avatar: data.avatar || '',
-          socialLinks: data.socialLinks || {}
+          companyName: companyName, // Use the user's name from session as company name
+          contactPerson: profileData.contactPerson || '',
+          email: session?.user?.email || '',
+          phone: profileData.phone || '',
+          address: profileData.address || '',
+          website: profileData.website || '',
+          googleBusinessUrl: profileData.googleBusinessUrl || '',
+          description: profileData.description || '',
+          avatar: profileData.avatar || '',
+          socialLinks: profileData.socialLinks || {}
         });
       }
       
@@ -1005,7 +1012,7 @@ export default function ProviderCabinetPage() {
       
       // Create a clean profile object with all fields
       const profileToSave = {
-        companyName: profileData.companyName || '',
+        companyName: profileData.companyName || session?.user?.name || '',
         contactPerson: profileData.contactPerson || '',
         email: profileData.email || '',
         phone: profileData.phone || '',
@@ -1017,7 +1024,7 @@ export default function ProviderCabinetPage() {
         socialLinks: profileData.socialLinks || {}
       };
       
-      console.log('Saving profile data to API:', profileToSave);
+      console.log('Saving profile data to API:', JSON.stringify(profileToSave, null, 2));
       
       // First try to save to the API
       const response = await fetch('/api/provider/profile', {
@@ -1030,7 +1037,13 @@ export default function ProviderCabinetPage() {
       
       console.log('Profile save response status:', response.status);
       const result = await response.json();
-      console.log('Profile save response:', result);
+      console.log('Profile save response:', JSON.stringify(result, null, 2));
+      
+      // Check if company name was updated in the session
+      if (response.ok && result.success && profileToSave.companyName !== session?.user?.name) {
+        console.log('Company name updated, refreshing session');
+        // Optionally refresh the session or update UI state
+      }
       
       // Always save to localStorage for backup
       for (const [key, value] of Object.entries(profileToSave)) {
@@ -1269,15 +1282,85 @@ export default function ProviderCabinetPage() {
                       
                       <FormControl>
                         <FormLabel>Google Business URL (Optional)</FormLabel>
-                        <Input 
-                          name="googleBusinessUrl"
-                          value={profileData.googleBusinessUrl}
-                          onChange={handleProfileChange}
-                          placeholder="https://g.page/your-business"
-                        />
+                        <Flex>
+                          <Input 
+                            name="googleBusinessUrl"
+                            value={profileData.googleBusinessUrl}
+                            onChange={handleProfileChange}
+                            placeholder="https://g.page/your-business"
+                            mr={2}
+                          />
+                          <Button 
+                            colorScheme="blue" 
+                            size="md" 
+                            isDisabled={!profileData.googleBusinessUrl}
+                            onClick={async () => {
+                              if (!profileData.googleBusinessUrl) return;
+                              
+                              try {
+                                const response = await fetch('/api/google/ratings', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ googleBusinessUrl: profileData.googleBusinessUrl })
+                                });
+                                
+                                const result = await response.json();
+                                
+                                if (result.success) {
+                                  // Update profile data with ratings
+                                  setProfileData(prev => ({
+                                    ...prev,
+                                    googleBusinessRating: result.data.googleBusinessRating,
+                                    googleBusinessReviews: result.data.googleBusinessReviews
+                                  }));
+                                  
+                                  toast({
+                                    title: 'Ratings Updated',
+                                    description: `Successfully fetched ratings: ${result.data.googleBusinessRating}/5 (${result.data.googleBusinessReviews} reviews)`,
+                                    status: 'success',
+                                    duration: 5000,
+                                    isClosable: true
+                                  });
+                                } else {
+                                  throw new Error(result.error?.message || 'Failed to fetch ratings');
+                                }
+                              } catch (error) {
+                                console.error('Error fetching ratings:', error);
+                                toast({
+                                  title: 'Error',
+                                  description: error.message || 'Failed to fetch Google Business ratings',
+                                  status: 'error',
+                                  duration: 5000,
+                                  isClosable: true
+                                });
+                              }
+                            }}
+                          >
+                            Fetch Ratings
+                          </Button>
+                        </Flex>
                         <Text fontSize="xs" color="gray.500" mt={1}>
                           Your Google Business rating will appear on your service listings
                         </Text>
+                        {profileData.googleBusinessRating && (
+                          <Flex align="center" mt={2} bg="gray.50" p={2} borderRadius="md">
+                            <Image src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_74x24dp.png" h="20px" mr={2} alt="Google" />
+                            <Flex align="center" mr={2}>
+                              {Array(5).fill('').map((_, i) => (
+                                <StarIcon
+                                  key={i}
+                                  color={i < Math.floor(profileData.googleBusinessRating) ? 'yellow.400' : 'gray.300'}
+                                  mr={0.5}
+                                  boxSize={3}
+                                />
+                              ))}
+                            </Flex>
+                            <Text fontWeight="medium" fontSize="sm">{profileData.googleBusinessRating}</Text>
+                            {profileData.googleBusinessReviews && (
+                              <Text fontSize="xs" ml={1} color="gray.600">({profileData.googleBusinessReviews} reviews)</Text>
+                            )}
+                          </Flex>
+                        )}
                       </FormControl>
                       
                       <FormControl gridColumn={{ md: "span 2" }}>

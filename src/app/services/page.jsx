@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useToast, HStack, Badge, Icon, Spinner, Select, InputGroup, InputLeftElement, Input, RangeSlider, RangeSliderTrack, RangeSliderFilledTrack, RangeSliderThumb, Flex, Divider, Checkbox, CheckboxGroup, Stack } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useToast, HStack, Badge, Icon, Spinner, Select, InputGroup, InputLeftElement, Input, Flex, Divider, Checkbox, CheckboxGroup, Stack } from '@chakra-ui/react';
 import { StarIcon, ViewIcon, SearchIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import LocationServiceSearch from '@/components/search/LocationServiceSearch';
@@ -17,12 +17,16 @@ export default function ServicesPage() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [minPrice, setMinPrice] = useState(0);
-  const [maxPrice, setMaxPrice] = useState(10000);
   const [selectedColor, setSelectedColor] = useState('');
+  const [sortByPrice, setSortByPrice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   
   const availableColors = ['Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple', 'Orange', 'White'];
+  const sortOptions = [
+    { value: '', label: 'Default Sort' },
+    { value: 'price_asc', label: 'Price: Low to High' },
+    { value: 'price_desc', label: 'Price: High to Low' }
+  ];
   
   useEffect(() => {
     const fetchData = async () => {
@@ -85,17 +89,13 @@ export default function ServicesPage() {
       if (searchTerm && searchTerm.trim()) {
         queryParams.append('search', searchTerm.trim());
       }
-      
-      if (minPrice > 0) {
-        queryParams.append('minPrice', minPrice.toString());
-      }
-      
-      if (maxPrice < 10000) {
-        queryParams.append('maxPrice', maxPrice.toString());
-      }
 
       if (selectedColor) {
         queryParams.append('color', selectedColor);
+      }
+      
+      if (sortByPrice) {
+        queryParams.append('sort', sortByPrice);
       }
 
       // Log the query params for debugging
@@ -113,8 +113,22 @@ export default function ServicesPage() {
       const data = await response.json();
       
       if (data.success) {
-        setServices(data.data || []);
-        if (data.data.length === 0) {
+        // Apply client-side sorting if needed
+        let sortedServices = data.data || [];
+        
+        if (sortByPrice && !queryParams.has('sort')) {
+          sortedServices = [...sortedServices].sort((a, b) => {
+            if (sortByPrice === 'price_asc') {
+              return parseFloat(a.price) - parseFloat(b.price);
+            } else if (sortByPrice === 'price_desc') {
+              return parseFloat(b.price) - parseFloat(a.price);
+            }
+            return 0;
+          });
+        }
+        
+        setServices(sortedServices);
+        if (sortedServices.length === 0) {
           setErrorMessage('No services found matching your criteria.');
         }
       } else {
@@ -136,7 +150,7 @@ export default function ServicesPage() {
     if (!isLoading || categories.length > 0 || cities.length > 0) {
       fetchServices();
     }
-  }, [selectedCategory, selectedCity, searchTerm, minPrice, maxPrice, selectedColor]);
+  }, [selectedCategory, selectedCity, searchTerm, selectedColor, sortByPrice]);
 
   const handleCityChange = (e) => {
     setSelectedCity(e.target.value);
@@ -149,10 +163,9 @@ export default function ServicesPage() {
   const handleColorChange = (e) => {
     setSelectedColor(e.target.value);
   };
-
-  const handlePriceChange = (values) => {
-    setMinPrice(values[0]);
-    setMaxPrice(values[1]);
+  
+  const handleSortChange = (e) => {
+    setSortByPrice(e.target.value);
   };
   
   return (
@@ -167,19 +180,9 @@ export default function ServicesPage() {
 
         <Box bg="white" p={6} borderRadius="lg" boxShadow="md">
           <VStack spacing={4}>
-            <LocationServiceSearch />
+            {/* <LocationServiceSearch /> */}
             <HStack w="full" spacing={4} mt={2}>
-              <InputGroup>
-                <InputLeftElement pointerEvents="none">
-                  <SearchIcon color="gray.400" />
-                </InputLeftElement>
-                <Input 
-                  placeholder="Search services..." 
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                />
-              </InputGroup>
-              <Select placeholder="All Locations" value={selectedCity} onChange={handleCityChange}>
+              <Select placeholder="All Locations" value={selectedCity} onChange={handleCityChange} w="full">
                 {cities.map(city => (
                   <option key={city.id} value={city.id}>
                     {city.name}
@@ -207,24 +210,19 @@ export default function ServicesPage() {
                 </Select>
               </Box>
               
-              {/* Price range slider */}
-              <Box flex="2">
-                <Text fontWeight="medium" mb={2}>Price Range: ${minPrice} - ${maxPrice}</Text>
-                <RangeSlider
-                  aria-label={['min', 'max']}
-                  defaultValue={[0, 10000]}
-                  min={0}
-                  max={10000}
-                  step={50}
-                  value={[minPrice, maxPrice]}
-                  onChange={handlePriceChange}
+              {/* Sort by price */}
+              <Box flex="1">
+                <Text fontWeight="medium" mb={2}>Sort by Price</Text>
+                <Select
+                  value={sortByPrice}
+                  onChange={handleSortChange}
                 >
-                  <RangeSliderTrack>
-                    <RangeSliderFilledTrack />
-                  </RangeSliderTrack>
-                  <RangeSliderThumb index={0} />
-                  <RangeSliderThumb index={1} />
-                </RangeSlider>
+                  {sortOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
               </Box>
             </Flex>
           </VStack>

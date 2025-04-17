@@ -15,17 +15,9 @@ import {
   VStack,
   useToast,
   Box,
-  Stepper,
-  Step,
-  StepIndicator,
-  StepStatus,
-  StepIcon,
-  StepNumber,
-  StepTitle,
-  StepDescription,
-  StepSeparator,
-  useSteps
+  Flex
 } from '@chakra-ui/react';
+import { CheckIcon } from '@chakra-ui/icons';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import ServiceRequestPayment from '../payment/ServiceRequestPayment';
@@ -48,15 +40,14 @@ const ServiceRequestButton = ({ service, offer }) => {
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const toast = useToast();
   const router = useRouter();
-  const { activeStep, setActiveStep } = useSteps({
-    index: 0,
-    count: steps.length,
-  });
+  const [activeStep, setActiveStep] = useState(0);
 
   // Booking details
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedDuration, setSelectedDuration] = useState(service?.minRentalHours || 1);
+  const [bookingComments, setBookingComments] = useState('');
+  const [bookingAddress, setBookingAddress] = useState('');
   const [bookingDetails, setBookingDetails] = useState(null);
 
   console.log("ServiceRequestButton received service:", JSON.stringify({
@@ -82,6 +73,14 @@ const ServiceRequestButton = ({ service, offer }) => {
   const handleDurationSelect = (duration) => {
     setSelectedDuration(duration);
   };
+  
+  const handleCommentChange = (comment) => {
+    setBookingComments(comment);
+  };
+  
+  const handleAddressChange = (address) => {
+    setBookingAddress(address);
+  };
 
   const handleProceedToPayment = () => {
     if (!selectedDate || !selectedTime) {
@@ -100,6 +99,8 @@ const ServiceRequestButton = ({ service, offer }) => {
       date: selectedDate,
       time: selectedTime,
       duration: selectedDuration,
+      comments: bookingComments,
+      address: bookingAddress,
       formattedDate: selectedDate.toLocaleDateString('en-US', { 
         weekday: 'long', 
         year: 'numeric', 
@@ -158,6 +159,28 @@ const ServiceRequestButton = ({ service, offer }) => {
     }, 300);
   };
 
+  // Format booking details for the confirmation step
+  const getFormattedBookingInfo = () => {
+    if (!selectedDate) return null;
+
+    const date = new Date(selectedDate);
+    const formattedDate = date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    return {
+      date: selectedDate,
+      formattedDate,
+      time: selectedTime,
+      duration: selectedDuration,
+      address: bookingAddress,
+      comments: bookingComments,
+    };
+  };
+
   return (
     <>
       <Button 
@@ -181,24 +204,63 @@ const ServiceRequestButton = ({ service, offer }) => {
           </ModalHeader>
           <ModalCloseButton />
           
-          <Stepper index={activeStep} mb={6} mt={2} px={6}>
-            {steps.map((step, index) => (
-              <Step key={index}>
-                <StepIndicator>
-                  <StepStatus
-                    complete={<StepIcon />}
-                    incomplete={<StepNumber />}
-                    active={<StepNumber />}
-                  />
-                </StepIndicator>
-                <Box flexShrink='0'>
-                  <StepTitle>{step.title}</StepTitle>
-                  <StepDescription>{step.description}</StepDescription>
-                </Box>
-                <StepSeparator />
-              </Step>
-            ))}
-          </Stepper>
+          {/* Custom Stepper */}
+          <Box px={6} mb={6} mt={4}>
+            <Flex justify="space-between" align="center" width="100%">
+              {steps.map((step, index) => (
+                <React.Fragment key={index}>
+                  {/* Step Item */}
+                  <VStack 
+                    spacing={1}
+                    flexBasis="30%"
+                    align="center"
+                    opacity={index < activeStep ? 1 : index === activeStep ? 1 : 0.5}
+                  >
+                    {/* Number Indicator */}
+                    <Flex
+                      w="30px"
+                      h="30px"
+                      borderRadius="full"
+                      bg={index < activeStep ? "green.500" : index === activeStep ? "blue.500" : "gray.200"}
+                      color="white"
+                      justify="center"
+                      align="center"
+                      fontWeight="bold"
+                    >
+                      {index < activeStep ? <CheckIcon fontSize="sm" /> : index + 1}
+                    </Flex>
+                    
+                    {/* Step Title and Description */}
+                    <Text 
+                      fontWeight="medium" 
+                      fontSize="sm" 
+                      textAlign="center"
+                      color={index === activeStep ? "blue.500" : "gray.700"}
+                    >
+                      {step.title}
+                    </Text>
+                    <Text 
+                      fontSize="xs" 
+                      color="gray.500" 
+                      textAlign="center"
+                      display={{ base: 'none', md: 'block' }}
+                    >
+                      {step.description}
+                    </Text>
+                  </VStack>
+                  
+                  {/* Separator Line */}
+                  {index < steps.length - 1 && (
+                    <Box 
+                      height="1px" 
+                      bg={index < activeStep ? "green.500" : "gray.200"} 
+                      flex="1"
+                    />
+                  )}
+                </React.Fragment>
+              ))}
+            </Flex>
+          </Box>
           
           <ModalBody pb={6}>
             {activeStep === 0 && (
@@ -207,6 +269,8 @@ const ServiceRequestButton = ({ service, offer }) => {
                 onDateSelect={handleDateSelect}
                 onTimeSelect={handleTimeSelect}
                 onDurationSelect={handleDurationSelect}
+                onCommentChange={handleCommentChange}
+                onAddressChange={handleAddressChange}
               />
             )}
             
@@ -238,6 +302,13 @@ const ServiceRequestButton = ({ service, offer }) => {
                   <Text>Date: {bookingDetails?.formattedDate}</Text>
                   <Text>Time: {bookingDetails?.time}</Text>
                   <Text>Duration: {bookingDetails?.duration} hour{bookingDetails?.duration !== 1 ? 's' : ''}</Text>
+                  <Text>Address: {bookingDetails?.address}</Text>
+                  {bookingDetails?.comments && (
+                    <Text mt={2}>
+                      <Text as="span" fontWeight="bold">Comments: </Text>
+                      {bookingDetails.comments}
+                    </Text>
+                  )}
                 </Box>
                 <Text>
                   Your payment will only be processed if the provider accepts your request.

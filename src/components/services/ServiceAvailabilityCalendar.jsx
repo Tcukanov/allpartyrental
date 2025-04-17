@@ -18,6 +18,7 @@ import {
   IconButton,
   Badge,
   useToast,
+  Textarea,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
 import { FiClock, FiCalendar } from 'react-icons/fi';
@@ -25,7 +26,7 @@ import { FiClock, FiCalendar } from 'react-icons/fi';
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDurationSelect }) => {
+const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDurationSelect, onCommentChange, onAddressChange }) => {
   const toast = useToast();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -214,96 +215,142 @@ const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDu
   };
   
   return (
-    <Box borderWidth="1px" borderRadius="lg" p={4} w="100%">
-      <VStack spacing={4} align="stretch">
-        <Heading size="md" mb={2}>Select Date & Time</Heading>
-        
+    <VStack spacing={6} align="stretch">
+      {/* Month selector */}
+      <Flex justify="space-between" align="center">
+        <IconButton
+          icon={<ChevronLeftIcon />}
+          onClick={handlePrevMonth}
+          aria-label="Previous month"
+        />
+        <Heading size="md">
+          {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+        </Heading>
+        <IconButton
+          icon={<ChevronRightIcon />}
+          onClick={handleNextMonth}
+          aria-label="Next month"
+        />
+      </Flex>
+      
+      {/* Days of the week header */}
+      <Grid templateColumns="repeat(7, 1fr)" gap={2} textAlign="center">
+        {DAYS_OF_WEEK.map((day, index) => (
+          <GridItem key={index}>
+            <Text fontWeight="bold">{day.substring(0, 3)}</Text>
+          </GridItem>
+        ))}
+      </Grid>
+      
+      {/* Calendar grid */}
+      <Grid templateColumns="repeat(7, 1fr)" gap={2} mb={4}>
+        {renderCalendar()}
+      </Grid>
+      
+      {/* Time and duration selection */}
+      {selectedDate && (
         <Box>
-          <HStack justify="space-between" mb={2}>
-            <IconButton
-              icon={<ChevronLeftIcon />}
-              onClick={handlePrevMonth}
-              aria-label="Previous month"
-            />
-            <Heading size="sm">
-              {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </Heading>
-            <IconButton
-              icon={<ChevronRightIcon />}
-              onClick={handleNextMonth}
-              aria-label="Next month"
-            />
-          </HStack>
-          
-          <Grid templateColumns="repeat(7, 1fr)" gap={1} mb={4}>
-            {DAYS_OF_WEEK.map((day, i) => (
-              <GridItem key={i} textAlign="center" fontWeight="bold" fontSize="sm">
-                {day.substring(0, 1)}
-              </GridItem>
-            ))}
-            {renderCalendar()}
-          </Grid>
-        </Box>
-        
-        <VStack spacing={4} align="stretch">
-          <Flex wrap="wrap" gap={2} mb={2}>
-            <Badge colorScheme="blue">Available Days: </Badge>
-            {availableDays.map((day, i) => (
-              <Badge key={i} colorScheme="green">{day}</Badge>
-            ))}
+          {/* Selected date display */}
+          <Flex align="center" mb={4} bg="blue.50" p={3} borderRadius="md">
+            <Box as={FiCalendar} size="20px" color="blue.500" mr={2} />
+            <Text fontWeight="medium">
+              Selected: {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </Text>
           </Flex>
           
-          <FormControl isDisabled={!selectedDate}>
-            <FormLabel>Select Time</FormLabel>
-            <Select 
-              placeholder="Select time" 
-              value={selectedTime} 
-              onChange={handleTimeSelect}
-              icon={<FiClock />}
+          <Box borderWidth="1px" borderRadius="md" p={4}>
+            <VStack spacing={4} align="stretch">
+              {/* Time selection */}
+              <FormControl isRequired>
+                <FormLabel htmlFor="timeSelect" display="flex" alignItems="center">
+                  <Box as={FiClock} mr={2} color="blue.500" />
+                  Available Time Slots
+                </FormLabel>
+                
+                {availableTimes.length > 0 ? (
+                  <Select 
+                    id="timeSelect"
+                    placeholder="Select a time" 
+                    value={selectedTime} 
+                    onChange={handleTimeSelect}
+                  >
+                    {availableTimes.map(time => (
+                      <option key={time} value={time}>
+                        {time}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Text color="red.500">No available times for this date</Text>
+                )}
+              </FormControl>
+              
+              {/* Duration selection */}
+              <FormControl isRequired>
+                <FormLabel htmlFor="durationSelect">Duration (hours)</FormLabel>
+                <Select 
+                  id="durationSelect"
+                  value={selectedDuration} 
+                  onChange={handleDurationSelect}
+                >
+                  {getDurationOptions().map(hours => (
+                    <option key={hours} value={hours}>
+                      {hours} hour{hours !== 1 ? 's' : ''}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* Event Address */}
+              <FormControl isRequired>
+                <FormLabel htmlFor="addressInput">Event address</FormLabel>
+                <Input
+                  id="addressInput"
+                  placeholder="Enter the full address of your event"
+                  onChange={(e) => {
+                    if (onAddressChange) {
+                      onAddressChange(e.target.value);
+                    }
+                  }}
+                />
+              </FormControl>
+              
+              {/* Description/Additional Comments */}
+              <FormControl>
+                <FormLabel htmlFor="commentInput">Description or additional comments</FormLabel>
+                <Textarea
+                  id="commentInput"
+                  placeholder="Add any special requirements or information for the provider"
+                  resize="vertical"
+                  rows={3}
+                  onChange={(e) => {
+                    if (onCommentChange) {
+                      onCommentChange(e.target.value);
+                    }
+                  }}
+                />
+              </FormControl>
+            </VStack>
+          </Box>
+        </Box>
+      )}
+      
+      {/* Available days info */}
+      <Box mt={4}>
+        <Text fontWeight="bold" mb={2}>Available Days:</Text>
+        <Flex flexWrap="wrap" gap={2}>
+          {DAYS_OF_WEEK.map(day => (
+            <Badge 
+              key={day} 
+              colorScheme={availableDays.includes(day) ? "green" : "gray"}
+              opacity={availableDays.includes(day) ? 1 : 0.6}
             >
-              {availableTimes.map((time, i) => (
-                <option key={i} value={time}>{time}</option>
-              ))}
-            </Select>
-          </FormControl>
-          
-          <FormControl isDisabled={!selectedDate}>
-            <FormLabel>Rental Duration (hours)</FormLabel>
-            <Select 
-              value={selectedDuration} 
-              onChange={handleDurationSelect}
-            >
-              {getDurationOptions().map((hours) => (
-                <option key={hours} value={hours}>{hours} hour{hours !== 1 ? 's' : ''}</option>
-              ))}
-            </Select>
-          </FormControl>
-          
-          {selectedDate && selectedTime && (
-            <Box borderWidth="1px" borderRadius="md" p={3} bg="blue.50">
-              <Text fontWeight="bold">Selected Booking</Text>
-              <Flex align="center" mt={1}>
-                <FiCalendar />
-                <Text ml={2}>
-                  {selectedDate.toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </Text>
-              </Flex>
-              <Flex align="center" mt={1}>
-                <FiClock />
-                <Text ml={2}>
-                  {selectedTime} ({selectedDuration} hour{selectedDuration !== 1 ? 's' : ''})
-                </Text>
-              </Flex>
-            </Box>
-          )}
-        </VStack>
-      </VStack>
-    </Box>
+              {day}
+            </Badge>
+          ))}
+        </Flex>
+      </Box>
+    </VStack>
   );
 };
 

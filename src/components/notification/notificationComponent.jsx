@@ -49,6 +49,7 @@ const NotificationComponent = () => {
         const data = await response.json();
         
         if (data.success) {
+          console.log('Fetched notifications:', data.data);
           setNotifications(data.data || []);
           setUnreadCount(data.data.filter(n => !n.isRead).length);
         } else {
@@ -72,6 +73,7 @@ const NotificationComponent = () => {
     
     // Initialize Socket.io
     if (!socket) {
+      console.log('Initializing socket connection for notifications...');
       socket = io({
         path: '/api/socket',
         auth: {
@@ -80,10 +82,16 @@ const NotificationComponent = () => {
       });
       
       socket.on('connect', () => {
-        console.log('Socket connected for notifications');
+        console.log('Socket connected for notifications with ID:', socket.id);
+      });
+      
+      socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
       });
       
       socket.on('notification:new', (notification) => {
+        console.log('New notification received via socket:', notification);
+        
         // Add new notification to state
         setNotifications(prev => [notification, ...prev]);
         setUnreadCount(prev => prev + 1);
@@ -102,10 +110,16 @@ const NotificationComponent = () => {
       });
     }
     
+    // Poll for new notifications every 30 seconds as a fallback
+    const pollingInterval = setInterval(fetchNotifications, 30000);
+    
     // Cleanup function
     return () => {
+      clearInterval(pollingInterval);
       if (socket) {
         socket.off('notification:new');
+        socket.off('connect');
+        socket.off('connect_error');
       }
     };
   }, [session, toast]);

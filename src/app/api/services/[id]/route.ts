@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -29,6 +31,10 @@ export async function GET(
                 phone: true,
                 website: true,
                 isProStatus: true,
+                googleBusinessUrl: true,
+                googleBusinessRating: true,
+                googleBusinessReviews: true,
+                contactPerson: true
               },
             },
           },

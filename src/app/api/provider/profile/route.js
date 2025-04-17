@@ -61,10 +61,18 @@ export async function PUT(request) {
     // Check if we need to update the user's name (company name)
     if (data.companyName && data.companyName !== user.name) {
       console.log(`Updating user name from "${user.name}" to "${data.companyName}"`);
-      await prisma.user.update({
-        where: { id: userId },
-        data: { name: data.companyName }
-      });
+      try {
+        const updatedUser = await prisma.user.update({
+          where: { id: userId },
+          data: { name: data.companyName }
+        });
+        console.log('User name updated successfully:', updatedUser.name);
+      } catch (nameUpdateError) {
+        console.error('Error updating user name:', nameUpdateError);
+        // Continue with profile update even if name update fails
+      }
+    } else {
+      console.log('No need to update user name - unchanged or empty');
     }
     
     // Check if profile exists first

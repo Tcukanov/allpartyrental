@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
     const color = searchParams.get('color');
+    const sort = searchParams.get('sort');
     const limit = parseInt(searchParams.get('limit') || '50');
     const page = parseInt(searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
@@ -56,6 +57,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Determine sorting order
+    let orderBy: any = { createdAt: 'desc' };
+    
+    if (sort) {
+      if (sort === 'price_asc') {
+        orderBy = { price: 'asc' };
+      } else if (sort === 'price_desc') {
+        orderBy = { price: 'desc' };
+      }
+    }
+
     // Get services with pagination
     const services = await prisma.service.findMany({
       where,
@@ -72,9 +84,7 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy,
       skip,
       take: limit,
     });
