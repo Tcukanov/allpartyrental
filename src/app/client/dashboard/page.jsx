@@ -218,13 +218,13 @@ export default function ClientDashboardPage() {
             </CardBody>
           </Card>
           
-          <Card cursor="pointer" onClick={() => router.push('/client/approved-services')}>
+          <Card cursor="pointer" onClick={() => router.push('/client/my-bookings')}>
             <CardBody>
               <VStack spacing={4} align="center">
                 <Icon as={CheckCircleIcon} w={8} h={8} color="green.500" />
-                <Text fontWeight="bold">Approved Services</Text>
+                <Text fontWeight="bold">My bookings</Text>
                 <Text fontSize="sm" color="gray.600" textAlign="center">
-                  View your approved service requests
+                  View your booked services
                 </Text>
               </VStack>
             </CardBody>

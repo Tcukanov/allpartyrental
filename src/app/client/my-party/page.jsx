@@ -498,54 +498,6 @@ export default function MyPartyPage() {
               
               <Divider />
               
-              <Box>
-                <Text fontWeight="bold" mb={4}>Service Offers</Text>
-                <VStack spacing={4} align="stretch">
-                  {party.partyServices.flatMap(service => 
-                    service.offers.map(offer => (
-                      <Card key={offer.id} variant="outline" p={3}>
-                        <Flex justify="space-between" align="center">
-                          <VStack align="start" spacing={1}>
-                            <Text fontWeight="bold">
-                              {service.service.name} - {offer.provider.name}
-                            </Text>
-                            <Text fontSize="sm" color="green.500">
-                              Price: ${Number(offer.price).toFixed(2)}
-                            </Text>
-                            <Badge colorScheme={
-                              offer.status === 'APPROVED' ? 'green' : 
-                              offer.status === 'REJECTED' ? 'red' : 'yellow'
-                            }>
-                              {offer.status}
-                            </Badge>
-                          </VStack>
-                          <HStack>
-                            <Button 
-                              size="sm" 
-                              leftIcon={<ChatIcon />} 
-                              onClick={() => handleOpenChat(offer)}
-                            >
-                              Chat
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleViewOffer(offer)}
-                            >
-                              View Details
-                            </Button>
-                          </HStack>
-                        </Flex>
-                      </Card>
-                    ))
-                  )}
-                  {party.partyServices.every(service => service.offers.length === 0) && (
-                    <Text color="gray.500" textAlign="center">No offers received yet</Text>
-                  )}
-                </VStack>
-              </Box>
-              
-              <Divider />
-              
               <Flex justify="space-between">
                 <Button variant="outline" onClick={() => router.push('/client/dashboard')}>
                   Back to Dashboard

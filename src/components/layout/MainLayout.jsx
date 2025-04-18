@@ -41,7 +41,7 @@ import NotificationComponent from '@/components/notification/notificationCompone
 const clientLinks = [
   { name: 'Dashboard', href: '/client/dashboard' },
   // { name: 'My Party', href: '/client/my-party' },
-  { name: 'Approved Services', href: '/client/approved-services' },
+  { name: 'My bookings', href: '/client/my-bookings' },
   // { name: 'Create Party', href: '/client/create-party' },
   { name: 'Services', href: '/services' },
   { name: 'Calendar', href: '/client/calendar' },

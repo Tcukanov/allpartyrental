@@ -108,6 +108,9 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
         duration: bookingDetails?.duration || undefined
       });
       
+      // Flag to track if we already attempted to create a transaction
+      let transactionCreated = false;
+      
       if (!offer && service) {
         console.log("Direct Service Transaction Mode - Service details:", {
           id: service.id,
@@ -138,6 +141,7 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
           
           if (debugData.success) {
             console.log("Debug transaction created successfully!");
+            transactionCreated = true;
             
             // Use the transaction from the debug response
             setTransaction(debugData.data.transaction);
@@ -202,168 +206,175 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
           }
         } catch (debugError) {
           console.error("Debug transaction creation failed:", debugError);
-          // Continue with regular flow
+          // Mark that we tried the debug flow, but continue with regular flow only if we didn't create a transaction
+          if (transactionCreated) {
+            throw debugError; // If transaction was created but payment failed, don't try again with regular flow
+          }
+          // Continue with regular flow if no transaction was created
         }
       }
       
-      const transactionResponse = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          offerId: offer?.id,
-          serviceId: !offer ? service.id : null,
-          amount: baseAmount,
-          providerId: offer?.providerId || service?.providerId,
-          bookingDate: bookingDetails?.isoDateTime,
-          duration: bookingDetails?.duration,
-          comments: bookingDetails?.comments,
-          isFixedPrice: true
-        }),
-      });
-
-      let errorData;
-      
-      // Handle authentication errors
-      if (transactionResponse.status === 401) {
-        toast({
-          title: "Authentication required",
-          description: "Please sign in to continue with your payment",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
-        
-        // Redirect to login
-        window.location.href = `/api/auth/signin?callbackUrl=${encodeURIComponent(window.location.href)}`;
-        return;
-      }
-      
-      // Try to get detailed error information
-      try {
-        errorData = await transactionResponse.json();
-        console.log("Transaction response data:", errorData);
-      } catch (e) {
-        console.error("Failed to parse transaction response:", e, "Status:", transactionResponse.status);
-        // Try to get the raw response text for debugging
-        try {
-          const responseText = await transactionResponse.text();
-          console.error("Raw response text:", responseText);
-        } catch (textError) {
-          console.error("Could not get response text:", textError);
-        }
-        errorData = { 
-          success: false, 
-          error: { message: `Could not parse server response. Status: ${transactionResponse.status}` } 
-        };
-      }
-      
-      // If the response was not successful
-      if (!transactionResponse.ok) {
-        console.error('Transaction error details:', errorData);
-        const errorMessage = 
-          errorData.error?.message || 
-          errorData.error?.details || 
-          `Transaction failed with status ${transactionResponse.status}`;
-          
-        // Display more user-friendly error based on status code  
-        if (transactionResponse.status === 409) {
-          throw new Error('A transaction for this service already exists. Please check your transactions page.');
-        } else if (transactionResponse.status === 404) {
-          throw new Error('Unable to find the necessary information to complete this transaction. Please try again.');
-        } else {
-          throw new Error(errorMessage);
-        }
-      }
-      
-      // If the response doesn't indicate success
-      if (!errorData.success || !errorData.data?.transaction) {
-        console.error('Transaction unsuccessful:', errorData);
-        if (errorData.error?.details) {
-          console.error('Detailed error:', errorData.error.details);
-        }
-        throw new Error(errorData.error?.message || 'Failed to create transaction');
-      }
-      
-      const transaction = errorData.data.transaction;
-      console.log('Transaction created successfully:', {
-        id: transaction.id,
-        status: transaction.status,
-        amount: transaction.amount
-      });
-      setTransaction(transaction);
-      
-      // Process payment
-      try {
-        const paymentResponse = await fetch(`/api/transactions/${transaction.id}/pay`, {
+      // Only proceed with regular transaction creation if debug method didn't create a transaction
+      if (!transactionCreated) {
+        const transactionResponse = await fetch('/api/transactions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-          }
-        });
-        
-        if (!paymentResponse.ok) {
-          const paymentErrorData = await paymentResponse.json();
-          console.error('Payment error details:', paymentErrorData);
-          throw new Error(
-            paymentErrorData.error?.message || 
-            paymentErrorData.error?.details || 
-            `Payment processing failed with status ${paymentResponse.status}`
-          );
-        }
-
-        const paymentData = await paymentResponse.json();
-        
-        if (!paymentData.success) {
-          throw new Error(paymentData.error?.message || 'Failed to process payment');
-        }
-        
-        // Set client secret and review deadline
-        setClientSecret(paymentData.data.clientSecret);
-        setReviewDeadline(new Date(paymentData.data.reviewDeadline));
-        
-        // Confirm card payment
-        const { error, paymentIntent } = await stripe.confirmCardPayment(paymentData.data.clientSecret, {
-          payment_method: {
-            card: elements.getElement(CardElement),
           },
+          body: JSON.stringify({
+            offerId: offer?.id,
+            serviceId: !offer ? service.id : null,
+            amount: baseAmount,
+            providerId: offer?.providerId || service?.providerId,
+            bookingDate: bookingDetails?.isoDateTime,
+            duration: bookingDetails?.duration,
+            comments: bookingDetails?.comments,
+            isFixedPrice: true
+          }),
         });
-        
-        if (error) {
-          throw new Error(error.message);
-        }
-        
-        if (paymentIntent.status === 'requires_capture') {
-          setIsComplete(true);
+      
+        let errorData;
+      
+        // Handle authentication errors
+        if (transactionResponse.status === 401) {
           toast({
-            title: "Payment authorized!",
-            description: "Your payment has been authorized and will be held in escrow. The provider now has 24 hours to review and approve your request.",
-            status: "success",
-            duration: 8000,
+            title: "Authentication required",
+            description: "Please sign in to continue with your payment",
+            status: "error",
+            duration: 5000,
             isClosable: true,
           });
           
-          if (onPaymentComplete) {
-            onPaymentComplete(transaction);
-          }
-        } else {
-          throw new Error(`Unexpected payment status: ${paymentIntent.status}`);
+          // Redirect to login
+          window.location.href = `/api/auth/signin?callbackUrl=${encodeURIComponent(window.location.href)}`;
+          return;
         }
-      } catch (paymentError) {
-        console.error('Payment processing error:', paymentError);
-        // Try to cancel the transaction since payment failed
+        
+        // Try to get detailed error information
         try {
-          await fetch(`/api/transactions/${transaction.id}/cancel`, {
+          errorData = await transactionResponse.json();
+          console.log("Transaction response data:", errorData);
+        } catch (e) {
+          console.error("Failed to parse transaction response:", e, "Status:", transactionResponse.status);
+          // Try to get the raw response text for debugging
+          try {
+            const responseText = await transactionResponse.text();
+            console.error("Raw response text:", responseText);
+          } catch (textError) {
+            console.error("Could not get response text:", textError);
+          }
+          errorData = { 
+            success: false, 
+            error: { message: `Could not parse server response. Status: ${transactionResponse.status}` } 
+          };
+        }
+        
+        // If the response was not successful
+        if (!transactionResponse.ok) {
+          console.error('Transaction error details:', errorData);
+          const errorMessage = 
+            errorData.error?.message || 
+            errorData.error?.details || 
+            `Transaction failed with status ${transactionResponse.status}`;
+            
+          // Display more user-friendly error based on status code  
+          if (transactionResponse.status === 409) {
+            throw new Error('A transaction for this service already exists. Please check your transactions page.');
+          } else if (transactionResponse.status === 404) {
+            throw new Error('Unable to find the necessary information to complete this transaction. Please try again.');
+          } else {
+            throw new Error(errorMessage);
+          }
+        }
+        
+        // If the response doesn't indicate success
+        if (!errorData.success || !errorData.data?.transaction) {
+          console.error('Transaction unsuccessful:', errorData);
+          if (errorData.error?.details) {
+            console.error('Detailed error:', errorData.error.details);
+          }
+          throw new Error(errorData.error?.message || 'Failed to create transaction');
+        }
+        
+        const transaction = errorData.data.transaction;
+        console.log('Transaction created successfully:', {
+          id: transaction.id,
+          status: transaction.status,
+          amount: transaction.amount
+        });
+        setTransaction(transaction);
+        
+        // Process payment
+        try {
+          const paymentResponse = await fetch(`/api/transactions/${transaction.id}/pay`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             }
           });
-        } catch (cancelError) {
-          console.error('Failed to cancel transaction after payment error:', cancelError);
+          
+          if (!paymentResponse.ok) {
+            const paymentErrorData = await paymentResponse.json();
+            console.error('Payment error details:', paymentErrorData);
+            throw new Error(
+              paymentErrorData.error?.message || 
+              paymentErrorData.error?.details || 
+              `Payment processing failed with status ${paymentResponse.status}`
+            );
+          }
+
+          const paymentData = await paymentResponse.json();
+          
+          if (!paymentData.success) {
+            throw new Error(paymentData.error?.message || 'Failed to process payment');
+          }
+          
+          // Set client secret and review deadline
+          setClientSecret(paymentData.data.clientSecret);
+          setReviewDeadline(new Date(paymentData.data.reviewDeadline));
+          
+          // Confirm card payment
+          const { error, paymentIntent } = await stripe.confirmCardPayment(paymentData.data.clientSecret, {
+            payment_method: {
+              card: elements.getElement(CardElement),
+            },
+          });
+          
+          if (error) {
+            throw new Error(error.message);
+          }
+          
+          if (paymentIntent.status === 'requires_capture') {
+            setIsComplete(true);
+            toast({
+              title: "Payment authorized!",
+              description: "Your payment has been authorized and will be held in escrow. The provider now has 24 hours to review and approve your request.",
+              status: "success",
+              duration: 8000,
+              isClosable: true,
+            });
+            
+            if (onPaymentComplete) {
+              onPaymentComplete(transaction);
+            }
+          } else {
+            throw new Error(`Unexpected payment status: ${paymentIntent.status}`);
+          }
+        } catch (paymentError) {
+          console.error('Payment processing error:', paymentError);
+          // Try to cancel the transaction since payment failed
+          try {
+            await fetch(`/api/transactions/${transaction.id}/cancel`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+          } catch (cancelError) {
+            console.error('Failed to cancel transaction after payment error:', cancelError);
+          }
+          throw paymentError;
         }
-        throw paymentError;
       }
     } catch (error) {
       console.error('Payment error:', error);

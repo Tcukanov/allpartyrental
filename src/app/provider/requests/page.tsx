@@ -27,7 +27,9 @@ import {
   AlertDialogOverlay,
   useDisclosure,
   VStack,
+  Icon,
 } from '@chakra-ui/react';
+import { ChatIcon } from '@chakra-ui/icons';
 import { formatDistanceToNow } from 'date-fns';
 import { OfferStatus } from '@prisma/client';
 
@@ -244,6 +246,61 @@ export default function ProviderRequestsPage() {
     onOpen();
   };
 
+  const handleCreateChat = async (offer: Offer) => {
+    try {
+      // Show loading toast
+      const loadingToastId = toast({
+        title: "Creating chat",
+        description: "Setting up a new conversation...",
+        status: "loading",
+        duration: null,
+        isClosable: false,
+      });
+      
+      const offerId = offer.id;
+      
+      // Create chat via API
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ offerId }),
+      });
+      
+      const data = await response.json();
+      console.log("Chat creation response:", data);
+      
+      // Close loading toast
+      toast.close(loadingToastId);
+      
+      if (data.chat && data.chat.id) {
+        // Success - navigate to chat
+        toast({
+          title: "Chat created",
+          description: "Successfully created a new conversation.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+        
+        // Navigate to chat
+        router.push(`/chats/${data.chat.id}`);
+      } else {
+        throw new Error(data.error?.message || 'Failed to create chat');
+      }
+    } catch (err) {
+      console.error('Error creating chat:', err);
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Failed to create chat',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
   const getStatusBadge = (status: OfferStatus) => {
     const colorScheme = {
       PENDING: 'yellow',
@@ -330,6 +387,14 @@ export default function ProviderRequestsPage() {
                           </Button>
                         </>
                       )}
+                      <Button
+                        size="sm"
+                        colorScheme="blue"
+                        leftIcon={<Icon as={ChatIcon} />}
+                        onClick={() => handleCreateChat(offer)}
+                      >
+                        Chat
+                      </Button>
                     </Flex>
                   </Td>
                 </Tr>
