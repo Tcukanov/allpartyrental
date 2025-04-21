@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { createProviderNotification } from '@/lib/notifications/notification-service';
 
 /**
  * Create a new transaction for a service request
@@ -63,6 +64,24 @@ export async function POST(request: NextRequest) {
           }
         }
       });
+
+      // Get the offer details for the notification
+      const offer = await prisma.offer.findUnique({
+        where: { id: offerId },
+        include: {
+          service: true
+        }
+      });
+
+      // Create notification for the provider
+      if (offer && offer.providerId) {
+        await createProviderNotification(
+          offer.providerId, 
+          transaction.id,
+          offer.service?.name || 'your service'
+        );
+      }
+      
       return NextResponse.json({ success: true, data: { transaction } }, { status: 201 });
     } 
     // Handle direct service transaction
@@ -330,7 +349,7 @@ export async function POST(request: NextRequest) {
           
           // Use proper Prisma transaction creation without duplication
           try {
-            // Create the transaction using Prisma's standard approach
+            // Create a transaction using Prisma's standard approach
             transaction = await prisma.transaction.create({
               data: {
                 offerId: offer.id,
@@ -347,6 +366,9 @@ export async function POST(request: NextRequest) {
             });
             
             console.log(`Created transaction with ID: ${transaction.id}`);
+            
+            // Create notification for the provider
+            await createProviderNotification(offer.providerId, transaction.id, service.name);
           } catch (prismaError) {
             // Check if this is a unique constraint error (transaction already exists)
             if (prismaError instanceof Prisma.PrismaClientKnownRequestError && 

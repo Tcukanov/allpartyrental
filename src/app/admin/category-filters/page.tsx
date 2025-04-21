@@ -54,6 +54,7 @@ interface CategoryFilter {
   type: string;
   options: string[];
   isRequired: boolean;
+  isTextOnly?: boolean;
   category?: {
     id: string;
     name: string;
@@ -72,7 +73,7 @@ export default function CategoryFiltersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [filterTypes] = useState(['color', 'size', 'material', 'feature']);
+  const [filterTypes] = useState(['color', 'size', 'material', 'feature', 'text']);
   
   const [formData, setFormData] = useState<{
     id?: string;
@@ -81,12 +82,14 @@ export default function CategoryFiltersPage() {
     type: string;
     options: string[];
     isRequired: boolean;
+    isTextOnly: boolean;
   }>({
     categoryId: '',
     name: '',
     type: '',
     options: [],
     isRequired: false,
+    isTextOnly: false,
   });
   
   const [newOption, setNewOption] = useState('');
@@ -264,10 +267,22 @@ export default function CategoryFiltersPage() {
   
   const handleSubmit = async () => {
     // Validation
-    if (!formData.categoryId || !formData.name || !formData.type || formData.options.length === 0) {
+    if (!formData.categoryId || !formData.name || !formData.type) {
       toast({
         title: 'Validation Error',
-        description: 'Please fill all required fields and add at least one option.',
+        description: 'Please fill all required fields.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    
+    // Only validate options if not in text-only mode
+    if (!formData.isTextOnly && formData.options.length === 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please add at least one option or enable "Text-only field" mode.',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -290,8 +305,9 @@ export default function CategoryFiltersPage() {
           body: JSON.stringify({
             name: formData.name,
             type: formData.type,
-            options: formData.options,
+            options: formData.isTextOnly ? [] : formData.options,
             isRequired: formData.isRequired,
+            isTextOnly: formData.isTextOnly,
           }),
         });
       } else {
@@ -301,7 +317,10 @@ export default function CategoryFiltersPage() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            ...formData,
+            options: formData.isTextOnly ? [] : formData.options,
+          }),
         });
       }
       
@@ -357,6 +376,8 @@ export default function CategoryFiltersPage() {
   };
   
   const handleEdit = (filter: CategoryFilter) => {
+    const isTextOnly = filter.options.length === 0;
+    
     setFormData({
       id: filter.id,
       categoryId: filter.categoryId,
@@ -364,6 +385,7 @@ export default function CategoryFiltersPage() {
       type: filter.type,
       options: [...filter.options],
       isRequired: filter.isRequired,
+      isTextOnly: isTextOnly,
     });
     
     setIsEditing(true);
@@ -433,6 +455,7 @@ export default function CategoryFiltersPage() {
       type: '',
       options: [],
       isRequired: false,
+      isTextOnly: false,
     });
     setNewOption('');
     setIsEditing(false);
@@ -540,15 +563,23 @@ export default function CategoryFiltersPage() {
                     </Td>
                     <Td>
                       <Flex wrap="wrap" gap={2}>
-                        {filter.options.slice(0, 3).map(option => (
-                          <Tag key={option} size="sm" colorScheme="brand" borderRadius="full">
-                            <TagLabel>{option}</TagLabel>
+                        {filter.options.length === 0 ? (
+                          <Tag size="sm" colorScheme="cyan" borderRadius="full">
+                            <TagLabel>Text input field</TagLabel>
                           </Tag>
-                        ))}
-                        {filter.options.length > 3 && (
-                          <Tag size="sm" colorScheme="gray" borderRadius="full">
-                            <TagLabel>+{filter.options.length - 3} more</TagLabel>
-                          </Tag>
+                        ) : (
+                          <>
+                            {filter.options.slice(0, 3).map(option => (
+                              <Tag key={option} size="sm" colorScheme="brand" borderRadius="full">
+                                <TagLabel>{option}</TagLabel>
+                              </Tag>
+                            ))}
+                            {filter.options.length > 3 && (
+                              <Tag size="sm" colorScheme="gray" borderRadius="full">
+                                <TagLabel>+{filter.options.length - 3} more</TagLabel>
+                              </Tag>
+                            )}
+                          </>
                         )}
                       </Flex>
                     </Td>
@@ -636,18 +667,32 @@ export default function CategoryFiltersPage() {
                 </Checkbox>
               </FormControl>
               
-              <FormControl isRequired>
-                <FormLabel>Options</FormLabel>
+              <FormControl>
+                <FormLabel>Text-only field</FormLabel>
+                <Checkbox
+                  isChecked={formData.isTextOnly}
+                  onChange={(e) => setFormData({ ...formData, isTextOnly: e.target.checked })}
+                >
+                  This is a free-text field without predefined options
+                </Checkbox>
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                  Enable this for filters where vendors should enter their own text values
+                </Text>
+              </FormControl>
+              
+              <FormControl isRequired={!formData.isTextOnly}>
+                <FormLabel>Options {formData.isTextOnly && <Text as="span" color="gray.500">(Disabled in text-only mode)</Text>}</FormLabel>
                 <HStack>
                   <Input
                     value={newOption}
                     onChange={(e) => setNewOption(e.target.value)}
                     placeholder="Enter an option"
+                    isDisabled={formData.isTextOnly}
                   />
-                  <Button onClick={handleAddOption}>Add</Button>
+                  <Button onClick={handleAddOption} isDisabled={formData.isTextOnly}>Add</Button>
                 </HStack>
                 
-                <Box mt={4}>
+                <Box mt={4} opacity={formData.isTextOnly ? 0.5 : 1}>
                   <Text mb={2} fontSize="sm" color="gray.600">
                     Added options ({formData.options.length}):
                   </Text>
@@ -655,7 +700,7 @@ export default function CategoryFiltersPage() {
                     {formData.options.map((option, index) => (
                       <Tag key={index} size="md" borderRadius="full" variant="solid" colorScheme="brand">
                         <TagLabel>{option}</TagLabel>
-                        <TagCloseButton onClick={() => handleRemoveOption(option)} />
+                        <TagCloseButton onClick={() => handleRemoveOption(option)} isDisabled={formData.isTextOnly} />
                       </Tag>
                     ))}
                   </Flex>

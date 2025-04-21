@@ -21,7 +21,14 @@ import {
   Image,
   useToast,
   Icon,
-  Divider
+  Divider,
+  useDisclosure,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
 } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 import { getSession } from 'next-auth/react';
@@ -54,6 +61,9 @@ export default function ClientTransactionsPage() {
   const [error, setError] = useState(null);
   const router = useRouter();
   const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [transactionToCancel, setTransactionToCancel] = useState(null);
+  const [isCanceling, setIsCanceling] = useState(false);
 
   useEffect(() => {
     async function fetchTransactions() {
@@ -77,51 +87,16 @@ export default function ClientTransactionsPage() {
         const data = await response.json();
         console.log("Transactions data received:", data);
         
-        // More detailed logging to identify duplicates
+        // Log transactions for debugging
         if (data.length > 0) {
-          console.log("Transaction details for debugging:");
+          console.log(`Received ${data.length} transactions`);
           data.forEach((tx, index) => {
-            console.log(`[${index}] ID: ${tx.id}, OfferId: ${tx.offerId}, PartyId: ${tx.offer?.partyService?.party?.id}, PartyName: ${tx.offer?.partyService?.party?.name}, Service: ${tx.offer?.service?.name}, Amount: ${tx.amount}, Status: ${tx.status}, Date: ${tx.createdAt}`);
+            console.log(`[${index}] ID: ${tx.id}, Status: ${tx.status}, Amount: ${tx.amount}, Date: ${tx.createdAt}`);
           });
         }
         
-        // Group transactions by party name + service name
-        const uniqueTransactionKeys = new Map();
-        
-        data.forEach(transaction => {
-          // Extract all the data we need
-          const partyName = transaction.offer?.partyService?.party?.name || '';
-          const partyId = transaction.offer?.partyService?.party?.id || '';
-          const serviceName = transaction.offer?.service?.name || '';
-          const serviceId = transaction.offer?.service?.id || '';
-          
-          // Look specifically for duplicate "Test Party" entries with the same service
-          // This fixes the specific issue in the client's data
-          let transactionKey;
-          
-          if (partyName.includes('Test Party') && serviceName === 'Soft Play Rentals') {
-            // For the specific duplicates mentioned, use a single key
-            transactionKey = 'TestParty-SoftPlayRentals';
-            console.log(`Found duplicated Test Party - Soft Play Rentals transaction`);
-          } else {
-            // For other transactions, use party name + service name as key for deduplication
-            transactionKey = `${partyName}|${serviceName}`.toLowerCase();
-          }
-          
-          console.log(`Transaction key: ${transactionKey} (${partyName} - ${serviceName})`);
-          
-          // Keep the most recent transaction for each party+service combination
-          if (!uniqueTransactionKeys.has(transactionKey) || 
-              new Date(transaction.createdAt) > new Date(uniqueTransactionKeys.get(transactionKey).createdAt)) {
-            uniqueTransactionKeys.set(transactionKey, transaction);
-          }
-        });
-        
-        // Convert the map values to an array
-        const finalTransactions = Array.from(uniqueTransactionKeys.values());
-        
-        console.log(`Filtered ${data.length} transactions to ${finalTransactions.length} unique transactions by party and service`);
-        setTransactions(finalTransactions);
+        // Display all transactions without deduplication
+        setTransactions(data);
       } catch (err) {
         setError(err.message);
         toast({
@@ -140,19 +115,34 @@ export default function ClientTransactionsPage() {
   }, [router, toast]);
 
   // Filter transactions by status
-  const pendingTransactions = transactions.filter(
+  // Check if a pending transaction is less than 48 hours old
+  const isPendingValid = (tx) => {
+    if (tx.status !== 'PENDING' && tx.status !== 'PROVIDER_REVIEW') return true;
+    
+    const createdAt = new Date(tx.createdAt);
+    const now = new Date();
+    const diffHours = (now - createdAt) / (1000 * 60 * 60);
+    
+    return diffHours < 48; // Less than 48 hours old
+  };
+  
+  // Filter out pending transactions older than a 48 hours
+  const filteredTransactions = transactions.filter(isPendingValid);
+  
+  // Filter transactions by status
+  const pendingTransactions = filteredTransactions.filter(
     tx => tx.status === 'PENDING' || tx.status === 'PROVIDER_REVIEW'
   );
   
-  const activeTransactions = transactions.filter(
+  const activeTransactions = filteredTransactions.filter(
     tx => tx.status === 'ESCROW'
   );
   
-  const completedTransactions = transactions.filter(
+  const completedTransactions = filteredTransactions.filter(
     tx => tx.status === 'COMPLETED'
   );
   
-  const cancelledTransactions = transactions.filter(
+  const cancelledTransactions = filteredTransactions.filter(
     tx => tx.status === 'DECLINED' || tx.status === 'REFUNDED' || tx.status === 'CANCELLED'
   );
 
@@ -258,9 +248,19 @@ export default function ClientTransactionsPage() {
               )}
               
               {transaction.status === 'PROVIDER_REVIEW' && (
-                <Text fontSize="sm" color="yellow.500">
-                  Awaiting provider approval
-                </Text>
+                <>
+                  <Text fontSize="sm" color="yellow.500">
+                    Awaiting provider approval
+                  </Text>
+                  <Button
+                    size="sm"
+                    colorScheme="red"
+                    variant="outline"
+                    onClick={() => handleCancelTransaction(transaction.id)}
+                  >
+                    Cancel Request
+                  </Button>
+                </>
               )}
             </Flex>
             
@@ -280,6 +280,65 @@ export default function ClientTransactionsPage() {
     </Card>
   );
   
+  // Handle transaction cancellation
+  const handleCancelTransaction = (transactionId) => {
+    setTransactionToCancel(transactionId);
+    onOpen();
+  };
+
+  // Confirm and process cancellation
+  const confirmCancelTransaction = async () => {
+    if (!transactionToCancel) return;
+    
+    try {
+      setIsCanceling(true);
+      
+      const response = await fetch(`/api/transactions/${transactionToCancel}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to cancel transaction');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update local state to reflect the cancellation
+        setTransactions(transactions.map(tx => 
+          tx.id === transactionToCancel 
+            ? { ...tx, status: 'CANCELLED' } 
+            : tx
+        ));
+        
+        toast({
+          title: 'Request cancelled',
+          description: 'Your service request has been cancelled',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        throw new Error(data.error?.message || 'Failed to cancel transaction');
+      }
+    } catch (error) {
+      console.error('Error cancelling transaction:', error);
+      toast({
+        title: 'Error',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsCanceling(false);
+      onClose();
+    }
+  };
+
   if (loading) {
     return (
       <Container maxW="container.lg" py={10}>
@@ -297,18 +356,12 @@ export default function ClientTransactionsPage() {
     <Container maxW="container.lg" py={10}>
       <Heading as="h1" mb={6}>My Transactions</Heading>
       
-      <Box mb={4} p={3} bg="blue.50" borderRadius="md">
-        <Text fontSize="sm">
-          <strong>Note:</strong> Transactions are grouped by party and service. If you have multiple transactions for the same service in the same party, only the most recent one will be displayed.
-        </Text>
-      </Box>
-      
       {error ? (
         <Box textAlign="center" py={10}>
           <Text color="red.500" mb={4}>{error}</Text>
           <Button onClick={() => window.location.reload()}>Try Again</Button>
         </Box>
-      ) : transactions.length === 0 ? (
+      ) : filteredTransactions.length === 0 ? (
         <Box textAlign="center" py={10} borderWidth={1} borderRadius="lg">
           <Heading size="md" mb={4}>No Transactions Found</Heading>
           <Text mb={6}>You haven't made any service requests yet.</Text>
@@ -323,7 +376,7 @@ export default function ClientTransactionsPage() {
       ) : (
         <Tabs variant="enclosed" colorScheme="blue">
           <TabList>
-            <Tab>All ({transactions.length})</Tab>
+            <Tab>All ({filteredTransactions.length})</Tab>
             <Tab>Pending ({pendingTransactions.length})</Tab>
             <Tab>Active ({activeTransactions.length})</Tab>
             <Tab>Completed ({completedTransactions.length})</Tab>
@@ -333,7 +386,7 @@ export default function ClientTransactionsPage() {
           <TabPanels>
             {/* All Transactions */}
             <TabPanel px={0}>
-              {transactions.map(transaction => (
+              {filteredTransactions.map(transaction => (
                 <TransactionCard key={transaction.id} transaction={transaction} />
               ))}
             </TabPanel>
@@ -384,6 +437,38 @@ export default function ClientTransactionsPage() {
           </TabPanels>
         </Tabs>
       )}
+      
+      {/* Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        leastDestructiveRef={undefined}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Cancel Service Request
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              Are you sure you want to cancel this service request? This action cannot be undone.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={undefined} onClick={onClose} disabled={isCanceling}>
+                No, Keep Request
+              </Button>
+              <Button 
+                colorScheme="red"
+                ml={3}
+                onClick={confirmCancelTransaction}
+                isLoading={isCanceling}
+                loadingText="Cancelling"
+              >
+                Yes, Cancel Request
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Container>
   );
 } 

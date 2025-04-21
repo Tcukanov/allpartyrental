@@ -48,6 +48,7 @@ import {
   FiFilter,
 } from 'react-icons/fi';
 import { MdDashboard } from 'react-icons/md';
+import NotificationComponent from '@/components/notification/notificationComponent';
 
 const NAV_ITEMS = [
   {
@@ -154,29 +155,7 @@ export default function AdminNavbar() {
           </HStack>
           
           <Flex alignItems="center">
-            <IconButton
-              size="md"
-              variant="ghost"
-              aria-label="Notifications"
-              icon={
-                <Box position="relative">
-                  <FiBell />
-                  <Badge
-                    position="absolute"
-                    top="0"
-                    right="0"
-                    colorScheme="red"
-                    variant="solid"
-                    fontSize="0.6rem"
-                    borderRadius="full"
-                    transform="translate(25%, -25%)"
-                  >
-                    3
-                  </Badge>
-                </Box>
-              }
-              mr={2}
-            />
+            <NotificationComponent />
             
             <Menu>
               <MenuButton

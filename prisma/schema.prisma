@@ -217,6 +217,9 @@ model Transaction {
   escrowStartTime    DateTime?
   providerFeePercent Float             @default(10.0)
   reviewDeadline     DateTime?
+  termsAccepted      Boolean?          @default(false)
+  termsType          String?           
+  termsAcceptedAt    DateTime?
   dispute            Dispute?
   offer              Offer             @relation(fields: [offerId], references: [id])
   party              Party             @relation(fields: [partyId], references: [id])

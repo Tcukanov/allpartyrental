@@ -55,6 +55,7 @@ export default function Navbar() {
     { label: 'My Profile', href: '/client/profile' },
     { label: 'Calendar', href: '/client/calendar' },
     { label: 'My bookings', href: '/client/my-bookings' },
+    { label: 'Transactions', href: '/client/transactions' },
   ];
 
   const providerItems = [

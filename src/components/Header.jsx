@@ -149,6 +149,11 @@ const Header = () => {
                     )}
                     <MenuItem onClick={() => router.push('/chats')}>Messages</MenuItem>
                     <MenuItem onClick={() => router.push('/profile')}>Profile</MenuItem>
+                    {session?.user?.role === 'CLIENT' && (
+                      <MenuItem onClick={() => router.push('/client/transactions')}>
+                        Transactions
+                      </MenuItem>
+                    )}
                     <MenuDivider />
                     <MenuItem onClick={() => signOut({ callbackUrl: '/' })}>Sign Out</MenuItem>
                   </MenuList>
@@ -209,9 +214,14 @@ const Header = () => {
                   </Link>
                   
                   {session?.user?.role === 'CLIENT' && (
-                    <Link href="/client/cabinet" _hover={{ textDecoration: 'none' }} onClick={onMobileNavClose}>
-                      <Text fontWeight="medium">Client Cabinet</Text>
-                    </Link>
+                    <>
+                      <Link href="/client/cabinet" _hover={{ textDecoration: 'none' }} onClick={onMobileNavClose}>
+                        <Text fontWeight="medium">Client Cabinet</Text>
+                      </Link>
+                      <Link href="/client/transactions" _hover={{ textDecoration: 'none' }} onClick={onMobileNavClose}>
+                        <Text fontWeight="medium">Transactions</Text>
+                      </Link>
+                    </>
                   )}
                   
                   {session?.user?.role === 'PROVIDER' && (

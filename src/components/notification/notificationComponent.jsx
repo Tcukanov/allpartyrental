@@ -41,19 +41,29 @@ const NotificationComponent = () => {
   useEffect(() => {
     if (!session || !session.user) return;
     
+    // Log user role for debugging
+    console.log(`Notification component initialized for ${session.user.role} user:`, session.user.name);
+    
     // Fetch existing notifications
     const fetchNotifications = async () => {
       try {
         setIsLoading(true);
+        console.log('Fetching notifications for user:', session.user.id);
         const response = await fetch('/api/notifications');
+        
+        if (!response.ok) {
+          console.error('Notification fetch error:', response.status, response.statusText);
+          throw new Error(`Failed to fetch notifications: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (data.success) {
-          console.log('Fetched notifications:', data.data);
+          console.log(`Fetched ${data.data.length} notifications for ${session.user.role}:`, data.data);
           setNotifications(data.data || []);
           setUnreadCount(data.data.filter(n => !n.isRead).length);
         } else {
-          throw new Error(data.error.message || 'Failed to fetch notifications');
+          throw new Error(data.error?.message || 'Failed to fetch notifications');
         }
       } catch (error) {
         console.error('Fetch notifications error:', error);
@@ -185,12 +195,22 @@ const NotificationComponent = () => {
     setIsOpen(false);
     
     // Navigate based on notification type and user role
+    const userRole = session?.user?.role;
+    
     switch (notification.type) {
       case 'NEW_OFFER':
-        router.push('/client/my-party');
+        if (userRole === 'CLIENT') {
+          router.push('/client/my-party');
+        } else if (userRole === 'ADMIN') {
+          router.push('/admin/transactions');
+        }
         break;
       case 'OFFER_UPDATED':
-        router.push('/client/my-party');
+        if (userRole === 'CLIENT') {
+          router.push('/client/my-party');
+        } else if (userRole === 'ADMIN') {
+          router.push('/admin/transactions');
+        }
         break;
       case 'MESSAGE':
         if (notification.chatId) {
@@ -206,20 +226,51 @@ const NotificationComponent = () => {
         }
         break;
       case 'PAYMENT':
-        router.push('/client/my-party');
+        if (userRole === 'CLIENT') {
+          router.push('/client/my-party');
+        } else if (userRole === 'ADMIN') {
+          router.push('/admin/finances');
+        }
         break;
       case 'SYSTEM':
         // Handle system notifications based on content
-        if (notification.content.includes('request') && session?.user?.role === 'PROVIDER') {
-          router.push('/provider/requests');
-        } else if (notification.content.includes('approved') && session?.user?.role === 'CLIENT') {
-          router.push('/client/my-party');
-        } else if (notification.content.includes('service') && session?.user?.role === 'PROVIDER') {
-          router.push('/provider/services');
+        const content = notification.content.toLowerCase();
+        
+        if (userRole === 'ADMIN') {
+          if (content.includes('transaction') || content.includes('payment')) {
+            router.push('/admin/transactions');
+          } else if (content.includes('user') || content.includes('account')) {
+            router.push('/admin/users');
+          } else if (content.includes('service')) {
+            router.push('/admin/services');
+          } else {
+            router.push('/admin/dashboard');
+          }
+        } else if (userRole === 'PROVIDER') {
+          if (content.includes('request')) {
+            router.push('/provider/requests');
+          } else if (content.includes('service')) {
+            router.push('/provider/services');
+          } else if (content.includes('transaction')) {
+            router.push('/provider/requests');
+          }
+        } else if (userRole === 'CLIENT') {
+          if (content.includes('approved')) {
+            router.push('/client/my-party');
+          } else if (content.includes('transaction')) {
+            router.push('/client/transactions');
+          }
         }
         break;
       default:
-        // For other types, no navigation
+        // Default route based on user role if notification type not handled
+        if (userRole === 'ADMIN') {
+          router.push('/admin/dashboard');
+        } else if (userRole === 'PROVIDER') {
+          router.push('/provider/cabinet');
+        } else if (userRole === 'CLIENT') {
+          router.push('/client/cabinet');
+        }
         break;
     }
   };

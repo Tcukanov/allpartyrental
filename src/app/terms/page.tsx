@@ -1,7 +1,8 @@
 'use client';
 
-import { Box, Container, Heading, Text, VStack, List, ListItem, ListIcon } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, VStack, List, ListItem, ListIcon, Button, Link } from '@chakra-ui/react';
 import { CheckIcon } from '@chakra-ui/icons';
+import NextLink from 'next/link';
 
 export default function TermsPage() {
   return (
@@ -15,6 +16,22 @@ export default function TermsPage() {
           <Text fontSize="lg" color="gray.600">
             Last updated: {new Date().toLocaleDateString()}
           </Text>
+
+          <Box bg="blue.50" p={6} borderRadius="md" mb={4}>
+            <VStack spacing={3} align="flex-start">
+              <Heading as="h3" size="sm">
+                Service-Specific Agreements
+              </Heading>
+              <Text>
+                For specific services, additional terms may apply. Please review the appropriate agreement for your service:
+              </Text>
+              <NextLink href="/terms/soft-play" passHref>
+                <Button as="a" variant="outline" colorScheme="blue" size="sm">
+                  Soft Play Service Agreement
+                </Button>
+              </NextLink>
+            </VStack>
+          </Box>
 
           <VStack spacing={6} align="stretch">
             <Box>

@@ -30,15 +30,18 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, type, options, isRequired } = body;
+    const { name, type, options, isRequired, isTextOnly = false } = body;
 
     // Validate request
-    if (!name || !type || !Array.isArray(options)) {
+    if (!name || !type) {
       return NextResponse.json(
         { success: false, error: { message: 'Missing required fields' } },
         { status: 400 }
       );
     }
+
+    // Ensure options is an array
+    const sanitizedOptions = Array.isArray(options) ? options : [];
 
     // Check if filter exists
     const existingFilter = await prisma.categoryFilter.findUnique({
@@ -58,7 +61,7 @@ export async function PUT(
       data: {
         name,
         type,
-        options,
+        options: sanitizedOptions,
         isRequired: isRequired ?? existingFilter.isRequired,
       },
     });
