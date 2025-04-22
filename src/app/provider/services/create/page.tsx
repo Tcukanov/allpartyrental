@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, useEffect } from 'react';
+import { useState, useRef, ChangeEvent, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
@@ -30,8 +30,9 @@ import {
   SimpleGrid,
   Alert,
   AlertIcon,
+  Divider,
 } from '@chakra-ui/react';
-import { AddIcon, CloseIcon } from '@chakra-ui/icons';
+import { AddIcon, CloseIcon, EditIcon } from '@chakra-ui/icons';
 
 interface Category {
   id: string;
@@ -45,24 +46,63 @@ interface City {
   slug: string;
 }
 
+// Define the service form data structure
+interface ServiceFormData {
+  name: string;
+  description: string;
+  price: string;
+  categoryId: string;
+  cityId: string;
+  availableDays: string[];
+  availableHoursStart: string;
+  availableHoursEnd: string;
+  minRentalHours: number;
+  maxRentalHours: number;
+  colors: string[];
+  filterValues: Record<string, string | string[]>;
+  addons: Array<{
+    title: string;
+    description?: string;
+    price: string;
+    thumbnail?: string;
+  }>;
+  weekAvailability: Array<{
+    day: string;
+    available: boolean;
+    hours?: { start: string; end: string };
+  }>;
+}
+
 export default function CreateServicePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [formData, setFormData] = useState({
+  // Initialize the form data
+  const [formData, setFormData] = useState<ServiceFormData>({
     name: '',
     description: '',
     price: '',
     categoryId: '',
     cityId: '',
-    availableDays: [] as string[],
+    availableDays: [],
     availableHoursStart: '09:00',
     availableHoursEnd: '17:00',
     minRentalHours: 1,
-    maxRentalHours: 8,
-    colors: [] as string[],
+    maxRentalHours: 24,
+    colors: [],
+    filterValues: {},
+    addons: [],
+    weekAvailability: [
+      { day: 'Monday', available: false },
+      { day: 'Tuesday', available: false },
+      { day: 'Wednesday', available: false },
+      { day: 'Thursday', available: false },
+      { day: 'Friday', available: false },
+      { day: 'Saturday', available: false },
+      { day: 'Sunday', available: false },
+    ],
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -76,6 +116,14 @@ export default function CreateServicePage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Add state for the current add-on being edited
+  const [currentAddon, setCurrentAddon] = useState({
+    title: '',
+    description: '',
+    price: '',
+    thumbnail: ''
+  });
   
   useEffect(() => {
     const fetchCategoriesAndCities = async () => {
@@ -316,80 +364,64 @@ export default function CreateServicePage() {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please check all required fields and fix any errors',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-    
-    // Validate that the selected city and category exist in the current lists
-    const cityExists = cities.some(city => city.id === formData.cityId);
-    const categoryExists = categories.some(category => category.id === formData.categoryId);
-    
-    if (!cityExists) {
-      toast({
-        title: 'Error',
-        description: 'Selected city is not valid. Please select a city from the list.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      setErrors(prev => ({ ...prev, cityId: 'Invalid selection' }));
-      return;
-    }
-    
-    if (!categoryExists) {
-      toast({
-        title: 'Error',
-        description: 'Selected category is not valid. Please select a category from the list.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      setErrors(prev => ({ ...prev, categoryId: 'Invalid selection' }));
-      return;
-    }
-    
-    // Prepare the request data
-    const requestData = {
-      ...formData,
-      price: parseFloat(formData.price),
-      photos: uploadedImages,
-    };
-    
-    setIsSubmitting(true);
-    
+    setIsLoading(true);
+    setErrors({});
+
     try {
-      // Get the selected city object for more detailed logging
-      const selectedCity = cities.find(c => c.id === requestData.cityId);
+      // Validate required fields
+      const requiredFields = ['name', 'description', 'price', 'categoryId'];
+      const newErrors: Record<string, string> = {};
       
-      console.log('Submitting service data:', {
-        ...requestData,
-        photos: requestData.photos ? `${requestData.photos.length} images` : 'none',
-        cityId: requestData.cityId,
-        cityDetails: selectedCity ? {
-          id: selectedCity.id,
-          name: selectedCity.name,
-          slug: selectedCity.slug,
-        } : 'City not found in options',
-        categoryName: categories.find(c => c.id === requestData.categoryId)?.name || 'Unknown'
+      requiredFields.forEach((field) => {
+        if (!formData[field as keyof typeof formData]) {
+          newErrors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+        }
       });
-      
-      // Submit the service data
-      const response = await fetch('/api/services/my', {
+
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        toast({
+          title: 'Please fill in all required fields',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Only include valid filter values (not empty strings or null)
+      const validFilterValues = Object.entries(formData.filterValues).reduce((acc, [key, value]) => {
+        if (value !== '' && value !== null && value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as Record<string, any>);
+
+      // Construct the data to send to the API
+      const serviceData = {
+        ...formData,
+        filterValues: validFilterValues,
+        // Format the weekAvailability array to match what the backend expects
+        weekAvailability: formData.weekAvailability,
+        // Include the add-ons data
+        addons: formData.addons.map(addon => ({
+          title: addon.title,
+          description: addon.description || '',
+          price: parseFloat(addon.price),
+          thumbnail: addon.thumbnail || null
+        }))
+      };
+
+      // Submit the data
+      const response = await fetch('/api/provider/services', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestData),
+        body: JSON.stringify(serviceData),
       });
-      
+
       // Parse the response
       let data;
       try {
@@ -443,6 +475,7 @@ export default function CreateServicePage() {
       });
     } finally {
       setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
   
@@ -468,6 +501,110 @@ export default function CreateServicePage() {
         return { ...prev, colors: [...colors, color] };
       }
     });
+  };
+  
+  // Handle filter value changes - optimized with useCallback to prevent unnecessary rerenders
+  const handleFilterChange = useCallback((filterId: string, value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      filterValues: {
+        ...prev.filterValues,
+        [filterId]: value
+      }
+    }));
+    
+    // Only clear errors if they exist, to avoid unnecessary re-renders
+    setErrors(prev => {
+      if (!prev[`filter_${filterId}`]) return prev;
+      const newErrors = { ...prev };
+      delete newErrors[`filter_${filterId}`];
+      return newErrors;
+    });
+  }, []);
+  
+  // Add a function to handle add-on form input changes
+  const handleAddonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setCurrentAddon({
+      ...currentAddon,
+      [name]: value
+    });
+  };
+
+  // Add a function to handle add-on price input
+  const handleAddonPriceChange = (valueString: string) => {
+    setCurrentAddon({
+      ...currentAddon,
+      price: valueString
+    });
+  };
+
+  // Add a function to add or update an add-on
+  const addOrUpdateAddon = () => {
+    // Validate the add-on
+    if (!currentAddon.title || !currentAddon.price) {
+      toast({
+        title: 'Missing Information',
+        description: 'Add-on title and price are required',
+        status: 'error',
+        duration: 3000,
+        isClosable: true
+      });
+      return;
+    }
+    
+    // Add the new add-on to formData
+    setFormData(prev => ({
+      ...prev,
+      addons: [...prev.addons, { ...currentAddon }]
+    }));
+    
+    // Reset the current add-on
+    setCurrentAddon({
+      title: '',
+      description: '',
+      price: '',
+      thumbnail: ''
+    });
+  };
+
+  // Add a function to remove an add-on
+  const removeAddon = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      addons: prev.addons.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Add a function to edit an existing add-on
+  const editAddon = (index: number) => {
+    setCurrentAddon(formData.addons[index]);
+    
+    // Remove it from the list (will be added back when user saves)
+    removeAddon(index);
+  };
+
+  // Add a function to handle add-on thumbnail upload
+  const handleAddonThumbnailUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    try {
+      const imageData = await processImage(files[0]);
+      setCurrentAddon({
+        ...currentAddon,
+        thumbnail: imageData
+      });
+    } catch (error) {
+      console.error('Error uploading add-on thumbnail:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload add-on thumbnail',
+        status: 'error',
+        duration: 3000,
+        isClosable: true
+      });
+    }
   };
   
   return (
@@ -720,6 +857,151 @@ export default function CreateServicePage() {
               </Text>
               <FormErrorMessage>{imageError}</FormErrorMessage>
             </FormControl>
+            
+            {/* Add-ons Section */}
+            <Box mt={8}>
+              <Heading as="h3" size="md" mb={4}>
+                Optional Add-ons
+              </Heading>
+              <Divider mb={4} />
+              
+              <Text fontSize="sm" color="gray.600" mb={4}>
+                Add optional items that customers can add to their rental. Each add-on will be shown as an optional extra during checkout.
+              </Text>
+              
+              {/* Current Add-ons List */}
+              {formData.addons.length > 0 && (
+                <Box mb={6}>
+                  <Text fontWeight="medium" mb={2}>Current Add-ons:</Text>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                    {formData.addons.map((addon, index) => (
+                      <Box 
+                        key={index} 
+                        borderWidth="1px" 
+                        borderRadius="md" 
+                        p={4}
+                        position="relative"
+                      >
+                        {addon.thumbnail && (
+                          <Image 
+                            src={addon.thumbnail} 
+                            alt={addon.title}
+                            borderRadius="md"
+                            height="80px"
+                            width="80px"
+                            objectFit="cover"
+                            mb={2}
+                          />
+                        )}
+                        <Heading size="sm">{addon.title}</Heading>
+                        <Text fontWeight="bold" color="green.500">
+                          ${parseFloat(addon.price).toFixed(2)}
+                        </Text>
+                        {addon.description && (
+                          <Text fontSize="sm" color="gray.600" mt={1} noOfLines={2}>
+                            {addon.description}
+                          </Text>
+                        )}
+                        
+                        <HStack position="absolute" top={2} right={2}>
+                          <IconButton
+                            aria-label="Edit add-on"
+                            icon={<EditIcon />}
+                            size="sm"
+                            onClick={() => editAddon(index)}
+                          />
+                          <IconButton
+                            aria-label="Remove add-on"
+                            icon={<CloseIcon />}
+                            size="sm"
+                            colorScheme="red"
+                            onClick={() => removeAddon(index)}
+                          />
+                        </HStack>
+                      </Box>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              )}
+              
+              {/* Add New Add-on Form */}
+              <Box borderWidth="1px" borderRadius="md" p={4} bg="gray.50">
+                <Heading size="sm" mb={3}>Add New Add-on</Heading>
+                
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={3}>
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm">Title</FormLabel>
+                    <Input
+                      name="title"
+                      value={currentAddon.title}
+                      onChange={handleAddonChange}
+                      placeholder="e.g. Extra Hour, Additional Table"
+                      size="md"
+                    />
+                  </FormControl>
+                  
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm">Price</FormLabel>
+                    <NumberInput
+                      min={0}
+                      precision={2}
+                      value={currentAddon.price}
+                      onChange={handleAddonPriceChange}
+                    >
+                      <NumberInputField placeholder="0.00" />
+                      <NumberInputStepper>
+                        <NumberIncrementStepper />
+                        <NumberDecrementStepper />
+                      </NumberInputStepper>
+                    </NumberInput>
+                  </FormControl>
+                </SimpleGrid>
+                
+                <FormControl mb={3}>
+                  <FormLabel fontSize="sm">Description (Optional)</FormLabel>
+                  <Textarea
+                    name="description"
+                    value={currentAddon.description}
+                    onChange={handleAddonChange}
+                    placeholder="Briefly describe this add-on"
+                    size="md"
+                    rows={2}
+                  />
+                </FormControl>
+                
+                <FormControl mb={3}>
+                  <FormLabel fontSize="sm">Thumbnail Image (Optional)</FormLabel>
+                  <Input
+                    type="file"
+                    onChange={handleAddonThumbnailUpload}
+                    accept="image/*"
+                    p={1}
+                    size="sm"
+                  />
+                  {currentAddon.thumbnail && (
+                    <Image
+                      src={currentAddon.thumbnail}
+                      alt="Thumbnail preview"
+                      mt={2}
+                      height="60px"
+                      width="60px"
+                      objectFit="cover"
+                      borderRadius="md"
+                    />
+                  )}
+                </FormControl>
+                
+                <Button
+                  onClick={addOrUpdateAddon}
+                  leftIcon={<AddIcon />}
+                  colorScheme="blue"
+                  size="md"
+                  width="full"
+                >
+                  Add to Service
+                </Button>
+              </Box>
+            </Box>
             
             <Box pt={4}>
               <Text fontSize="sm" color="gray.600" mb={4}>

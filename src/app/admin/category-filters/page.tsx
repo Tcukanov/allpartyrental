@@ -55,6 +55,7 @@ interface CategoryFilter {
   options: string[];
   isRequired: boolean;
   isTextOnly?: boolean;
+  iconUrl?: string;
   category?: {
     id: string;
     name: string;
@@ -83,6 +84,7 @@ export default function CategoryFiltersPage() {
     options: string[];
     isRequired: boolean;
     isTextOnly: boolean;
+    iconUrl?: string;
   }>({
     categoryId: '',
     name: '',
@@ -90,6 +92,7 @@ export default function CategoryFiltersPage() {
     options: [],
     isRequired: false,
     isTextOnly: false,
+    iconUrl: '',
   });
   
   const [newOption, setNewOption] = useState('');
@@ -308,6 +311,7 @@ export default function CategoryFiltersPage() {
             options: formData.isTextOnly ? [] : formData.options,
             isRequired: formData.isRequired,
             isTextOnly: formData.isTextOnly,
+            iconUrl: formData.iconUrl
           }),
         });
       } else {
@@ -386,6 +390,7 @@ export default function CategoryFiltersPage() {
       options: [...filter.options],
       isRequired: filter.isRequired,
       isTextOnly: isTextOnly,
+      iconUrl: filter.iconUrl || '',
     });
     
     setIsEditing(true);
@@ -456,6 +461,7 @@ export default function CategoryFiltersPage() {
       options: [],
       isRequired: false,
       isTextOnly: false,
+      iconUrl: '',
     });
     setNewOption('');
     setIsEditing(false);
@@ -537,6 +543,7 @@ export default function CategoryFiltersPage() {
                   <Th>Name</Th>
                   {!selectedCategory && <Th>Category</Th>}
                   <Th>Type</Th>
+                  <Th>Icon</Th>
                   <Th>Options</Th>
                   <Th>Required</Th>
                   <Th>Actions</Th>
@@ -560,6 +567,15 @@ export default function CategoryFiltersPage() {
                       }>
                         {filter.type}
                       </Badge>
+                    </Td>
+                    <Td>
+                      {filter.iconUrl ? (
+                        <Box maxW="50px">
+                          <img src={filter.iconUrl} alt={filter.name} width="24" height="24" />
+                        </Box>
+                      ) : (
+                        '-'
+                      )}
                     </Td>
                     <Td>
                       <Flex wrap="wrap" gap={2}>
@@ -705,6 +721,18 @@ export default function CategoryFiltersPage() {
                     ))}
                   </Flex>
                 </Box>
+              </FormControl>
+              
+              <FormControl mt={4}>
+                <FormLabel>Icon URL (SVG)</FormLabel>
+                <Input
+                  placeholder="https://example.com/icons/icon.svg"
+                  value={formData.iconUrl || ''}
+                  onChange={(e) => setFormData({ ...formData, iconUrl: e.target.value })}
+                />
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                  Enter a URL to an SVG icon for this filter
+                </Text>
               </FormControl>
             </VStack>
           </ModalBody>

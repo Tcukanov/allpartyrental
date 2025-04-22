@@ -3,6 +3,29 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/prisma/client';
 
+// Define an extended service type that includes metadata
+interface ServiceWithMetadata {
+  id: string;
+  name: string;
+  description: string;
+  price: number | string;
+  categoryId: string;
+  cityId: string;
+  providerId: string;
+  photos: string[];
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  availableDays: string[];
+  availableHoursStart?: string | null;
+  availableHoursEnd?: string | null;
+  minRentalHours?: number | null;
+  maxRentalHours?: number | null;
+  colors: string[];
+  metadata?: string | null;
+  filterValues?: Record<string, any>;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -46,9 +69,26 @@ export async function GET(
       );
     }
 
+    // Process metadata if it exists
+    const serviceWithMeta = service as unknown as ServiceWithMetadata;
+    let responseService = { ...serviceWithMeta };
+    
+    try {
+      if (serviceWithMeta.metadata) {
+        const metadata = JSON.parse(serviceWithMeta.metadata);
+        responseService = {
+          ...responseService,
+          filterValues: metadata.filterValues || {}
+        };
+      }
+    } catch (e) {
+      console.error('Error parsing metadata:', e);
+      // Continue with the original service
+    }
+
     return NextResponse.json({
       success: true,
-      data: service
+      data: responseService
     }, { status: 200 });
   } catch (error) {
     console.error('Get service error:', error);
@@ -77,25 +117,49 @@ export async function PUT(
       );
     }
 
-    const data = await request.json();
+    const requestData = await request.json();
+    
+    // Extract filterValues if present
+    const { filterValues, ...data } = requestData;
+    
+    // Prepare metadata if filterValues are provided
+    let metadata = null;
+    if (filterValues) {
+      metadata = JSON.stringify({ filterValues });
+    }
+    
+    // Add metadata to the update data
+    const updateData = {
+      ...data,
+      metadata
+    };
     
     const service = await prisma.service.update({
       where: {
         id: id,
         providerId: session.user.id
       },
-      data,
+      data: updateData,
       include: {
         category: true,
         city: true
       }
     });
 
-    return NextResponse.json(service);
+    // Add filterValues to the response if they were provided
+    const responseService = filterValues ? {
+      ...service,
+      filterValues
+    } : service;
+
+    return NextResponse.json({
+      success: true,
+      data: responseService
+    });
   } catch (error) {
     console.error('Error updating service:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -114,7 +178,7 @@ export async function DELETE(
     
     if (!session?.user || session.user.role !== 'PROVIDER') {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
@@ -130,7 +194,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting service:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

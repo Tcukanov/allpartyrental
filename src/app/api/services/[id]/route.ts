@@ -3,6 +3,32 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 
+// Define service with metadata interface
+interface ServiceWithMetadata {
+  id: string;
+  name: string;
+  description: string;
+  price: number | string;
+  categoryId: string;
+  cityId: string;
+  providerId: string;
+  photos: string[];
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  availableDays: string[];
+  availableHoursStart?: string | null;
+  availableHoursEnd?: string | null;
+  minRentalHours?: number | null;
+  maxRentalHours?: number | null;
+  colors: string[];
+  metadata?: string | null;
+  filterValues?: Record<string, any>;
+  provider?: any;
+  category?: any;
+  city?: any;
+}
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(
@@ -51,9 +77,26 @@ export async function GET(
       );
     }
 
+    // Process metadata if it exists
+    const serviceWithMeta = service as unknown as ServiceWithMetadata;
+    let responseService = { ...serviceWithMeta };
+    
+    try {
+      if (serviceWithMeta.metadata) {
+        const metadata = JSON.parse(serviceWithMeta.metadata);
+        responseService = {
+          ...responseService,
+          filterValues: metadata.filterValues || {}
+        };
+      }
+    } catch (e) {
+      console.error('Error parsing metadata:', e);
+      // Continue with the original service
+    }
+
     return NextResponse.json({
       success: true,
-      data: service
+      data: responseService
     }, { status: 200 });
   } catch (error) {
     console.error('Get service error:', error);
@@ -85,22 +128,7 @@ export async function PUT(
     // Get service by ID 
     const existingService = await prisma.service.findUnique({
       where: { id },
-      select: {
-        providerId: true,
-        cityId: true,
-        categoryId: true, 
-        name: true,
-        description: true,
-        price: true,
-        photos: true,
-        status: true,
-        availableDays: true,
-        availableHoursStart: true,
-        availableHoursEnd: true,
-        minRentalHours: true,
-        maxRentalHours: true,
-      }
-    });
+    }) as any;
     
     if (!existingService) {
       return NextResponse.json(
@@ -131,7 +159,8 @@ export async function PUT(
       availableHoursStart,
       availableHoursEnd,
       minRentalHours,
-      maxRentalHours
+      maxRentalHours,
+      filterValues
     } = body;
     
     // Build update object with only valid fields to avoid schema mismatches
@@ -168,13 +197,35 @@ export async function PUT(
         (maxRentalHours ? parseInt(String(maxRentalHours)) : existingService.maxRentalHours);
     }
     
+    // Handle metadata update if filterValues are provided
+    if (filterValues !== undefined) {
+      updateData.metadata = JSON.stringify({ filterValues });
+    }
+    
     // Update service
     const service = await prisma.service.update({
       where: { id },
       data: updateData,
     });
     
-    return NextResponse.json({ success: true, data: service }, { status: 200 });
+    // Process the response to include filterValues if they were provided
+    const serviceAsMetadata = service as unknown as ServiceWithMetadata;
+    let responseService: any = { ...service };
+    
+    if (filterValues !== undefined) {
+      responseService.filterValues = filterValues;
+    } else if (serviceAsMetadata.metadata) {
+      // Try to parse existing metadata if no new filterValues were provided
+      try {
+        const metadata = JSON.parse(serviceAsMetadata.metadata);
+        responseService.filterValues = metadata.filterValues || {};
+      } catch (e) {
+        // If parsing fails, continue with the service as is
+        console.error('Error parsing metadata in response:', e);
+      }
+    }
+    
+    return NextResponse.json({ success: true, data: responseService }, { status: 200 });
   } catch (error) {
     console.error('Error updating service:', error);
     return NextResponse.json(
@@ -197,7 +248,7 @@ export async function DELETE(
     
     if (!session?.user || session.user.role !== 'PROVIDER') {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
@@ -213,7 +264,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting service:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }

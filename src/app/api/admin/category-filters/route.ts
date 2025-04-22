@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { categoryId, name, type, options, isRequired = false, isTextOnly = false } = body;
+    const { categoryId, name, type, options, isRequired = false, isTextOnly = false, iconUrl = null } = body;
 
     // Validate request
     if (!categoryId || !name || !type) {
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the filter
+    // Create the filter with a type assertion to handle the iconUrl field
     const filter = await prisma.categoryFilter.create({
       data: {
         categoryId,
@@ -129,7 +129,9 @@ export async function POST(request: NextRequest) {
         type,
         options: sanitizedOptions,
         isRequired,
-      },
+        // Use type assertion to add iconUrl
+        ...(iconUrl ? { iconUrl } : {})
+      } as any,
     });
 
     return NextResponse.json({ success: true, data: filter }, { status: 201 });

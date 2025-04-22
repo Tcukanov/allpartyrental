@@ -30,7 +30,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, type, options, isRequired, isTextOnly = false } = body;
+    const { name, type, options, isRequired, isTextOnly = false, iconUrl } = body;
 
     // Validate request
     if (!name || !type) {
@@ -55,15 +55,22 @@ export async function PUT(
       );
     }
 
-    // Update the filter
+    // Update the filter with type assertion for iconUrl
+    const updateData = {
+      name,
+      type,
+      options: sanitizedOptions,
+      isRequired: isRequired ?? existingFilter.isRequired,
+    };
+
+    // Add iconUrl to the update data if it exists
+    if (iconUrl !== undefined) {
+      Object.assign(updateData, { iconUrl });
+    }
+
     const updatedFilter = await prisma.categoryFilter.update({
       where: { id },
-      data: {
-        name,
-        type,
-        options: sanitizedOptions,
-        isRequired: isRequired ?? existingFilter.isRequired,
-      },
+      data: updateData as any,
     });
 
     return NextResponse.json({ success: true, data: updatedFilter });

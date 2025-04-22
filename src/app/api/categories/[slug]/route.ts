@@ -16,14 +16,28 @@ export async function GET(
     let category = null;
     if (slug.match(/^[0-9a-fA-F]{24}$/) || slug.match(/^[0-9a-fA-F]{12}$/)) {
       category = await prisma.serviceCategory.findUnique({
-        where: { id: slug }
+        where: { id: slug },
+        include: {
+          filters: {
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+        },
       });
     }
     
     // If not found by id, try to find by slug
     if (!category) {
       category = await prisma.serviceCategory.findFirst({
-        where: { slug: slug.toLowerCase() }
+        where: { slug: slug.toLowerCase() },
+        include: {
+          filters: {
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+        },
       });
     }
 
