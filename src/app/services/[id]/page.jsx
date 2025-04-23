@@ -137,6 +137,7 @@ export default function ServiceDetailPage({ params }) {
   const [requestDate, setRequestDate] = useState('');
   const [userRole, setUserRole] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [categoryFilters, setCategoryFilters] = useState({});
   
   // For client components, use React.use() to unwrap the params Promise
   const unwrappedParams = React.use(params);
@@ -207,6 +208,11 @@ export default function ServiceDetailPage({ params }) {
             setIsOwner(false);
           }
           
+          // Fetch category filters if there's metadata
+          if (data.data?.metadata && data.data.categoryId) {
+            await fetchCategoryFilters(data.data.categoryId);
+          }
+          
           // Fetch similar services (same category)
           await fetchSimilarServices(data.data.categoryId, data.data.id);
         }
@@ -254,6 +260,32 @@ export default function ServiceDetailPage({ params }) {
       }
     } catch (error) {
       console.error('Error fetching similar services:', error);
+    }
+  };
+  
+  // Function to fetch category filters
+  const fetchCategoryFilters = async (categoryId) => {
+    try {
+      const response = await fetch(`/api/categories/filters?categoryId=${categoryId}`);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch category filters:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Convert array to object with id as key for easy lookup
+        const filtersObject = {};
+        data.data.forEach(filter => {
+          filtersObject[filter.id] = filter;
+        });
+        
+        setCategoryFilters(filtersObject);
+      }
+    } catch (error) {
+      console.error('Error fetching category filters:', error);
     }
   };
   
@@ -638,10 +670,9 @@ export default function ServiceDetailPage({ params }) {
                 {Object.entries(extractFilterValues(service)).map(([filterId, value]) => {
                   if (!value || (Array.isArray(value) && value.length === 0)) return null;
                   
-                  // Create a formatted filter name from the ID
-                  const filterName = filterId.split('-').map(
-                    word => word.charAt(0).toUpperCase() + word.slice(1)
-                  ).join(' ');
+                  // Use the filter name from fetched filters or create a formatted name from the ID
+                  const filterName = categoryFilters[filterId]?.name || 
+                    filterId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
                   
                   return (
                     <Box key={filterId} p={4} borderWidth="1px" borderRadius="md">

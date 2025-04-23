@@ -148,29 +148,77 @@ export default function AdminNavbar() {
               </Link>
             </Box>
             
-            <HStack as="nav" spacing={4} display={{ base: 'none', md: 'flex' }}>
-              {AdminNavbarItems.map((navItem) => (
-                <Link
-                  key={navItem.label}
-                  as={NextLink}
-                  href={navItem.href}
-                  px={2}
-                  py={1}
-                  rounded="md"
-                  color={pathname === navItem.href ? 'blue.500' : 'gray.500'}
-                  fontWeight={pathname === navItem.href ? 'bold' : 'normal'}
-                  _hover={{
-                    textDecoration: 'none',
-                    color: 'blue.500',
-                  }}
-                >
-                  <HStack spacing={1}>
-                    <Icon as={navItem.icon} />
-                    <Text>{navItem.label}</Text>
-                  </HStack>
-                </Link>
-              ))}
-            </HStack>
+            <Box 
+              as="nav" 
+              display={{ base: 'none', md: 'block' }}
+              maxW={{ md: "calc(100vw - 400px)", lg: "100%" }}
+              overflowX="auto"
+              sx={{
+                '&::-webkit-scrollbar': {
+                  height: '6px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                  borderRadius: '6px',
+                },
+              }}
+            >
+              <Stack spacing={1}>
+                {/* First row of items */}
+                <Flex>
+                  {AdminNavbarItems.slice(0, 6).map((navItem) => (
+                    <Link
+                      key={navItem.label}
+                      as={NextLink}
+                      href={navItem.href}
+                      px={2}
+                      py={1}
+                      mx={1}
+                      rounded="md"
+                      color={pathname === navItem.href ? 'blue.500' : 'gray.500'}
+                      fontWeight={pathname === navItem.href ? 'bold' : 'normal'}
+                      whiteSpace="nowrap"
+                      _hover={{
+                        textDecoration: 'none',
+                        color: 'blue.500',
+                      }}
+                    >
+                      <HStack spacing={1}>
+                        <Icon as={navItem.icon} />
+                        <Text fontSize="sm">{navItem.label}</Text>
+                      </HStack>
+                    </Link>
+                  ))}
+                </Flex>
+                
+                {/* Second row of items */}
+                <Flex>
+                  {AdminNavbarItems.slice(6).map((navItem) => (
+                    <Link
+                      key={navItem.label}
+                      as={NextLink}
+                      href={navItem.href}
+                      px={2}
+                      py={1}
+                      mx={1}
+                      rounded="md"
+                      color={pathname === navItem.href ? 'blue.500' : 'gray.500'}
+                      fontWeight={pathname === navItem.href ? 'bold' : 'normal'}
+                      whiteSpace="nowrap"
+                      _hover={{
+                        textDecoration: 'none',
+                        color: 'blue.500',
+                      }}
+                    >
+                      <HStack spacing={1}>
+                        <Icon as={navItem.icon} />
+                        <Text fontSize="sm">{navItem.label}</Text>
+                      </HStack>
+                    </Link>
+                  ))}
+                </Flex>
+              </Stack>
+            </Box>
           </HStack>
           
           <Flex alignItems="center">
