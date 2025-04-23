@@ -17,6 +17,18 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
 
+    console.log('Search parameters:', { 
+      categoryId, 
+      cityId, 
+      search, 
+      minPrice, 
+      maxPrice, 
+      color, 
+      sort, 
+      limit, 
+      page 
+    });
+
     // Build query conditions
     const where: any = {
       status: 'ACTIVE', // Only return active services
@@ -26,15 +38,67 @@ export async function GET(request: NextRequest) {
       where.categoryId = categoryId;
     }
 
+    // Handle city filtering in a different way
     if (cityId) {
-      where.cityId = cityId;
+      try {
+        console.log(`Processing city filtering for cityId: ${cityId}`);
+        
+        // Get providers who serve this city from ProviderCity table
+        const providersWithCity = await prisma.$queryRaw`
+          SELECT p."userId" as "providerId"
+          FROM "ProviderCity" pc
+          JOIN "Provider" p ON pc."providerId" = p.id
+          WHERE pc."cityId" = ${cityId}
+        `;
+        
+        // Extract provider IDs
+        const providerIds: string[] = [];
+        if (Array.isArray(providersWithCity) && providersWithCity.length > 0) {
+          providersWithCity.forEach(p => {
+            if (p.providerId) providerIds.push(p.providerId);
+          });
+          console.log(`Found ${providerIds.length} providers with service locations in city ${cityId}`);
+        } else {
+          console.log(`No providers found with service locations in city ${cityId}`);
+        }
+        
+        // Fixed approach: Either services in this exact city OR services from providers who serve this city
+        // This ensures we only include relevant services
+        if (providerIds.length > 0) {
+          where.OR = [
+            { cityId }, // Services directly in this city
+            { 
+              AND: [
+                { providerId: { in: providerIds } }, // From providers who serve this city
+                { 
+                  OR: [
+                    { cityId }, // Either exact match on city
+                    { cityId: null } // Or no city specified (provider-wide services)
+                  ]
+                }
+              ]
+            }
+          ];
+          console.log(`Using improved city filtering with ${providerIds.length} provider IDs`);
+        } else {
+          // If no providers found, just filter by cityId
+          where.cityId = cityId;
+          console.log(`No providers serve this city, filtering only by exact cityId match: ${cityId}`);
+        }
+      } catch (error) {
+        console.error('Error finding providers with city:', error);
+        // Fallback to simple cityId filtering
+        where.cityId = cityId;
+        console.log(`Error occurred, falling back to simple cityId filtering: ${cityId}`);
+      }
     }
 
     if (search) {
-      where.OR = [
+      where.OR = where.OR || [];
+      where.OR.push(
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
-      ];
+      );
     }
 
     // Filter by color if provided
@@ -42,6 +106,90 @@ export async function GET(request: NextRequest) {
       where.colors = {
         has: color
       };
+    }
+
+    // Process dynamic filter parameters
+    // Look for params that start with "filter_" and extract the filter id
+    const filterParams = Array.from(searchParams.entries())
+      .filter(([key]) => key.startsWith('filter_'))
+      .map(([key, value]) => ({
+        filterId: key.replace('filter_', ''),
+        value
+      }));
+    
+    // If we have filter parameters, we need to fetch services with matching metadata
+    if (filterParams.length > 0) {
+      console.log('Processing filter params:', filterParams);
+      
+      try {
+        // Get all services that match the basic criteria
+        const baseMatchingServices = await prisma.service.findMany({
+          where,
+          select: { id: true, metadata: true }
+        });
+        
+        // Post-filter to check metadata values
+        const filteredServiceIds = baseMatchingServices
+          .filter(service => {
+            // Skip services without metadata
+            if (!service.metadata) return false;
+            
+            try {
+              // Parse metadata (stored as JSON string)
+              const metadata = typeof service.metadata === 'string' 
+                ? JSON.parse(service.metadata) 
+                : service.metadata;
+              
+              // Get filter values from metadata
+              const filterValues = metadata?.filterValues || {};
+              
+              // Check if service matches all filter criteria
+              return filterParams.every(({ filterId, value }) => {
+                // The value from the query params
+                const requestedValues = value.split(',');
+                
+                // The value in the service metadata
+                const serviceValue = filterValues[filterId];
+                
+                // Skip if the service doesn't have this filter
+                if (serviceValue === undefined) return false;
+                
+                // For array values (multi-select filters)
+                if (Array.isArray(serviceValue)) {
+                  // If any requested value is in the service values
+                  return requestedValues.some(rv => serviceValue.includes(rv));
+                }
+                
+                // For string values (single-select filters)
+                return requestedValues.includes(serviceValue);
+              });
+            } catch (error) {
+              console.error('Error parsing service metadata:', error);
+              return false;
+            }
+          })
+          .map(service => service.id);
+        
+        // Add the filtered IDs to the where clause
+        if (filteredServiceIds.length > 0) {
+          where.id = { in: filteredServiceIds };
+        } else {
+          // If no services match the filters, return empty results
+          return NextResponse.json({
+            success: true,
+            data: [],
+            pagination: {
+              total: 0,
+              page,
+              limit,
+              pages: 0,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Error processing filter parameters:', error);
+        // Continue with basic query without filters
+      }
     }
 
     // Initialize price filter if needed
@@ -68,6 +216,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    console.log('Final query where clause:', JSON.stringify(where, null, 2));
+
     // Get services with pagination
     const services = await prisma.service.findMany({
       where,
@@ -80,7 +230,15 @@ export async function GET(request: NextRequest) {
             name: true,
             email: true,
             role: true,
-            profile: true
+            profile: true,
+            // Include provider business location details
+            provider: {
+              select: {
+                businessName: true,
+                businessCity: true,
+                businessState: true
+              }
+            }
           },
         },
       },
@@ -88,6 +246,8 @@ export async function GET(request: NextRequest) {
       skip,
       take: limit,
     });
+
+    console.log(`Found ${services.length} services matching criteria`);
 
     // Get total count for pagination
     const total = await prisma.service.count({ where });
@@ -102,21 +262,15 @@ export async function GET(request: NextRequest) {
         pages: Math.ceil(total / limit),
       },
     });
-  } catch (error: any) {
-    console.error('Error fetching public services:', error);
-    console.error('Query parameters:', request.url);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    
+  } catch (error) {
+    console.error('Error fetching services:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: {
-          message: error.message || 'Failed to fetch services',
-        },
+      { 
+        success: false, 
+        error: { 
+          message: 'Failed to fetch services',
+          details: error instanceof Error ? error.message : String(error)
+        }
       },
       { status: 500 }
     );

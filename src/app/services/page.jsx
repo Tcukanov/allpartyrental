@@ -21,6 +21,10 @@ export default function ServicesPage() {
   const [sortByPrice, setSortByPrice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   
+  // Add state for category filters
+  const [categoryFilters, setCategoryFilters] = useState([]);
+  const [filterValues, setFilterValues] = useState({});
+  
   const availableColors = ['Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple', 'Orange', 'White'];
   const sortOptions = [
     { value: '', label: 'Default Sort' },
@@ -50,7 +54,11 @@ export default function ServicesPage() {
         
         // If categories are available, automatically select the first one
         if (categoriesData.data && categoriesData.data.length > 0) {
-          setSelectedCategory(categoriesData.data[0].id);
+          const softPlayCategory = categoriesData.data.find(cat => cat.name === 'Soft play') || categoriesData.data[0];
+          setSelectedCategory(softPlayCategory.id);
+          
+          // Fetch filters for this category
+          await fetchCategoryFilters(softPlayCategory.id);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -69,6 +77,28 @@ export default function ServicesPage() {
     fetchData();
   }, [toast]);
 
+  // Add function to fetch category filters
+  const fetchCategoryFilters = async (categoryId) => {
+    try {
+      const response = await fetch(`/api/categories/filters?categoryId=${categoryId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch category filters: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setCategoryFilters(data.data || []);
+        console.log('Fetched category filters:', data.data);
+      } else {
+        console.error('Failed to fetch category filters:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching category filters:', error);
+    }
+  };
+
   // Function to fetch services with filters
   const fetchServices = async () => {
     setIsLoading(true);
@@ -82,6 +112,9 @@ export default function ServicesPage() {
         queryParams.append('categoryId', selectedCategory);
       }
       
+      // Note: cityId is a required field in the database schema but not prominently
+      // displayed in the frontend UI. It's included in the query for filtering but
+      // the UI de-emphasizes it. See DEVELOPMENT_NOTES.md for more details.
       if (selectedCity) {
         queryParams.append('cityId', selectedCity);
       }
@@ -97,6 +130,18 @@ export default function ServicesPage() {
       if (sortByPrice) {
         queryParams.append('sort', sortByPrice);
       }
+      
+      // Add dynamic filter values
+      Object.entries(filterValues).forEach(([filterId, value]) => {
+        if (value && (typeof value === 'string' || Array.isArray(value))) {
+          if (typeof value === 'string') {
+            queryParams.append(`filter_${filterId}`, value);
+          } else if (Array.isArray(value) && value.length > 0) {
+            // For multi-select filters, we can join values with comma
+            queryParams.append(`filter_${filterId}`, value.join(','));
+          }
+        }
+      });
 
       // Log the query params for debugging
       console.log('Fetching services with params:', queryParams.toString());
@@ -150,7 +195,7 @@ export default function ServicesPage() {
     if (!isLoading || categories.length > 0 || cities.length > 0) {
       fetchServices();
     }
-  }, [selectedCategory, selectedCity, searchTerm, selectedColor, sortByPrice]);
+  }, [selectedCategory, selectedCity, searchTerm, selectedColor, sortByPrice, filterValues]);
 
   const handleCityChange = (e) => {
     setSelectedCity(e.target.value);
@@ -168,6 +213,14 @@ export default function ServicesPage() {
     setSortByPrice(e.target.value);
   };
   
+  // Add handler for filter changes
+  const handleFilterChange = (filterId, value) => {
+    setFilterValues(prev => ({
+      ...prev,
+      [filterId]: value
+    }));
+  };
+  
   return (
     <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
@@ -181,21 +234,36 @@ export default function ServicesPage() {
         <Box bg="white" p={6} borderRadius="lg" boxShadow="md">
           <VStack spacing={4}>
             {/* <LocationServiceSearch /> */}
-            <HStack w="full" spacing={4} mt={2}>
-              <Select placeholder="All Locations" value={selectedCity} onChange={handleCityChange} w="full">
-                {cities.map(city => (
-                  <option key={city.id} value={city.id}>
-                    {city.name}
-                  </option>
-                ))}
-              </Select>
-            </HStack>
-
-            <Divider my={3} />
+            <Flex w="full" wrap="wrap" gap={4}>
+              {/* Search input */}
+              <Box flex="1" minW="200px">
+                <Text fontWeight="medium" mb={2}>Search</Text>
+                <InputGroup>
+                  <InputLeftElement pointerEvents="none">
+                    <SearchIcon color="gray.300" />
+                  </InputLeftElement>
+                  <Input 
+                    placeholder="Search services..." 
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                  />
+                </InputGroup>
+              </Box>
             
-            <Flex w="full" direction={{ base: 'column', md: 'row' }} gap={6}>
+              {/* Location filter */}
+              <Box flex="1" minW="200px">
+                <Text fontWeight="medium" mb={2}>Location</Text>
+                <Select placeholder="All Locations" value={selectedCity} onChange={handleCityChange}>
+                  {cities.map(city => (
+                    <option key={city.id} value={city.id}>
+                      {city.name}
+                    </option>
+                  ))}
+                </Select>
+              </Box>
+              
               {/* Color filter */}
-              <Box flex="1">
+              <Box flex="1" minW="200px">
                 <Text fontWeight="medium" mb={2}>Filter by Color</Text>
                 <Select 
                   placeholder="All Colors" 
@@ -211,7 +279,7 @@ export default function ServicesPage() {
               </Box>
               
               {/* Sort by price */}
-              <Box flex="1">
+              <Box flex="1" minW="200px">
                 <Text fontWeight="medium" mb={2}>Sort by Price</Text>
                 <Select
                   value={sortByPrice}
@@ -225,6 +293,94 @@ export default function ServicesPage() {
                 </Select>
               </Box>
             </Flex>
+
+            {/* Dynamic Category Filters */}
+            {categoryFilters.length > 0 && (
+              <Box mt={4}>
+                <Divider my={3} />
+                <Text fontWeight="medium" mb={3}>Additional Filters</Text>
+                
+                <Flex w="full" wrap="wrap" gap={4}>
+                  {categoryFilters.map(filter => (
+                    <Box key={filter.id} minW="200px" flexGrow={1} maxW={{ base: "100%", md: "auto" }}>
+                      <Text fontWeight="medium" mb={2}>
+                        {filter.name}
+                        {filter.iconUrl && (
+                          <Image
+                            src={filter.iconUrl}
+                            alt={filter.name}
+                            boxSize="16px"
+                            display="inline-block"
+                            ml={2}
+                            verticalAlign="middle"
+                          />
+                        )}
+                      </Text>
+                      
+                      {/* Render different input types based on filter type */}
+                      {filter.options.length === 0 ? (
+                        // Text input for text-only filters
+                        <Input
+                          value={filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                          placeholder={`Enter ${filter.name.toLowerCase()}`}
+                          size="md"
+                        />
+                      ) : filter.type === 'color' ? (
+                        // Color selection radio buttons
+                        <Select
+                          placeholder={`Select ${filter.name}`}
+                          value={filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                        >
+                          <option value="">All {filter.name}s</option>
+                          {filter.options.map(option => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : filter.type === 'size' || filter.type === 'material' ? (
+                        // Single select dropdown
+                        <Select
+                          placeholder={`Select ${filter.name}`}
+                          value={filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                        >
+                          <option value="">All {filter.name}s</option>
+                          {filter.options.map(option => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        // Multi-select checkboxes
+                        <Select
+                          placeholder={`Select ${filter.name}`}
+                          value={filterValues[filter.id]?.[0] || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value) {
+                              handleFilterChange(filter.id, [value]);
+                            } else {
+                              handleFilterChange(filter.id, []);
+                            }
+                          }}
+                        >
+                          <option value="">Any {filter.name}</option>
+                          {filter.options.map(option => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </Box>
+                  ))}
+                </Flex>
+              </Box>
+            )}
           </VStack>
         </Box>
         
@@ -312,7 +468,12 @@ export default function ServicesPage() {
                       </HStack>
                       <HStack spacing={1}>
                         <Icon as={ViewIcon} color="gray.500" />
-                        <Text fontSize="sm">{service.city?.name || 'Chicago'}</Text>
+                        <Text fontSize="sm">
+                          {service.city?.name || 
+                           (service.provider?.provider?.businessCity ? 
+                            service.provider.provider.businessCity : 
+                            (service.provider?.name ? `${service.provider.name}'s location` : 'Location unavailable'))}
+                        </Text>
                       </HStack>
                     </HStack>
 

@@ -198,50 +198,27 @@ export default function ServiceDetailPage({ params }) {
             throw new Error(data.error?.message || 'Failed to load service');
           }
           
-          // Log provider data for debugging
-          console.log('Service provider data:', data.data.provider);
-          if (data.data.provider && data.data.provider.googleBusinessUrl) {
-            console.log('Google Business URL:', data.data.provider.googleBusinessUrl);
-            console.log('URL format check:', {
-              isGPage: data.data.provider.googleBusinessUrl.startsWith('https://g.page/'),
-              isGCo: data.data.provider.googleBusinessUrl.startsWith('https://g.co/'),
-              raw: data.data.provider.googleBusinessUrl
-            });
+          setService(data.data);
+          
+          // Check if user is the owner of this service
+          if (session?.user && session.user.id === data.data.providerId) {
+            setIsOwner(true);
+          } else {
+            setIsOwner(false);
           }
           
-          // Ensure the service object has the correct providerId
-          const serviceData = {
-            ...data.data,
-            providerId: data.data.provider?.id
-          };
-          
-          setService(serviceData);
-          
-          // Fetch similar services
-          try {
-            const similarResponse = await fetch(`/api/services/public?categoryId=${data.data.categoryId}&limit=3&exclude=${id}`);
-            const similarData = await similarResponse.json();
-            if (similarData.success) {
-              setSimilarServices(similarData.data);
-            }
-          } catch (error) {
-            console.error('Error fetching similar services:', error);
-          }
-          
-          // Check if current user is the service owner
-          if (session && data?.data) {
-            setIsOwner(session.user.id === data.data.providerUserId);
-          }
+          // Fetch similar services (same category)
+          await fetchSimilarServices(data.data.categoryId, data.data.id);
         }
       } catch (error) {
         console.error('Error fetching service:', error);
         setFetchError(true);
         toast({
           title: 'Error',
-          description: error.message || 'Failed to load service details',
+          description: 'Failed to load the service details. Please try again later.',
           status: 'error',
-          duration: 3000,
-          isClosable: true,
+          duration: 5000,
+          isClosable: true
         });
       } finally {
         setIsLoading(false);
@@ -251,7 +228,60 @@ export default function ServiceDetailPage({ params }) {
     if (id) {
       fetchServiceData();
     }
-  }, [id, toast, session]);
+  }, [id, session, toast]);
+  
+  // Function to fetch similar services based on category
+  const fetchSimilarServices = async (categoryId, currentServiceId) => {
+    try {
+      if (!categoryId) return;
+      
+      const response = await fetch(`/api/services/public?categoryId=${categoryId}&limit=4`);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch similar services:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Filter out the current service and limit to 3 services
+        const filtered = data.data
+          .filter(service => service.id !== currentServiceId)
+          .slice(0, 3);
+          
+        setSimilarServices(filtered);
+      }
+    } catch (error) {
+      console.error('Error fetching similar services:', error);
+    }
+  };
+  
+  // Function to extract filter values from service metadata
+  const extractFilterValues = (service) => {
+    if (!service || !service.metadata) return {};
+    
+    try {
+      if (typeof service.metadata === 'string') {
+        const metadata = JSON.parse(service.metadata);
+        return metadata.filterValues || {};
+      }
+      
+      return {};
+    } catch (error) {
+      console.error('Error parsing metadata:', error);
+      return {};
+    }
+  };
+  
+  // Function to get a more readable display for filter values
+  const getFilterDisplay = (value) => {
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+    
+    return value;
+  };
   
   // Handle booking request
   const handleSendRequest = async (e) => {
@@ -343,8 +373,14 @@ export default function ServiceDetailPage({ params }) {
   // Set SEO metadata
   useEffect(() => {
     if (service) {
+      // Get location
+      const locationName = service.city?.name || 
+                          (service.provider?.provider?.businessCity ? 
+                            service.provider.provider.businessCity : 
+                            'Any Location');
+
       // Set page title
-      document.title = `${service.name} in ${service.city.name} | Party Marketplace`;
+      document.title = `${service.name} in ${locationName} | Party Marketplace`;
       
       // Update meta description
       let metaDescription = document.querySelector('meta[name="description"]');
@@ -353,7 +389,7 @@ export default function ServiceDetailPage({ params }) {
         metaDescription.name = 'description';
         document.head.appendChild(metaDescription);
       }
-      metaDescription.content = `${service.name} in ${service.city.name}. ${service.description.substring(0, 150)}...`;
+      metaDescription.content = `${service.name} in ${locationName}. ${service.description.substring(0, 150)}...`;
       
       // Add canonical link for SEO
       let canonicalLink = document.querySelector('link[rel="canonical"]');
@@ -506,10 +542,17 @@ export default function ServiceDetailPage({ params }) {
                 </Flex>
               </Box>
                     
-              {service.location && (
+              {service.city && (
                 <Flex align="center">
                   <Icon as={FiMapPin} mr={2} color="red.500" />
-                  <Text>{service.location}</Text>
+                  <Text>{service.city.name}</Text>
+                </Flex>
+              )}
+              
+              {!service.city && service.provider?.provider?.businessCity && (
+                <Flex align="center">
+                  <Icon as={FiMapPin} mr={2} color="red.500" />
+                  <Text>{service.provider.provider.businessCity}{service.provider.provider.businessState ? `, ${service.provider.provider.businessState}` : ''}</Text>
                 </Flex>
               )}
               
@@ -560,6 +603,62 @@ export default function ServiceDetailPage({ params }) {
           <Text whiteSpace="pre-wrap">{service.description}</Text>
         </Box>
         
+        {/* Service Specifications */}
+        <Box>
+          <Heading as="h2" size="md" mb={4}>
+            Specifications
+          </Heading>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+            {/* Colors */}
+            {service.colors && service.colors.length > 0 && (
+              <Box p={4} borderWidth="1px" borderRadius="md">
+                <Heading as="h3" size="sm" mb={3}>
+                  Available Colors
+                </Heading>
+                <Flex wrap="wrap" gap={2}>
+                  {service.colors.map((color, index) => (
+                    <Badge 
+                      key={index} 
+                      px={2} 
+                      py={1} 
+                      borderRadius="full"
+                      bg={`${color.toLowerCase()}.100`}
+                      color={`${color.toLowerCase()}.800`}
+                    >
+                      {color}
+                    </Badge>
+                  ))}
+                </Flex>
+              </Box>
+            )}
+            
+            {/* Category Filters */}
+            {service.metadata && (
+              <>
+                {Object.entries(extractFilterValues(service)).map(([filterId, value]) => {
+                  if (!value || (Array.isArray(value) && value.length === 0)) return null;
+                  
+                  // Create a formatted filter name from the ID
+                  const filterName = filterId.split('-').map(
+                    word => word.charAt(0).toUpperCase() + word.slice(1)
+                  ).join(' ');
+                  
+                  return (
+                    <Box key={filterId} p={4} borderWidth="1px" borderRadius="md">
+                      <Heading as="h3" size="sm" mb={3}>
+                        {filterName}
+                      </Heading>
+                      <Text>
+                        {getFilterDisplay(value)}
+                      </Text>
+                    </Box>
+                  );
+                })}
+              </>
+            )}
+          </SimpleGrid>
+        </Box>
+        
         {service.features && service.features.length > 0 && (
           <Box>
             <Heading as="h2" size="md" mb={4}>
@@ -570,11 +669,11 @@ export default function ServiceDetailPage({ params }) {
                 <Flex key={index} align="center">
                   <Box as="span" w={2} h={2} bg="blue.500" borderRadius="full" mr={2}></Box>
                   <Text>{feature}</Text>
-                          </Flex>
-                  ))}
+                </Flex>
+              ))}
             </SimpleGrid>
-              </Box>
-            )}
+          </Box>
+        )}
                   
                   <Divider />
                   

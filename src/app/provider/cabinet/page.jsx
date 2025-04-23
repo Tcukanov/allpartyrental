@@ -32,13 +32,14 @@ import {
   Icon,
   Tooltip,
   CardHeader,
-  Progress
+  Progress,
+  IconButton
 } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon, ChatIcon, StarIcon } from '@chakra-ui/icons';
 import { useSession } from 'next-auth/react';
-import { FaComment, FaEye, FaBuilding, FaIdCard } from 'react-icons/fa';
-import { BsChatDots } from 'react-icons/bs';
+import { FaComment, FaEye, FaBuilding, FaIdCard, FaPlus, FaTrash } from 'react-icons/fa';
+import { BsChatDots, BsFillGeoAltFill } from 'react-icons/bs';
 import NextLink from 'next/link';
 
 // Mock data for service provider dashboard
@@ -274,19 +275,32 @@ export default function ProviderCabinetPage() {
   const [businessVerified, setBusinessVerified] = useState(false);
   const [hasEIN, setHasEIN] = useState(false);
   const [serviceCount, setServiceCount] = useState(0);
+  const [cities, setCities] = useState([]);
+  const [providerCities, setProviderCities] = useState([]);
+  const [isAddingCity, setIsAddingCity] = useState(false);
+  const [selectedCityId, setSelectedCityId] = useState('');
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
 
-  // Clear any outdated localStorage values
+  // Clear any outdated localStorage values but preserve important data
   useEffect(() => {
-    // Clear all localStorage provider data to ensure fresh start
+    // Clear outdated localStorage provider data while preserving important items
     const clearOutdatedLocalStorage = () => {
-      console.log('Clearing all provider profile data from localStorage');
+      console.log('Cleaning up outdated provider profile data from localStorage');
       
-      // Clear all provider_ keys
+      // Save important data
+      const savedCities = localStorage.getItem('provider_cities');
+      
+      // Clear provider_ keys that are not essential
       Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('provider_')) {
+        if (key.startsWith('provider_') && key !== 'provider_cities') {
           localStorage.removeItem(key);
         }
       });
+      
+      // Restore important data if it existed
+      if (savedCities) {
+        localStorage.setItem('provider_cities', savedCities);
+      }
     };
     
     clearOutdatedLocalStorage();
@@ -1164,6 +1178,393 @@ export default function ProviderCabinetPage() {
     calculateServiceCount();
   }, [services]);
 
+  // Add a function to fetch cities and provider's service locations
+  const fetchServiceLocations = async () => {
+    try {
+      setIsLoadingCities(true);
+      const userId = session?.user?.id;
+      console.log('Fetching service locations, user ID:', userId);
+      
+      if (!userId) {
+        console.log('Cannot fetch service locations: No user ID');
+        setIsLoadingCities(false);
+        return;
+      }
+      
+      // Fetch all available cities
+      const citiesResponse = await fetch('/api/cities', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      });
+      
+      if (!citiesResponse.ok) {
+        console.error('Failed to fetch cities:', citiesResponse.status);
+        throw new Error(`Failed to fetch cities: ${citiesResponse.status}`);
+      }
+      
+      const citiesData = await citiesResponse.json();
+      
+      if (citiesData.data && Array.isArray(citiesData.data)) {
+        setCities(citiesData.data);
+        console.log('Fetched all cities, count:', citiesData.data.length);
+      }
+      
+      // Fetch provider's service locations with cache-busting
+      const timestamp = Date.now();
+      const providerCitiesResponse = await fetch(`/api/provider/cities?_t=${timestamp}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      });
+      
+      console.log('Provider cities response status:', providerCitiesResponse.status);
+      
+      if (!providerCitiesResponse.ok) {
+        throw new Error(`Failed to fetch provider cities: ${providerCitiesResponse.status}`);
+      }
+      
+      const providerCitiesData = await providerCitiesResponse.json();
+      console.log('Provider cities API response:', providerCitiesData);
+      
+      if (providerCitiesData.success) {
+        const providerCitiesArray = providerCitiesData.data || [];
+        console.log('Setting provider cities from API, count:', providerCitiesArray.length);
+        
+        // Transform data if needed to ensure consistent structure
+        const formattedCities = providerCitiesArray.map(city => ({
+          id: city.id,
+          name: city.name,
+          state: city.state,
+          slug: city.slug,
+          providerCityId: city.providerCityId || city.id
+        }));
+        
+        setProviderCities(formattedCities);
+        
+        // Make provider cities data persistent in storage
+        try {
+          const citiesJson = JSON.stringify(formattedCities);
+          sessionStorage.setItem('provider_cities', citiesJson);
+          localStorage.setItem('provider_cities', citiesJson);
+          
+          // Also store timestamp for cache validation
+          sessionStorage.setItem('provider_cities_timestamp', timestamp.toString());
+          localStorage.setItem('provider_cities_timestamp', timestamp.toString());
+          
+          console.log('Saved provider cities to storage, count:', formattedCities.length);
+        } catch (storageError) {
+          console.error('Error storing cities in storage:', storageError);
+        }
+      } else {
+        console.log('API returned error, attempting to load from storage');
+        loadFromStorage();
+      }
+    } catch (error) {
+      console.error('Error fetching service locations:', error);
+      loadFromStorage();
+      
+      toast({
+        title: 'Error',
+        description: 'Failed to load service locations from server, using cached data if available',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoadingCities(false);
+    }
+  };
+  
+  // Helper function to load cities from storage
+  const loadFromStorage = () => {
+    try {
+      // Try sessionStorage first (current session)
+      let storedCities = sessionStorage.getItem('provider_cities');
+      
+      // If not in sessionStorage, try localStorage
+      if (!storedCities) {
+        storedCities = localStorage.getItem('provider_cities');
+      }
+      
+      if (storedCities) {
+        const parsedCities = JSON.parse(storedCities);
+        console.log('Loaded cities from storage:', parsedCities);
+        setProviderCities(parsedCities);
+        return true;
+      }
+    } catch (parseError) {
+      console.error('Error parsing cities from storage:', parseError);
+    }
+    return false;
+  };
+  
+  // Add initial loading from localStorage and sessionStorage
+  useEffect(() => {
+    // Try to load cities from storage first for quick rendering
+    console.log('Initial cities load attempt from storage');
+    const loaded = loadFromStorage();
+    console.log('Initial load successful:', loaded);
+  }, []);
+  
+  // Load locations from API when authenticated
+  useEffect(() => {
+    const loadProviderLocations = async () => {
+      // Only proceed if we have a valid provider session
+      if (!session?.user?.id || session?.user?.role !== 'PROVIDER') {
+        console.log('Cannot load provider locations: User not authenticated as provider');
+        return;
+      }
+      
+      console.log('Provider authenticated, checking provider record');
+      
+      try {
+        // First check if provider record exists and create if needed
+        const setupResponse = await fetch('/api/provider/setup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          }
+        });
+        
+        if (!setupResponse.ok) {
+          console.error('Failed to set up provider record:', setupResponse.status);
+          toast({
+            title: 'Error',
+            description: 'Failed to set up provider account. Please try again later.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
+          return;
+        }
+        
+        const setupResult = await setupResponse.json();
+        console.log('Provider setup result:', setupResult);
+        
+        if (setupResult.success) {
+          // Now that we have a provider record, load the service locations
+          console.log('Provider record confirmed, loading service locations');
+          fetchServiceLocations().catch(err => {
+            console.error('Error in fetchServiceLocations:', err);
+            // If API fetch fails, try to load from storage as fallback
+            loadFromStorage();
+          });
+        } else {
+          console.error('Failed to set up provider:', setupResult.error);
+          toast({
+            title: 'Error',
+            description: setupResult.error?.message || 'Failed to set up provider account',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+      } catch (error) {
+        console.error('Error setting up provider:', error);
+        toast({
+          title: 'Error',
+          description: 'An unexpected error occurred. Please try again later.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    };
+
+    // When session is ready or changes, load provider data
+    if (sessionStatus === 'authenticated') {
+      loadProviderLocations();
+    } else if (sessionStatus === 'loading') {
+      console.log('Session loading, will fetch locations when ready');
+    } else {
+      console.log('No session available, cannot load provider locations');
+    }
+  }, [sessionStatus, session?.user?.id, session?.user?.role]);
+  
+  // Add a function to add a city to provider's service locations
+  const handleAddCity = async () => {
+    if (!selectedCityId) {
+      toast({
+        title: 'Error',
+        description: 'Please select a city to add',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    
+    try {
+      setIsAddingCity(true);
+      console.log('Adding city ID:', selectedCityId);
+      
+      const response = await fetch('/api/provider/cities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+        body: JSON.stringify({
+          cityId: selectedCityId,
+        }),
+      });
+      
+      console.log('Add city response status:', response.status);
+      
+      const data = await response.json();
+      console.log('Add city response data:', data);
+      
+      if (data.success) {
+        // Handle case where city already exists
+        if (data.data?.alreadyExists) {
+          toast({
+            title: 'Information',
+            description: 'This location is already in your service areas',
+            status: 'info',
+            duration: 3000,
+            isClosable: true,
+          });
+        } else {
+          toast({
+            title: 'Success',
+            description: 'Service location added successfully',
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+        
+        // Add the new city to the state immediately if not already exists
+        if (!data.data?.alreadyExists) {
+          const selectedCity = cities.find(city => city.id === selectedCityId);
+          if (selectedCity) {
+            // Add providerCityId if available in the response
+            const cityWithRelation = {
+              ...selectedCity,
+              providerCityId: data.data?.providerCityId || selectedCity.id
+            };
+            
+            const updatedCities = [...providerCities, cityWithRelation];
+            console.log('Updating provider cities state with new city:', selectedCity.name);
+            setProviderCities(updatedCities);
+            
+            // Update both sessionStorage and localStorage
+            try {
+              const citiesToStore = JSON.stringify(updatedCities);
+              sessionStorage.setItem('provider_cities', citiesToStore);
+              localStorage.setItem('provider_cities', citiesToStore);
+              console.log('Updated storage with new city, count:', updatedCities.length);
+            } catch (storageError) {
+              console.error('Error storing updated cities in storage:', storageError);
+            }
+          }
+        }
+        
+        // Refresh service locations to get the latest data
+        console.log('Refreshing service locations after add');
+        setTimeout(() => fetchServiceLocations(), 1000); // Longer delay to ensure the server has processed
+        setSelectedCityId('');
+        setIsAddingCity(false);
+      } else {
+        throw new Error(data.error?.message || 'Failed to add service location');
+      }
+    } catch (error) {
+      console.error('Error adding service location:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add service location',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsAddingCity(false);
+    }
+  };
+
+  // Add a function to remove a city from provider's service locations
+  const handleRemoveCity = async (cityId) => {
+    try {
+      setIsLoadingCities(true);
+      console.log('Removing city ID:', cityId);
+      
+      const response = await fetch(`/api/provider/cities/${cityId}`, {
+        method: 'DELETE',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
+      console.log('Remove city response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Remove city error response:', errorText);
+        throw new Error(`Failed to remove city: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Remove city response data:', data);
+      
+      if (data.success) {
+        toast({
+          title: 'Success',
+          description: 'Service location removed successfully',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        
+        // Remove the city from state immediately
+        const updatedCities = providerCities.filter(city => city.id !== cityId);
+        console.log('Updating provider cities state after removal, count:', updatedCities.length);
+        setProviderCities(updatedCities);
+        
+        // Update both sessionStorage and localStorage
+        try {
+          const citiesToStore = JSON.stringify(updatedCities);
+          sessionStorage.setItem('provider_cities', citiesToStore);
+          localStorage.setItem('provider_cities', citiesToStore);
+          // Also update timestamp
+          const timestamp = Date.now();
+          sessionStorage.setItem('provider_cities_timestamp', timestamp.toString());
+          localStorage.setItem('provider_cities_timestamp', timestamp.toString());
+          console.log('Updated storage after city removal, count:', updatedCities.length);
+        } catch (storageError) {
+          console.error('Error updating cities in storage after removal:', storageError);
+        }
+        
+        // Refresh service locations from server to sync with a small delay
+        console.log('Refreshing service locations after removal');
+        setTimeout(() => fetchServiceLocations(), 1000);
+      } else {
+        throw new Error(data.error?.message || 'Failed to remove service location');
+      }
+    } catch (error) {
+      console.error('Error removing service location:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to remove service location',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      
+      // Try to refresh data from the server in case of error
+      setTimeout(() => fetchServiceLocations(), 1500);
+    } finally {
+      setIsLoadingCities(false);
+    }
+  };
+
   return (
       <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
@@ -1200,11 +1601,9 @@ export default function ProviderCabinetPage() {
         <Tabs variant="enclosed" colorScheme="brand">
           <TabList>
             <Tab>Profile</Tab>
-            {/* Services Tab */}
-            {/* Requests Tab */}
+            <Tab>Service Locations</Tab>
             <Tab>Party History</Tab>
             <Tab>Chats</Tab>
-            {/* Advertising Tab */}
           </TabList>
           
           <TabPanels>
@@ -1441,178 +1840,151 @@ export default function ProviderCabinetPage() {
               </VStack>
             </TabPanel>
             
-            {/* Services Tab */}
-            {/*
+            {/* Service Locations Tab */}
             <TabPanel>
               <VStack spacing={6} align="stretch">
-                <Heading as="h2" size="lg">Manage Services</Heading>
+                <Heading as="h2" size="lg">Service Locations</Heading>
+                <Text>Add cities where you offer your services. Clients will see your services when searching in these locations.</Text>
                 
-                {services.length === 0 ? (
-                  <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
-                    <Text>No services available.</Text>
-                  </Box>
+                {isLoadingCities ? (
+                  <Flex justifyContent="center" py={8} direction="column" align="center">
+                    <Spinner size="xl" color="brand.500" mb={4} />
+                    <Text color="gray.600">Loading your service locations...</Text>
+                  </Flex>
                 ) : (
-                  <VStack spacing={4} align="stretch">
-                    {services.map(service => (
-                      <Card key={service.id} cursor="pointer" onClick={() => handleEditService(service)}>
-                        <CardBody>
-                          <Flex justify="space-between" align="center">
-                            <Box>
-                              <Text fontWeight="bold">{service.name}</Text>
-                              <Text noOfLines={1} fontSize="sm" color="gray.600">
-                                {typeof service.category === 'string' 
-                                  ? service.category 
-                                  : service.category?.name || 'Uncategorized'}
-                              </Text>
-                            </Box>
-                            <VStack align="stretch" spacing={2} minW="150px">
+                  <>
+                    <Box borderWidth="1px" borderRadius="lg" p={4}>
+                      <VStack spacing={4} align="stretch">
+                        <Flex justifyContent="space-between" alignItems="center">
+                          <Heading as="h3" size="md">My Service Areas</Heading>
+                          <Button 
+                            leftIcon={<AddIcon />} 
+                            colorScheme="brand" 
+                            size="sm"
+                            onClick={() => setIsAddingCity(true)}
+                            isDisabled={isLoadingCities}
+                          >
+                            Add Location
+                          </Button>
+                        </Flex>
+                        
+                        {isAddingCity && (
+                          <Box borderWidth="1px" borderRadius="md" p={3} bg="gray.50">
+                            <HStack spacing={4} mb={1}>
+                              <FormControl isRequired flex="1">
+                                <FormLabel fontSize="sm">Select Location</FormLabel>
+                                <Select 
+                                  placeholder="Select city" 
+                                  value={selectedCityId}
+                                  onChange={(e) => setSelectedCityId(e.target.value)}
+                                  isDisabled={isLoadingCities}
+                                >
+                                  {cities
+                                    .filter(city => !providerCities.some(pc => pc.id === city.id))
+                                    .sort((a, b) => a.name.localeCompare(b.name))
+                                    .map(city => (
+                                      <option key={city.id} value={city.id}>
+                                        {city.name}, {city.state}
+                                      </option>
+                                    ))
+                                  }
+                                </Select>
+                              </FormControl>
+                            </HStack>
+                            <Flex justify="flex-end" mt={2}>
                               <Button 
-                                leftIcon={<EditIcon />} 
-                                variant="outline"
-                                _hover={{ bg: '#ffcba5' }}
-                                _active={{ bg: '#ffcba5' }}
+                                colorScheme="brand" 
+                                onClick={handleAddCity}
+                                isLoading={isLoadingCities}
+                                size="sm"
+                                mr={2}
                               >
-                                View Details
+                                Add
                               </Button>
                               <Button 
-                                leftIcon={<DeleteIcon />} 
                                 variant="outline" 
-                                colorScheme="red"
-                                _hover={{ bg: '#ffcba5' }}
-                                _active={{ bg: '#ffcba5' }}
+                                onClick={() => {
+                                  setIsAddingCity(false);
+                                  setSelectedCityId('');
+                                }}
+                                size="sm"
+                                isDisabled={isLoadingCities}
                               >
-                                Delete
+                                Cancel
                               </Button>
-                            </VStack>
-                          </Flex>
-                        </CardBody>
-                      </Card>
-                    ))}
-                  </VStack>
-                )}
-              </VStack>
-            </TabPanel>
-            */}
-            
-            {/* Requests Tab */}
-            {/*
-            <TabPanel>
-              <VStack spacing={6} align="stretch">
-                <Flex justify="space-between" align="center">
-                  <Heading as="h2" size="lg">Incoming Requests</Heading>
-                  
-                  <Select 
-                    width="200px" 
-                    value={requestFilter}
-                    onChange={(e) => setRequestFilter(e.target.value)}
-                  >
-                    <option value="All">All Requests</option>
-                    <option value="New">New</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Offer Sent">Offer Sent</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                  </Select>
-                </Flex>
-                
-                <!-- Message about chat functionality -->
-                <Box p={4} bg="blue.50" borderRadius="md" mb={4}>
-                  <Flex align="center">
-                    <Icon as={BsChatDots} color="blue.500" mr={3} boxSize={6} />
-                    <Box>
-                      <Text fontWeight="bold">Need to communicate with clients?</Text>
-                      <Text>
-                        Use the chat button next to each client's name to start a conversation or view existing messages.
+                            </Flex>
+                          </Box>
+                        )}
+                        
+                        {providerCities.length === 0 ? (
+                          <Box textAlign="center" py={6} borderWidth="1px" borderRadius="md" bg="gray.50">
+                            <Icon as={BsFillGeoAltFill} w={8} h={8} color="gray.400" mb={3} />
+                            <Text color="gray.500" mb={3}>You haven't added any service locations yet.</Text>
+                            {!isAddingCity && (
+                              <Button 
+                                mt={2} 
+                                leftIcon={<AddIcon />} 
+                                colorScheme="brand" 
+                                size="sm"
+                                onClick={() => setIsAddingCity(true)}
+                              >
+                                Add Your First Location
+                              </Button>
+                            )}
+                          </Box>
+                        ) : (
+                          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4} mt={2}>
+                            {providerCities
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .map(city => (
+                                <Box 
+                                  key={city.id} 
+                                  borderWidth="1px" 
+                                  borderRadius="md" 
+                                  p={3}
+                                  position="relative"
+                                  transition="all 0.2s"
+                                  _hover={{
+                                    shadow: "sm",
+                                    borderColor: "gray.300"
+                                  }}
+                                >
+                                  <Flex align="center">
+                                    <Icon as={BsFillGeoAltFill} color="brand.500" mr={2} />
+                                    <Text fontWeight="medium">{city.name}</Text>
+                                    <Text ml={1} color="gray.500">, {city.state}</Text>
+                                  </Flex>
+                                  <Tooltip label="Remove location">
+                                    <IconButton
+                                      aria-label="Remove location"
+                                      icon={<DeleteIcon />}
+                                      size="xs"
+                                      colorScheme="red"
+                                      variant="ghost"
+                                      position="absolute"
+                                      top={2}
+                                      right={2}
+                                      onClick={() => handleRemoveCity(city.id)}
+                                      isDisabled={isLoadingCities}
+                                    />
+                                  </Tooltip>
+                                </Box>
+                              ))}
+                          </SimpleGrid>
+                        )}
+                      </VStack>
+                    </Box>
+                    
+                    <Box mt={6} borderWidth="1px" borderRadius="lg" p={4}>
+                      <Heading as="h3" size="md" mb={4}>Add New Location</Heading>
+                      <Text mb={4}>
+                        Don't see your city? <Button as="a" href="#" variant="link" colorScheme="brand">Contact us</Button> to request adding a new location.
                       </Text>
                     </Box>
-                  </Flex>
-                </Box>
-                
-                {filteredRequests.length === 0 ? (
-                  <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
-                    <Text>No requests matching the selected filter.</Text>
-                  </Box>
-                ) : (
-                  filteredRequests.map(request => (
-                    <Card key={request.id} mb={4}>
-                      <CardBody>
-                        <Flex direction={{ base: 'column', md: 'row' }} justify="space-between">
-                          <Box mb={{ base: 4, md: 0 }}>
-                            <Flex align="center" mb={2}>
-                              <Heading as="h3" size="md">{request.partyType}</Heading>
-                              <Badge ml={2} colorScheme={getStatusColor(request.status)}>
-                                {request.status}
-                              </Badge>
-                            </Flex>
-                            
-                            <VStack spacing={2} align="stretch">
-                              <Flex justify="space-between" align="center">
-                                <Text><strong>Client:</strong> {request.clientName}</Text>
-                                
-                                <!-- Chat Button -->
-                                <Tooltip label={request.chatId ? "Go to conversation" : "Start conversation"}>
-                                  <Button
-                                    size="xs"
-                                    onClick={(e) => request.chatId ? handleNavigateToChat(request.chatId, e) : handleCreateChat(request, e)}
-                                    colorScheme={request.chatId ? "brand" : "gray"}
-                                    leftIcon={<Icon as={BsChatDots} />}
-                                    ml={2}
-                                  >
-                                    {request.chatId ? "Chat" : "Start Chat"}
-                                  </Button>
-                                </Tooltip>
-                              </Flex>
-                              
-                              <Text><strong>Date & Time:</strong> {request.date} at {request.time}</Text>
-                              <Text><strong>Location:</strong> {request.location}</Text>
-                              <Text><strong>Service Type:</strong> {request.serviceType}</Text>
-                              
-                              <Flex mt={2}>
-                                <!-- View Party Button -->
-                                <Button
-                                  size="sm"
-                                  colorScheme="blue"
-                                  variant="outline"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewParty(request?.partyId);
-                                  }}
-                                  leftIcon={<Icon as={FaEye} />}
-                                >
-                                  View Party
-                                </Button>
-                              </Flex>
-                            </VStack>
-                          </Box>
-                          
-                          <VStack align="stretch" spacing={2} minW="150px">
-                            <Button 
-                              colorScheme="brand" 
-                              leftIcon={<AddIcon />}
-                              isDisabled={request.status === 'Offer Sent' || request.status === 'Approved'}
-                              onClick={() => handleSendOffer(request.id)}
-                              _hover={{ bg: '#ffcba5' }}
-                              _active={{ bg: '#ffcba5' }}
-                            >
-                              Send Offer
-                            </Button>
-                            <Button 
-                              leftIcon={<EditIcon />} 
-                              variant="outline"
-                              _hover={{ bg: '#ffcba5' }}
-                              _active={{ bg: '#ffcba5' }}
-                            >
-                              View Details
-                            </Button>
-                          </VStack>
-                        </Flex>
-                      </CardBody>
-                    </Card>
-                  ))
+                  </>
                 )}
               </VStack>
             </TabPanel>
-            */}
             
             {/* Party History Tab */}
             <TabPanel>
@@ -1777,45 +2149,6 @@ export default function ProviderCabinetPage() {
                 )}
               </VStack>
             </TabPanel>
-            
-            {/* Advertising Tab */}
-            {/*
-            <TabPanel>
-              <VStack spacing={6} align="stretch">
-                <Heading as="h2" size="lg">Advertising Options</Heading>
-                <Text>
-                  Boost your visibility and get more clients with our advertising packages.
-                </Text>
-                
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-                  {adPackages.map(pkg => (
-                    <Card key={pkg.id}>
-                      <CardBody>
-                        <VStack spacing={3} align="stretch">
-                          <Heading size="md">{pkg.name}</Heading>
-                          <Badge colorScheme="brand" alignSelf="flex-start">
-                            {pkg.duration}
-                          </Badge>
-                          <Text>{pkg.description}</Text>
-                          <Text fontWeight="bold" fontSize="xl">
-                            ${Number(pkg.price).toFixed(2)}
-                          </Text>
-                          <Button
-                            colorScheme="brand"
-                            onClick={() => handlePurchaseAd(pkg.id)}
-                            _hover={{ bg: '#ffcba5' }}
-                            _active={{ bg: '#ffcba5' }}
-                          >
-                            Purchase
-                          </Button>
-                        </VStack>
-                      </CardBody>
-                    </Card>
-                  ))}
-                </SimpleGrid>
-              </VStack>
-            </TabPanel>
-            */}
           </TabPanels>
         </Tabs>
       </VStack>

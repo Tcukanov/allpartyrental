@@ -26,6 +26,8 @@ interface ServiceWithMetadata {
   filterValues?: Record<string, any>;
 }
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -35,65 +37,64 @@ export async function GET(
     const unwrappedParams = await params;
     const { id } = unwrappedParams;
     
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
-    if (!session || !session.user) {
+    if (!session?.user) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Get the service
     const service = await prisma.service.findUnique({
-      where: { id }
+      where: {
+        id: id,
+      },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            profile: {
+              select: {
+                avatar: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        category: true,
+        city: true,
+      },
     });
 
     if (!service) {
       return NextResponse.json(
-        { success: false, error: { code: 'NOT_FOUND', message: 'Service not found' } },
+        { success: false, error: 'Service not found' },
         { status: 404 }
       );
     }
 
-    // Check if user is a provider and owns this service
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email as string },
-      select: { id: true, role: true }
-    });
-
-    if (!user || user.role !== 'PROVIDER' || service.providerId !== user.id) {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } },
-        { status: 403 }
-      );
-    }
-
-    // Process metadata if it exists
-    const serviceWithMeta = service as unknown as ServiceWithMetadata;
-    let responseService = { ...serviceWithMeta };
+    let serviceWithMetadata = service as unknown as ServiceWithMetadata;
     
-    try {
-      if (serviceWithMeta.metadata) {
-        const metadata = JSON.parse(serviceWithMeta.metadata);
-        responseService = {
-          ...responseService,
-          filterValues: metadata.filterValues || {}
-        };
+    // Parse metadata if it exists
+    if (service.metadata) {
+      try {
+        const metadata = JSON.parse(service.metadata);
+        if (metadata.filterValues) {
+          serviceWithMetadata.filterValues = metadata.filterValues;
+        }
+      } catch (error) {
+        console.error('Error parsing service metadata:', error);
       }
-    } catch (e) {
-      console.error('Error parsing metadata:', e);
-      // Continue with the original service
     }
 
-    return NextResponse.json({
-      success: true,
-      data: responseService
-    }, { status: 200 });
+    return NextResponse.json({ success: true, data: serviceWithMetadata });
   } catch (error) {
-    console.error('Get service error:', error);
+    console.error('Error fetching service:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -112,50 +113,42 @@ export async function PUT(
     
     if (!session?.user || session.user.role !== 'PROVIDER') {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
     const requestData = await request.json();
     
-    // Extract filterValues if present
-    const { filterValues, ...data } = requestData;
-    
-    // Prepare metadata if filterValues are provided
+    // Prepare metadata with filterValues if they exist
     let metadata = null;
-    if (filterValues) {
-      metadata = JSON.stringify({ filterValues });
+    if (requestData.filterValues) {
+      metadata = JSON.stringify({ filterValues: requestData.filterValues });
+      // Remove it from the main data object since it's not a direct field
+      delete requestData.filterValues;
     }
-    
-    // Add metadata to the update data
-    const updateData = {
-      ...data,
-      metadata
-    };
-    
-    const service = await prisma.service.update({
+
+    // Remove non-Prisma fields if they exist
+    const { provider, category, city, ...serviceData } = requestData;
+
+    // Add metadata back if it exists
+    if (metadata) {
+      serviceData.metadata = metadata;
+    }
+
+    const updatedService = await prisma.service.update({
       where: {
         id: id,
         providerId: session.user.id
       },
-      data: updateData,
+      data: serviceData,
       include: {
         category: true,
         city: true
       }
     });
 
-    // Add filterValues to the response if they were provided
-    const responseService = filterValues ? {
-      ...service,
-      filterValues
-    } : service;
-
-    return NextResponse.json({
-      success: true,
-      data: responseService
-    });
+    return NextResponse.json({ success: true, data: updatedService });
   } catch (error) {
     console.error('Error updating service:', error);
     return NextResponse.json(
@@ -183,18 +176,99 @@ export async function DELETE(
       );
     }
 
-    await prisma.service.delete({
+    // First, check if the service exists and belongs to the current provider
+    const service = await prisma.service.findUnique({
       where: {
         id: id,
         providerId: session.user.id
+      },
+      include: {
+        offers: true,
+        partyServices: true
       }
+    });
+
+    if (!service) {
+      return NextResponse.json(
+        { success: false, error: 'Service not found or not owned by you' },
+        { status: 404 }
+      );
+    }
+
+    // Use a transaction to safely delete related records first
+    await prisma.$transaction(async (prisma) => {
+      // 1. Delete related offers
+      if (service.offers.length > 0) {
+        // We need to check if any offers have transactions or chats
+        for (const offer of service.offers) {
+          // Delete any related chat and messages
+          const chat = await prisma.chat.findUnique({
+            where: { offerId: offer.id }
+          });
+          
+          if (chat) {
+            // First delete messages
+            await prisma.message.deleteMany({
+              where: { chatId: chat.id }
+            });
+            
+            // Then delete the chat
+            await prisma.chat.delete({
+              where: { id: chat.id }
+            });
+          }
+          
+          // Check and delete related transactions
+          const transaction = await prisma.transaction.findUnique({
+            where: { offerId: offer.id }
+          });
+          
+          if (transaction) {
+            // Check if there's a dispute
+            const dispute = await prisma.dispute.findUnique({
+              where: { transactionId: transaction.id }
+            });
+            
+            if (dispute) {
+              await prisma.dispute.delete({
+                where: { id: dispute.id }
+              });
+            }
+            
+            // Delete the transaction
+            await prisma.transaction.delete({
+              where: { id: transaction.id }
+            });
+          }
+        }
+        
+        // Now delete all offers
+        await prisma.offer.deleteMany({
+          where: { serviceId: id }
+        });
+      }
+      
+      // 2. Delete related party services
+      if (service.partyServices.length > 0) {
+        await prisma.partyService.deleteMany({
+          where: { serviceId: id }
+        });
+      }
+      
+      // 3. Finally delete the service
+      await prisma.service.delete({
+        where: {
+          id: id,
+          providerId: session.user.id
+        }
+      });
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting service:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: 'Failed to delete service. There might be active transactions or other related records.' },
       { status: 500 }
     );
   }

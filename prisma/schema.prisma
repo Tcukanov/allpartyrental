@@ -51,8 +51,8 @@ model Profile {
 }
 
 model Provider {
-  id                  String    @id @default(cuid())
-  userId              String    @unique
+  id                  String         @id @default(cuid())
+  userId              String         @unique
   businessName        String
   businessDescription String?
   businessAddress     String?
@@ -64,12 +64,12 @@ model Provider {
   businessWebsite     String?
   businessLogo        String?
   ein                 String?
-  taxIdVerified       Boolean   @default(false)
-  bankAccountVerified Boolean   @default(false)
+  taxIdVerified       Boolean        @default(false)
+  bankAccountVerified Boolean        @default(false)
   stripeAccountId     String?
   paymentTerms        String?
-  commissionRate      Float     @default(10.0)
-  isApproved          Boolean   @default(false)
+  commissionRate      Float          @default(10.0)
+  isApproved          Boolean        @default(false)
   approvedAt          DateTime?
   rejectionReason     String?
   businessType        String?
@@ -77,9 +77,10 @@ model Provider {
   employeeCount       Int?
   insuranceProvider   String?
   insurancePolicyNum  String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  user                User      @relation(fields: [userId], references: [id])
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  user                User           @relation(fields: [userId], references: [id])
+  serviceCities       ProviderCity[]
 }
 
 model Calendar {
@@ -111,28 +112,29 @@ model CategoryFilter {
   type       String
   options    String[]
   isRequired Boolean         @default(false)
-  iconUrl    String?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
+  iconUrl    String?
   category   ServiceCategory @relation(fields: [categoryId], references: [id])
 }
 
 model City {
-  id        String    @id @default(cuid())
-  name      String
-  slug      String    @unique
-  state     String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  parties   Party[]
-  services  Service[]
+  id             String         @id @default(cuid())
+  name           String
+  slug           String         @unique
+  state          String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  parties        Party[]
+  providerCities ProviderCity[]
+  services       Service[]
 }
 
 model Service {
   id                  String          @id @default(cuid())
   providerId          String
   categoryId          String
-  cityId              String
+  cityId              String?
   name                String
   description         String
   price               Decimal
@@ -150,7 +152,7 @@ model Service {
   offers              Offer[]
   partyServices       PartyService[]
   category            ServiceCategory @relation(fields: [categoryId], references: [id])
-  city                City            @relation(fields: [cityId], references: [id])
+  city                City?           @relation(fields: [cityId], references: [id])
   provider            User            @relation(fields: [providerId], references: [id])
   addons              ServiceAddon[]
 }
@@ -340,6 +342,18 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model ProviderCity {
+  id         String   @id @default(cuid())
+  providerId String
+  cityId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  city       City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, cityId])
 }
 
 enum UserRole {

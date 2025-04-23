@@ -10,7 +10,7 @@ interface ServiceWithMetadata {
   description: string;
   price: number | string;
   categoryId: string;
-  cityId: string;
+  cityId?: string | null;
   providerId: string;
   photos: string[];
   status: string;
@@ -190,16 +190,12 @@ export async function POST(request: Request) {
     const { name, description, price, categoryId, cityId, filterValues, images, addons } = data;
     
     // Validate required fields
-    if (!name || !description || !price || !categoryId) {
-      return NextResponse.json({ 
-        error: 'Missing required fields',
-        details: { 
-          name: !name ? 'Name is required' : null,
-          description: !description ? 'Description is required' : null,
-          price: !price ? 'Price is required' : null,
-          categoryId: !categoryId ? 'Category is required' : null
-        }
-      }, { status: 400 });
+    if (!name || !description || !price || !categoryId || !data.photos?.length) {
+      console.log("Missing required fields in service creation");
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
     
     // Handle color selection
@@ -266,7 +262,7 @@ export async function POST(request: Request) {
         status: "PENDING_APPROVAL",
         providerId,
         categoryId,
-        cityId: cityId || '',
+        cityId: cityId || null,
         photos: data.photos || [],
         availableDays: data.availableDays || [],
         availableHoursStart: data.availableHoursStart,

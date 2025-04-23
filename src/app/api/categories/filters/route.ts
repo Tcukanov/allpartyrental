@@ -5,15 +5,8 @@ import { authOptions } from '@/lib/auth/auth-options';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    // Only authenticated users can access this endpoint
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { success: false, error: { message: 'Authentication required' } },
-        { status: 401 }
-      );
-    }
+    // No authentication check required for public endpoints
+    // This endpoint should be accessible to all users
 
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');

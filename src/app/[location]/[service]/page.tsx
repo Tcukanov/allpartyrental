@@ -144,9 +144,32 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
     // Fetch services for this location and category
     const services = await prisma.service.findMany({
       where: {
-        cityId: city.id,
-        categoryId: category.id,
-        status: 'ACTIVE',
+        AND: [
+          { categoryId: category.id },
+          { status: 'ACTIVE' },
+          {
+            OR: [
+              { cityId: city.id }, // Direct match on city
+              {
+                AND: [
+                  // Provider has this city as a service location
+                  {
+                    providerId: {
+                      in: await getProviderIdsWithCity(city.id)
+                    }
+                  },
+                  // The service is either in this city or has no city specified
+                  {
+                    OR: [
+                      { cityId: city.id },
+                      { cityId: null }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       include: {
         provider: {
@@ -248,5 +271,29 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
         </Box>
       </Container>
     );
+  }
+}
+
+// Helper function to get providers who serve this city
+async function getProviderIdsWithCity(cityId: string): Promise<string[]> {
+  try {
+    const providersWithCity = await prisma.$queryRaw`
+      SELECT p."userId" as "providerId"
+      FROM "ProviderCity" pc
+      JOIN "Provider" p ON pc."providerId" = p.id
+      WHERE pc."cityId" = ${cityId}
+    `;
+    
+    const providerIds: string[] = [];
+    if (Array.isArray(providersWithCity) && providersWithCity.length > 0) {
+      providersWithCity.forEach((p: any) => {
+        if (p.providerId) providerIds.push(p.providerId);
+      });
+    }
+    
+    return providerIds;
+  } catch (error) {
+    console.error(`Error finding providers for city ${cityId}:`, error);
+    return [];
   }
 } 

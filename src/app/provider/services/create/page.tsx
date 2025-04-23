@@ -117,6 +117,9 @@ export default function CreateServicePage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Add state for category filters
+  const [categoryFilters, setCategoryFilters] = useState<any[]>([]);
+  
   // Add state for the current add-on being edited
   const [currentAddon, setCurrentAddon] = useState({
     title: '',
@@ -157,10 +160,7 @@ export default function CreateServicePage() {
         const citiesData = await citiesResponse.json();
         setCities(citiesData.data || []);
         
-        // If there's at least one city, set it as default
-        if (citiesData.data && citiesData.data.length > 0) {
-          setFormData(prev => ({ ...prev, cityId: citiesData.data[0].id }));
-        }
+        // Don't set default city anymore
       } catch (error) {
         console.error('Error fetching data:', error);
         setLoadingError(error instanceof Error ? error.message : 'Failed to load required data');
@@ -199,16 +199,7 @@ export default function CreateServicePage() {
         setCities(cityData.data || []);
         setCategories(categoryData.data || []);
 
-        // Auto-select the Soft play category if available
-        if (categoryData.data && categoryData.data.length > 0) {
-          const softPlayCategory = categoryData.data.find(cat => cat.name === 'Soft play') || categoryData.data[0];
-          
-          setFormData(prev => ({
-            ...prev,
-            categoryId: softPlayCategory.id
-          }));
-        }
-
+        // Don't auto-select any category, let the user choose
       } catch (error) {
         console.error('Error loading data:', error);
         setError('Failed to load necessary data. Please try again later.');
@@ -219,6 +210,43 @@ export default function CreateServicePage() {
 
     loadData();
   }, []);
+  
+  // Add function to fetch category filters
+  const fetchCategoryFilters = async (categoryId: string) => {
+    try {
+      const response = await fetch(`/api/categories/filters?categoryId=${categoryId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch category filters: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const newFilters = data.data || [];
+        setCategoryFilters(newFilters);
+        console.log('Fetched category filters:', newFilters);
+        
+        // Clear existing filter values when category changes
+        // This prevents invalid filter values from being submitted
+        setFormData(prev => ({
+          ...prev,
+          filterValues: {} // Reset all filter values for the new category
+        }));
+      } else {
+        console.error('Failed to fetch category filters:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching category filters:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load category filters. Some options may not be available.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -270,13 +298,17 @@ export default function CreateServicePage() {
       newErrors.categoryId = 'Category is required';
     }
     
-    if (!formData.cityId) {
-      newErrors.cityId = 'City is required';
-    }
-    
-    if (formData.colors.length === 0) {
-      newErrors.colors = 'At least one color must be selected';
-    }
+    // Validate required category filters
+    categoryFilters.forEach(filter => {
+      if (filter.isRequired) {
+        const value = formData.filterValues[filter.id];
+        
+        if (value === undefined || value === null || value === '' || 
+            (Array.isArray(value) && value.length === 0)) {
+          newErrors[`filter_${filter.id}`] = `${filter.name} is required`;
+        }
+      }
+    });
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -363,11 +395,40 @@ export default function CreateServicePage() {
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setIsLoading(true);
     setErrors({});
 
     try {
+      // Check if we have unfilled add-on form fields that might confuse the user
+      const hasPartialAddon = currentAddon.title || currentAddon.price;
+      
+      if (hasPartialAddon) {
+        // Ask user if they want to include the current add-on or discard it
+        const shouldAddIncomplete = window.confirm(
+          'You have partially filled out an add-on but have not added it to your service. ' +
+          'Click OK to add this add-on or Cancel to ignore it and continue.'
+        );
+        
+        if (shouldAddIncomplete) {
+          // Check if we have enough info to add the add-on
+          if (currentAddon.title && currentAddon.price) {
+            // Add the add-on to the form data
+            addOrUpdateAddon();
+          } else {
+            toast({
+              title: 'Cannot Add Incomplete Add-on',
+              description: 'Please complete the add-on fields or clear them before continuing.',
+              status: 'warning',
+              duration: 3000,
+              isClosable: true,
+            });
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+
       // Validate required fields
       const requiredFields = ['name', 'description', 'price', 'categoryId'];
       const newErrors: Record<string, string> = {};
@@ -378,6 +439,12 @@ export default function CreateServicePage() {
         }
       });
 
+      // Special validation for categoryId to ensure it's selected from the database
+      if (!formData.categoryId) {
+        newErrors.categoryId = 'Please select a category from the dropdown';
+      }
+
+      // Check if we have any validation errors
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         toast({
@@ -401,6 +468,7 @@ export default function CreateServicePage() {
       // Construct the data to send to the API
       const serviceData = {
         ...formData,
+        photos: uploadedImages,
         filterValues: validFilterValues,
         // Format the weekAvailability array to match what the backend expects
         weekAvailability: formData.weekAvailability,
@@ -408,10 +476,19 @@ export default function CreateServicePage() {
         addons: formData.addons.map(addon => ({
           title: addon.title,
           description: addon.description || '',
-          price: parseFloat(addon.price),
+          price: parseFloat(addon.price || '0'),
           thumbnail: addon.thumbnail || null
-        }))
+        })),
       };
+
+      console.log("Submitting service data:", {
+        ...serviceData,
+        // Log key properties for debugging
+        categoryId: serviceData.categoryId,
+        price: serviceData.price,
+        photoCount: serviceData.photos?.length || 0,
+        addonsCount: serviceData.addons?.length || 0
+      });
 
       // Submit the data
       const response = await fetch('/api/provider/services', {
@@ -625,28 +702,30 @@ export default function CreateServicePage() {
               <FormErrorMessage>{errors.name}</FormErrorMessage>
             </FormControl>
             
-            {/* Category Field - Hidden since we now just have "Soft play" */}
-            <input 
-              type="hidden"
-              name="categoryId"
-              value={formData.categoryId}
-            />
-            
-            <FormControl isRequired isInvalid={!!errors.cityId}>
-              <FormLabel>Borough</FormLabel>
+            <FormControl isRequired isInvalid={!!errors.categoryId}>
+              <FormLabel>Category</FormLabel>
               <Select
-                name="cityId"
-                value={formData.cityId}
-                onChange={handleChange}
-                placeholder="Select borough"
+                name="categoryId"
+                value={formData.categoryId}
+                onChange={(e) => {
+                  handleChange(e);
+                  // Fetch filters for the selected category
+                  if (e.target.value) {
+                    fetchCategoryFilters(e.target.value);
+                  }
+                }}
+                placeholder="Select a category"
               >
-                {cities.map((city) => (
-                  <option key={city.id} value={city.id}>
-                    {city.name}
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
                   </option>
                 ))}
               </Select>
-              <FormErrorMessage>{errors.cityId}</FormErrorMessage>
+              <Text fontSize="sm" color="gray.600" mt={1}>
+                Choose the most appropriate category for your service. This determines what specific details customers will see.
+              </Text>
+              <FormErrorMessage>{errors.categoryId}</FormErrorMessage>
             </FormControl>
             
             <FormControl isRequired isInvalid={!!errors.price}>
@@ -678,36 +757,164 @@ export default function CreateServicePage() {
               <FormErrorMessage>{errors.description}</FormErrorMessage>
             </FormControl>
             
-            {/* Colors Selection */}
-            <FormControl isRequired isInvalid={!!errors.colors}>
-              <FormLabel>Available Colors</FormLabel>
-              <Text fontSize="sm" color="gray.600" mb={3}>
-                Select all colors available for your soft play equipment
-              </Text>
-              <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
-                {['Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple', 'Orange', 'White'].map(color => (
-                  <Box 
-                    key={color} 
-                    borderWidth="1px" 
-                    borderRadius="md" 
-                    p={3}
-                    bg={formData.colors.includes(color) ? `${color.toLowerCase()}.100` : 'white'}
-                    borderColor={formData.colors.includes(color) ? `${color.toLowerCase()}.300` : 'gray.200'}
-                  >
-                    <Flex align="center">
-                      <input 
-                        type="checkbox" 
-                        style={{ marginRight: '12px' }}
-                        checked={formData.colors.includes(color)}
-                        onChange={() => handleColorsChange(color)}
-                      />
-                      <Text>{color}</Text>
-                    </Flex>
-                  </Box>
-                ))}
-              </SimpleGrid>
-              <FormErrorMessage>{errors.colors}</FormErrorMessage>
-            </FormControl>
+            {/* Dynamic Category Filters */}
+            {formData.categoryId && categoryFilters.length > 0 && (
+              <Box mt={6}>
+                <Heading as="h3" size="md" mb={4}>
+                  Additional Details
+                </Heading>
+                <Divider mb={4} />
+                
+                <VStack spacing={4} align="stretch">
+                  {categoryFilters.map(filter => (
+                    <FormControl 
+                      key={filter.id} 
+                      isRequired={filter.isRequired}
+                      isInvalid={!!errors[`filter_${filter.id}`]}
+                    >
+                      <FormLabel>
+                        {filter.name}
+                        {filter.iconUrl && (
+                          <Image
+                            src={filter.iconUrl}
+                            alt={filter.name}
+                            boxSize="16px"
+                            display="inline-block"
+                            ml={2}
+                            verticalAlign="middle"
+                          />
+                        )}
+                      </FormLabel>
+                      
+                      {/* Render different input types based on filter type */}
+                      {filter.options.length === 0 ? (
+                        // Text input for text-only filters
+                        <Input
+                          value={formData.filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                          placeholder={`Enter ${filter.name.toLowerCase()}`}
+                        />
+                      ) : filter.type === 'color' ? (
+                        // Color selection
+                        <SimpleGrid columns={{ base: 2, md: 4 }} spacing={2}>
+                          {filter.options.map(option => {
+                            const colorMap: Record<string, string> = {
+                              'Red': 'red.500',
+                              'Blue': 'blue.500',
+                              'Green': 'green.500',
+                              'Yellow': 'yellow.400',
+                              'Purple': 'purple.500',
+                              'Pink': 'pink.400',
+                              'Orange': 'orange.500',
+                              'White': 'gray.100',
+                              'Black': 'gray.800',
+                              'Gray': 'gray.500',
+                              'Brown': 'orange.800',
+                              'Teal': 'teal.500',
+                            };
+                            
+                            const colorValue = colorMap[option] || 'gray.400';
+                            const isSelected = formData.filterValues[filter.id] === option ||
+                              (Array.isArray(formData.filterValues[filter.id]) && 
+                               formData.filterValues[filter.id]?.includes(option));
+                            
+                            return (
+                              <Box
+                                key={option}
+                                borderWidth="1px"
+                                borderRadius="md"
+                                p={2}
+                                cursor="pointer"
+                                bg={isSelected ? 'blue.50' : 'white'}
+                                borderColor={isSelected ? 'blue.300' : 'gray.200'}
+                                onClick={() => handleFilterChange(filter.id, option)}
+                                _hover={{ bg: 'gray.50' }}
+                              >
+                                <Flex align="center" justify="center">
+                                  <Box 
+                                    w="12px" 
+                                    h="12px" 
+                                    borderRadius="full" 
+                                    bg={colorValue}
+                                    mr={2}
+                                  />
+                                  <Text fontSize="sm">{option}</Text>
+                                  {isSelected && (
+                                    <Box ml="auto" color="blue.500">✓</Box>
+                                  )}
+                                </Flex>
+                              </Box>
+                            );
+                          })}
+                        </SimpleGrid>
+                      ) : filter.type === 'size' || filter.type === 'material' ? (
+                        // Single select dropdown
+                        <Select
+                          value={formData.filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                          placeholder={`Select ${filter.name.toLowerCase()}`}
+                        >
+                          {filter.options.map(option => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        // Multi-select checkboxes for features
+                        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+                          {filter.options.map(option => {
+                            const isSelected = Array.isArray(formData.filterValues[filter.id]) &&
+                              formData.filterValues[filter.id]?.includes(option);
+                            
+                            return (
+                              <Box 
+                                key={option}
+                                borderWidth="1px"
+                                borderRadius="md"
+                                p={2}
+                                bg={isSelected ? 'blue.50' : 'white'}
+                                borderColor={isSelected ? 'blue.300' : 'gray.200'}
+                              >
+                                <Flex align="center">
+                                  <input
+                                    type="checkbox"
+                                    style={{ marginRight: '12px' }}
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      const currentValues = Array.isArray(formData.filterValues[filter.id])
+                                        ? [...formData.filterValues[filter.id]]
+                                        : [];
+                                        
+                                      if (isSelected) {
+                                        handleFilterChange(
+                                          filter.id, 
+                                          currentValues.filter(val => val !== option)
+                                        );
+                                      } else {
+                                        handleFilterChange(
+                                          filter.id,
+                                          [...currentValues, option]
+                                        );
+                                      }
+                                    }}
+                                  />
+                                  <Text fontSize="sm">{option}</Text>
+                                </Flex>
+                              </Box>
+                            );
+                          })}
+                        </SimpleGrid>
+                      )}
+                      
+                      <FormErrorMessage>
+                        {errors[`filter_${filter.id}`]}
+                      </FormErrorMessage>
+                    </FormControl>
+                  ))}
+                </VStack>
+              </Box>
+            )}
             
             {/* Availability Days */}
             <FormControl>
@@ -872,7 +1079,10 @@ export default function CreateServicePage() {
               {/* Current Add-ons List */}
               {formData.addons.length > 0 && (
                 <Box mb={6}>
-                  <Text fontWeight="medium" mb={2}>Current Add-ons:</Text>
+                  <Heading as="h4" size="sm" mb={3} display="flex" alignItems="center">
+                    <Box bg="green.500" w="4px" h="20px" mr={2} borderRadius="md"></Box>
+                    Add-ons Added to This Service ({formData.addons.length})
+                  </Heading>
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                     {formData.addons.map((addon, index) => (
                       <Box 
@@ -881,6 +1091,9 @@ export default function CreateServicePage() {
                         borderRadius="md" 
                         p={4}
                         position="relative"
+                        boxShadow="sm"
+                        _hover={{ boxShadow: "md" }}
+                        transition="box-shadow 0.2s"
                       >
                         {addon.thumbnail && (
                           <Image 
@@ -925,11 +1138,19 @@ export default function CreateServicePage() {
               )}
               
               {/* Add New Add-on Form */}
-              <Box borderWidth="1px" borderRadius="md" p={4} bg="gray.50">
-                <Heading size="sm" mb={3}>Add New Add-on</Heading>
+              <Box borderWidth="1px" borderRadius="md" p={4} bg="gray.50" boxShadow="sm">
+                <Heading size="sm" mb={3} display="flex" alignItems="center">
+                  <Box bg="blue.500" w="4px" h="20px" mr={2} borderRadius="md"></Box>
+                  {currentAddon.title ? 'Edit Add-on' : 'Create a New Add-on (Optional)'}
+                </Heading>
+                
+                <Text fontSize="sm" color="blue.600" mb={4}>
+                  Add-ons are completely optional. You can add as many as you want or none at all.
+                  {formData.addons.length > 0 && ' You have already added some add-ons to this service.'}
+                </Text>
                 
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={3}>
-                  <FormControl isRequired>
+                  <FormControl>
                     <FormLabel fontSize="sm">Title</FormLabel>
                     <Input
                       name="title"
@@ -940,7 +1161,7 @@ export default function CreateServicePage() {
                     />
                   </FormControl>
                   
-                  <FormControl isRequired>
+                  <FormControl>
                     <FormLabel fontSize="sm">Price</FormLabel>
                     <NumberInput
                       min={0}
@@ -991,15 +1212,35 @@ export default function CreateServicePage() {
                   )}
                 </FormControl>
                 
-                <Button
-                  onClick={addOrUpdateAddon}
-                  leftIcon={<AddIcon />}
-                  colorScheme="blue"
-                  size="md"
-                  width="full"
-                >
-                  Add to Service
-                </Button>
+                <Flex gap={2}>
+                  <Button
+                    onClick={addOrUpdateAddon}
+                    leftIcon={<AddIcon />}
+                    colorScheme="blue"
+                    size="md"
+                    flex="1"
+                    isDisabled={!currentAddon.title || !currentAddon.price}
+                  >
+                    {currentAddon.title && currentAddon.price 
+                      ? `${formData.addons.some(a => a.title === currentAddon.title) ? 'Update' : 'Add'} "${currentAddon.title}" Add-on` 
+                      : 'Add Optional Add-on'}
+                  </Button>
+                  
+                  {(currentAddon.title || currentAddon.price || currentAddon.description || currentAddon.thumbnail) && (
+                    <Button
+                      colorScheme="gray"
+                      size="md"
+                      onClick={() => setCurrentAddon({
+                        title: '',
+                        description: '',
+                        price: '',
+                        thumbnail: ''
+                      })}
+                    >
+                      Clear Form
+                    </Button>
+                  )}
+                </Flex>
               </Box>
             </Box>
             
@@ -1009,16 +1250,17 @@ export default function CreateServicePage() {
               </Text>
               
               <Flex gap={4} direction={{ base: 'column', md: 'row' }}>
-              <Button
-                type="submit"
-                colorScheme="brand"
-                size="lg"
+                <Button
+                  type="button" 
+                  colorScheme="brand"
+                  size="lg"
                   flexGrow={1}
-                isLoading={isSubmitting}
-                loadingText="Creating..."
-              >
-                Create Service
-              </Button>
+                  isLoading={isSubmitting}
+                  loadingText="Creating..."
+                  onClick={handleSubmit}
+                >
+                  Create Service
+                </Button>
                 
                 <Button
                   variant="outline"

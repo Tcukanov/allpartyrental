@@ -64,6 +64,8 @@ interface Service {
   availableHoursEnd: string;
   minRentalHours: number;
   maxRentalHours: number;
+  colors: string[];
+  filterValues: Record<string, string | string[]>;
 }
 
 export default function EditServicePage({ params }: { params: Promise<{ id: string }> }) {
@@ -90,6 +92,8 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
     availableHoursEnd: '',
     minRentalHours: 0,
     maxRentalHours: 0,
+    colors: [],
+    filterValues: {},
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -101,6 +105,9 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  
+  // Add state for category filters
+  const [categoryFilters, setCategoryFilters] = useState<any[]>([]);
   
   useEffect(() => {
     const fetchServiceDetails = async () => {
@@ -151,10 +158,17 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
           availableHoursEnd: service.availableHoursEnd || '',
           minRentalHours: service.minRentalHours || 0,
           maxRentalHours: service.maxRentalHours || 0,
+          colors: service.colors || [],
+          filterValues: service.filterValues || {},
         });
         
         // Set uploaded images
         setUploadedImages(service.photos || []);
+        
+        // Fetch category filters for this service's category
+        if (service.categoryId) {
+          await fetchCategoryFilters(service.categoryId);
+        }
         
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -175,6 +189,35 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
       fetchServiceDetails();
     }
   }, [id, session, toast]);
+  
+  // Function to fetch category filters
+  const fetchCategoryFilters = async (categoryId: string) => {
+    try {
+      const response = await fetch(`/api/categories/filters?categoryId=${categoryId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch category filters: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setCategoryFilters(data.data || []);
+        console.log('Fetched category filters:', data.data);
+      } else {
+        console.error('Failed to fetch category filters:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching category filters:', error);
+      toast({
+        title: 'Warning',
+        description: 'Failed to load category filters. Some options may not be available.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
   
   // Check if user is authenticated and has provider role
   useEffect(() => {
@@ -213,14 +256,8 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
 
         setCities(cityData.data || []);
         setCategories(categoryData.data || []);
-
-        // Make sure the service's category is selected even if it's the only option
-        if (formData && categoryData.data && formData.categoryId) {
-          setFormData(prev => ({
-            ...prev,
-            categoryId: formData.categoryId
-          }));
-        }
+        
+        // Removed the formData update that was causing the infinite loop
       } catch (error) {
         console.error('Error loading data:', error);
         toast({
@@ -233,10 +270,9 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
       }
     }
 
-    if (formData) {
-      loadCategoriesAndCities();
-    }
-  }, [formData, toast]);
+    // Only run once when the component mounts, not on every formData change
+    loadCategoriesAndCities();
+  }, [toast]); // Removed formData dependency
   
   if (status === 'loading' || isLoading) {
     return (
@@ -312,9 +348,17 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
       newErrors.categoryId = 'Category is required';
     }
     
-    if (!formData.cityId) {
-      newErrors.cityId = 'City is required';
-    }
+    // Validate required category filters
+    categoryFilters.forEach(filter => {
+      if (filter.isRequired) {
+        const value = formData.filterValues[filter.id];
+        
+        if (value === undefined || value === null || value === '' || 
+            (Array.isArray(value) && value.length === 0)) {
+          newErrors[`filter_${filter.id}`] = `${filter.name} is required`;
+        }
+      }
+    });
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -437,6 +481,8 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
           availableHoursEnd: formData.availableHoursEnd,
           minRentalHours: formData.minRentalHours,
           maxRentalHours: formData.maxRentalHours,
+          colors: formData.colors,
+          filterValues: formData.filterValues,
         }),
       });
       
@@ -480,6 +526,38 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
         return { ...prev, availableDays: days.filter(d => d !== day) };
       } else {
         return { ...prev, availableDays: [...days, day] };
+      }
+    });
+  };
+  
+  // Add a handler for filter values
+  const handleFilterChange = (filterId: string, value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      filterValues: {
+        ...prev.filterValues,
+        [filterId]: value
+      }
+    }));
+    
+    // Clear error when field is updated
+    if (errors[`filter_${filterId}`]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`filter_${filterId}`];
+        return newErrors;
+      });
+    }
+  };
+  
+  // Add a handler for colors
+  const handleColorsChange = (color: string) => {
+    setFormData(prev => {
+      const colors = [...prev.colors];
+      if (colors.includes(color)) {
+        return { ...prev, colors: colors.filter(c => c !== color) };
+      } else {
+        return { ...prev, colors: [...colors, color] };
       }
     });
   };
@@ -642,25 +720,164 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
                 name="categoryId"
                 value={formData.categoryId}
               />
-              
-              {/* City Field */}
-              <FormControl isRequired isInvalid={!!errors.cityId}>
-                <FormLabel>Borough</FormLabel>
-                <Select
-                  name="cityId"
-                  value={formData.cityId}
-                  onChange={handleChange}
-                  placeholder="Select borough"
-                >
-                  {cities.map((city) => (
-                    <option key={city.id} value={city.id}>
-                      {city.name}
-                    </option>
-                  ))}
-                </Select>
-                <FormErrorMessage>{errors.cityId}</FormErrorMessage>
-              </FormControl>
             </SimpleGrid>
+            
+            {/* Dynamic Category Filters */}
+            {categoryFilters.length > 0 && (
+              <Box mt={6}>
+                <Heading as="h3" size="md" mb={4}>
+                  Additional Details
+                </Heading>
+                <VStack spacing={4} align="stretch">
+                  {categoryFilters.map(filter => (
+                    <FormControl 
+                      key={filter.id} 
+                      isRequired={filter.isRequired}
+                      isInvalid={!!errors[`filter_${filter.id}`]}
+                    >
+                      <FormLabel>
+                        {filter.name}
+                        {filter.iconUrl && (
+                          <Image
+                            src={filter.iconUrl}
+                            alt={filter.name}
+                            boxSize="16px"
+                            display="inline-block"
+                            ml={2}
+                            verticalAlign="middle"
+                          />
+                        )}
+                      </FormLabel>
+                      
+                      {/* Render different input types based on filter type */}
+                      {filter.options.length === 0 ? (
+                        // Text input for text-only filters
+                        <Input
+                          value={formData.filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                          placeholder={`Enter ${filter.name.toLowerCase()}`}
+                        />
+                      ) : filter.type === 'color' ? (
+                        // Color selection
+                        <SimpleGrid columns={{ base: 2, md: 4 }} spacing={2}>
+                          {filter.options.map(option => {
+                            const colorMap: Record<string, string> = {
+                              'Red': 'red.500',
+                              'Blue': 'blue.500',
+                              'Green': 'green.500',
+                              'Yellow': 'yellow.400',
+                              'Purple': 'purple.500',
+                              'Pink': 'pink.400',
+                              'Orange': 'orange.500',
+                              'White': 'gray.100',
+                              'Black': 'gray.800',
+                              'Gray': 'gray.500',
+                              'Brown': 'orange.800',
+                              'Teal': 'teal.500',
+                            };
+                            
+                            const colorValue = colorMap[option] || 'gray.400';
+                            const isSelected = formData.filterValues[filter.id] === option ||
+                              (Array.isArray(formData.filterValues[filter.id]) && 
+                               formData.filterValues[filter.id]?.includes(option));
+                            
+                            return (
+                              <Box
+                                key={option}
+                                borderWidth="1px"
+                                borderRadius="md"
+                                p={2}
+                                cursor="pointer"
+                                bg={isSelected ? 'blue.50' : 'white'}
+                                borderColor={isSelected ? 'blue.300' : 'gray.200'}
+                                onClick={() => handleFilterChange(filter.id, option)}
+                                _hover={{ bg: 'gray.50' }}
+                              >
+                                <Flex align="center" justify="center">
+                                  <Box 
+                                    w="12px" 
+                                    h="12px" 
+                                    borderRadius="full" 
+                                    bg={colorValue}
+                                    mr={2}
+                                  />
+                                  <Text fontSize="sm">{option}</Text>
+                                  {isSelected && (
+                                    <Box ml="auto" color="blue.500">✓</Box>
+                                  )}
+                                </Flex>
+                              </Box>
+                            );
+                          })}
+                        </SimpleGrid>
+                      ) : filter.type === 'size' || filter.type === 'material' ? (
+                        // Single select dropdown
+                        <Select
+                          value={formData.filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                          placeholder={`Select ${filter.name.toLowerCase()}`}
+                        >
+                          {filter.options.map(option => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        // Multi-select checkboxes for features
+                        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+                          {filter.options.map(option => {
+                            const isSelected = Array.isArray(formData.filterValues[filter.id]) &&
+                              formData.filterValues[filter.id]?.includes(option);
+                            
+                            return (
+                              <Box 
+                                key={option}
+                                borderWidth="1px"
+                                borderRadius="md"
+                                p={2}
+                                bg={isSelected ? 'blue.50' : 'white'}
+                                borderColor={isSelected ? 'blue.300' : 'gray.200'}
+                              >
+                                <Flex align="center">
+                                  <input
+                                    type="checkbox"
+                                    style={{ marginRight: '12px' }}
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      const currentValues = Array.isArray(formData.filterValues[filter.id])
+                                        ? [...formData.filterValues[filter.id]]
+                                        : [];
+                                        
+                                      if (isSelected) {
+                                        handleFilterChange(
+                                          filter.id, 
+                                          currentValues.filter(val => val !== option)
+                                        );
+                                      } else {
+                                        handleFilterChange(
+                                          filter.id,
+                                          [...currentValues, option]
+                                        );
+                                      }
+                                    }}
+                                  />
+                                  <Text fontSize="sm">{option}</Text>
+                                </Flex>
+                              </Box>
+                            );
+                          })}
+                        </SimpleGrid>
+                      )}
+                      
+                      <FormErrorMessage>
+                        {errors[`filter_${filter.id}`]}
+                      </FormErrorMessage>
+                    </FormControl>
+                  ))}
+                </VStack>
+              </Box>
+            )}
             
             <FormControl>
               <FormLabel>Service Images (Max 5)</FormLabel>

@@ -46,20 +46,19 @@ import {
   FiHelpCircle,
   FiZap,
   FiFilter,
+  FiTag,
+  FiAlertCircle,
+  FiFileText,
+  FiMap,
 } from 'react-icons/fi';
 import { MdDashboard } from 'react-icons/md';
 import NotificationComponent from '@/components/notification/notificationComponent';
 
-const NAV_ITEMS = [
+export const AdminNavbarItems = [
   {
     label: 'Dashboard',
-    href: '/admin/dashboard',
-    icon: MdDashboard,
-  },
-  {
-    label: 'Transactions',
-    href: '/admin/transactions',
-    icon: FiDollarSign,
+    href: '/admin',
+    icon: FiHome,
   },
   {
     label: 'Users',
@@ -67,9 +66,29 @@ const NAV_ITEMS = [
     icon: FiUsers,
   },
   {
-    label: 'Finances',
-    href: '/admin/finances',
-    icon: FiActivity,
+    label: 'Services',
+    href: '/admin/services',
+    icon: FiTag,
+  },
+  {
+    label: 'Service Approvals',
+    href: '/admin/services/approval',
+    icon: FiAlertCircle,
+  },
+  {
+    label: 'Transactions',
+    href: '/admin/transactions',
+    icon: FiDollarSign,
+  },
+  {
+    label: 'Locations',
+    href: '/admin/locations',
+    icon: FiMap,
+  },
+  {
+    label: 'Categories',
+    href: '/admin/categories',
+    icon: FiServer,
   },
   {
     label: 'Category Filters',
@@ -77,19 +96,19 @@ const NAV_ITEMS = [
     icon: FiFilter,
   },
   {
-    label: 'System Status',
-    href: '/admin/system',
-    icon: FiServer,
+    label: 'Reports',
+    href: '/admin/reports',
+    icon: FiFileText,
+  },
+  {
+    label: 'Activity Logs',
+    href: '/admin/activity',
+    icon: FiActivity,
   },
   {
     label: 'Settings',
     href: '/admin/settings',
     icon: FiSettings,
-  },
-  {
-    label: 'Documentation',
-    href: '/admin/docs',
-    icon: FiHelpCircle,
   },
 ];
 
@@ -130,7 +149,7 @@ export default function AdminNavbar() {
             </Box>
             
             <HStack as="nav" spacing={4} display={{ base: 'none', md: 'flex' }}>
-              {NAV_ITEMS.map((navItem) => (
+              {AdminNavbarItems.map((navItem) => (
                 <Link
                   key={navItem.label}
                   as={NextLink}
@@ -209,7 +228,7 @@ export default function AdminNavbar() {
 
           <DrawerBody>
             <Stack spacing={4} mt={4}>
-              {NAV_ITEMS.map((navItem) => (
+              {AdminNavbarItems.map((navItem) => (
                 <Link
                   key={navItem.label}
                   as={NextLink}
