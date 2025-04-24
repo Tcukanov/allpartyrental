@@ -655,7 +655,13 @@ export default function CreateServicePage() {
 
   // Add a function to edit an existing add-on
   const editAddon = (index: number) => {
-    setCurrentAddon(formData.addons[index]);
+    const addon = formData.addons[index];
+    setCurrentAddon({
+      title: addon.title,
+      description: addon.description || '',
+      price: addon.price,
+      thumbnail: addon.thumbnail || ''
+    });
     
     // Remove it from the list (will be added back when user saves)
     removeAddon(index);

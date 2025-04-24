@@ -3,11 +3,13 @@ import { prisma } from '@/lib/prisma/client';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
-
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+
     if (!id) {
       return NextResponse.json(
         { success: false, error: { message: 'Service ID is required' } },
@@ -46,7 +48,7 @@ export async function GET(
       { status: 200 }
     );
   } catch (error) {
-    console.error(`Error fetching addons for service ${id}:`, error);
+    console.error(`Error fetching addons for service:`, error);
     
     return NextResponse.json(
       { 

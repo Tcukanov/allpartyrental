@@ -7,9 +7,13 @@ import { authOptions } from '@/lib/auth/auth-options';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Unwrap the params Promise
+    const unwrappedParams = await params;
+    const { id } = unwrappedParams;
+    
     const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
@@ -27,7 +31,6 @@ export async function PUT(
       );
     }
 
-    const { id } = params;
     const data = await request.json();
     
     // Extract the data we want to update
