@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Get request data
     const data = await request.json();
-    const { serviceId, offerId, amount, providerId, bookingDate, duration, comments, isFixedPrice, addons } = data;
+    const { serviceId, offerId, amount, providerId } = data;
 
     // Validate request data
     if ((!serviceId && !offerId) || !amount || !providerId) {
@@ -99,16 +99,11 @@ export async function POST(request: NextRequest) {
         // First, fetch the service to get provider information
         const service = await prisma.service.findUnique({
           where: { id: serviceId },
-          include: {
+      include: {
             provider: {
-              select: {
-                id: true,
-                name: true,
-                profile: {
-                  select: {
-                    id: true
-                  }
-                }
+          select: {
+            id: true,
+                name: true
               }
             },
             city: {
@@ -136,69 +131,47 @@ export async function POST(request: NextRequest) {
             error: { message: 'Service is missing provider information', details: 'providerId is required' } 
           }, { status: 400 });
         }
-
-        // We need a cityId for the transaction, either from the service or from the provider
-        let cityId = service.cityId;
         
-        // If the service doesn't have a city, get a default city
-        if (!cityId) {
-          console.log('Service missing city ID, fetching a default city');
-          
-          // Try to get the first city from the database
-          const defaultCity = await prisma.city.findFirst({
-            orderBy: {
-              name: 'asc'
-            }
-          });
-          
-          if (defaultCity) {
-            cityId = defaultCity.id;
-            console.log(`Using default city: ${defaultCity.name} (${cityId})`);
-          } else {
-            console.error('No default city found in database');
-            return NextResponse.json({ 
-              success: false, 
-              error: { message: 'Cannot process transaction without city information. Please contact support.' } 
-            }, { status: 400 });
-          }
+        if (!service.cityId) {
+          console.error('Service missing city ID:', service);
+          return NextResponse.json({ 
+            success: false, 
+            error: { message: 'Service is missing location information', details: 'cityId is required' } 
+          }, { status: 400 });
         }
         
-        console.log(`Service found with city ID: ${cityId}`, JSON.stringify(service, null, 2));
+        console.log(`Service found:`, JSON.stringify(service, null, 2));
         
         // Instead of using a transaction, perform steps individually with better error handling
         
         // 1. Create a temporary party
         let party;
         try {
-          console.log("Creating party for transaction...");
-          
-          // Extract time from booking date or use default
-          let bookingTime = '12:00'; // Default time
-          if (bookingDate) {
-            try {
-              // Try to extract time from ISO datetime string
-              const dateObj = new Date(bookingDate);
-              bookingTime = `${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
-            } catch (e) {
-              console.warn('Could not parse time from booking date, using default time:', e);
-            }
-          }
-          
-          // Create minimal party data without a party theme
-          party = await prisma.party.create({
-            data: {
-              clientId: userId,
-              cityId: cityId,
-              name: `${service.name} Booking`,
-              date: new Date(bookingDate || new Date()),
-              startTime: bookingTime,
-              duration: Number(duration) || 1,
-              guestCount: 1,
-              status: 'DRAFT'
-            }
+          console.log("Creating new party for service:", {
+            serviceId: service.id,
+            serviceName: service.name,
+            cityId: service.cityId,
+            userId: userId
           });
           
-          console.log(`Created party: ${party.id}`);
+          // Create a new party directly - don't try to reuse existing ones
+          party = await prisma.party.create({
+            data: {
+              name: `Service Booking: ${service.name}`,
+              date: new Date(),
+              startTime: '00:00',
+              duration: 1,
+              guestCount: 1,
+              status: 'DRAFT',
+              clientId: userId,
+              cityId: service.cityId
+            }
+          });
+          console.log(`Created new party: ${party.id}`);
+          
+          if (!party || !party.id) {
+            throw new Error('Failed to create party - no ID returned');
+          }
         } catch (err) {
           console.error('Error creating party:', err);
           return NextResponse.json(
@@ -225,14 +198,7 @@ export async function POST(request: NextRequest) {
           partyService = await prisma.partyService.create({
             data: {
               partyId: party.id,
-              serviceId: service.id,
-              specificOptions: addons && addons.length > 0 ? { 
-                addons: addons.map(addon => ({
-                  id: addon.id,
-                  title: addon.title,
-                  price: addon.price
-                }))
-              } : undefined
+              serviceId: service.id
             }
           });
           console.log(`Created party service: ${partyService.id}`);

@@ -22,9 +22,12 @@ import {
   Spinner,
   Flex,
   Badge,
+  Checkbox,
+  Link,
 } from '@chakra-ui/react';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { formatCurrency } from '@/lib/utils/formatters';
+import NextLink from 'next/link';
 
 const CARD_ELEMENT_OPTIONS = {
   style: {
@@ -55,14 +58,23 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
   const [transaction, setTransaction] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
   const [reviewDeadline, setReviewDeadline] = useState(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Calculate total amount (including platform fee)
   const servicePrice = offer?.price || service?.price || 0;
   // Fixed price regardless of duration
   const baseAmount = Number(servicePrice);
+  
+  // Calculate addon prices if present
+  const selectedAddons = bookingDetails?.addons || [];
+  const addonsTotal = selectedAddons.reduce((total, addon) => 
+    total + Number(addon.price), 0
+  );
+  
   const serviceFeePercent = 5.0; // 5% platform fee for clients
-  const serviceFee = baseAmount * (serviceFeePercent / 100);
-  const totalAmount = baseAmount + Number(serviceFee);
+  const subtotal = baseAmount + addonsTotal;
+  const serviceFee = subtotal * (serviceFeePercent / 100);
+  const totalAmount = subtotal + Number(serviceFee);
 
   const handleCardChange = (event) => {
     setCardError(event.error?.message || null);
@@ -77,6 +89,17 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
         description: "Please try again later.",
         status: "error",
         duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+    
+    if (!termsAccepted) {
+      toast({
+        title: "Terms and Conditions",
+        description: "You must accept the Terms and Conditions to proceed.",
+        status: "error",
+        duration: 3000,
         isClosable: true,
       });
       return;
@@ -224,12 +247,13 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
           body: JSON.stringify({
             offerId: offer?.id,
             serviceId: !offer ? service.id : null,
-            amount: baseAmount,
+            amount: totalAmount, // Use total amount including add-ons
             providerId: offer?.providerId || service?.providerId,
             bookingDate: bookingDetails?.isoDateTime,
             duration: bookingDetails?.duration,
             comments: bookingDetails?.comments,
-            isFixedPrice: true
+            isFixedPrice: true,
+            addons: bookingDetails?.addons || [] // Include selected add-ons
           }),
         });
       
@@ -346,6 +370,12 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
           
           if (paymentIntent.status === 'requires_capture') {
             setIsComplete(true);
+            
+            // Update terms acceptance after successful payment
+            if (transaction && transaction.id) {
+              await updateTermsAcceptance(transaction.id);
+            }
+            
             toast({
               title: "Payment authorized!",
               description: "Your payment has been authorized and will be held in escrow. The provider now has 24 hours to review and approve your request.",
@@ -444,6 +474,34 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
     </VStack>
   );
 
+  // After a successful transaction creation, update with terms acceptance
+  const updateTermsAcceptance = async (transactionId) => {
+    try {
+      console.log('Updating terms acceptance for transaction:', transactionId);
+      // Update the transaction with terms acceptance status
+      const termsResponse = await fetch(`/api/transactions/${transactionId}/terms-accepted`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          termsAccepted: true,
+          termsType: 'service-booking'
+        }),
+      });
+      
+      if (!termsResponse.ok) {
+        throw new Error(`Failed to update terms acceptance: ${termsResponse.status}`);
+      }
+      
+      const termsData = await termsResponse.json();
+      console.log('Terms acceptance updated:', termsData);
+    } catch (termsError) {
+      console.error('Error updating terms acceptance:', termsError);
+      // Continue with payment even if terms update fails
+    }
+  };
+
   return (
     <Card borderRadius="lg" overflow="hidden" variant="outline">
       <CardBody>
@@ -469,6 +527,23 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
               <Text>Service Price (fixed):</Text>
               <Text>{formatCurrency(servicePrice)}</Text>
             </HStack>
+            
+            {/* Add-ons section */}
+            {selectedAddons && selectedAddons.length > 0 && (
+              <Box my={2}>
+                <Text fontWeight="medium">Add-ons:</Text>
+                {selectedAddons.map((addon) => (
+                  <HStack key={addon.id} justify="space-between" mb={1} pl={4}>
+                    <Text fontSize="sm">{addon.title}</Text>
+                    <Text fontSize="sm">{formatCurrency(addon.price)}</Text>
+                  </HStack>
+                ))}
+                <HStack justify="space-between" mb={1}>
+                  <Text>Add-ons Subtotal:</Text>
+                  <Text>{formatCurrency(addonsTotal)}</Text>
+                </HStack>
+              </Box>
+            )}
             
             {bookingDetails?.duration > 0 && (
               <HStack justify="space-between" mb={1}>
@@ -505,6 +580,19 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
                 {cardError}
               </Text>
             )}
+          </Box>
+          
+          {/* Terms and Conditions Acceptance */}
+          <Box mt={2}>
+            <FormControl isRequired>
+              <Checkbox 
+                isChecked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                colorScheme="blue"
+              >
+                I accept the <NextLink href="/terms" passHref legacyBehavior><Link color="blue.500">Terms of Service</Link></NextLink> and <NextLink href="/terms/soft-play" passHref legacyBehavior><Link color="blue.500">Soft Play Service Agreement</Link></NextLink>
+              </Checkbox>
+            </FormControl>
           </Box>
           
           <Box>

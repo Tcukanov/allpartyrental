@@ -48,6 +48,7 @@ const ServiceRequestButton = ({ service, offer }) => {
   const [selectedDuration, setSelectedDuration] = useState(service?.minRentalHours || 1);
   const [bookingComments, setBookingComments] = useState('');
   const [bookingAddress, setBookingAddress] = useState('');
+  const [selectedAddons, setSelectedAddons] = useState([]);
   const [bookingDetails, setBookingDetails] = useState(null);
 
   console.log("ServiceRequestButton received service:", JSON.stringify({
@@ -81,62 +82,63 @@ const ServiceRequestButton = ({ service, offer }) => {
   const handleAddressChange = (address) => {
     setBookingAddress(address);
   };
+  
+  const handleAddonsChange = (addons) => {
+    console.log("Selected addons:", addons);
+    setSelectedAddons(addons);
+  };
 
   const handleProceedToPayment = () => {
     if (!selectedDate || !selectedTime) {
       toast({
-        title: "Missing Information",
-        description: "Please select both a date and time for your booking",
-        status: "error",
+        title: "Incomplete Information",
+        description: "Please select a date and time for your booking.",
+        status: "warning",
         duration: 3000,
         isClosable: true,
       });
       return;
     }
 
-    // Format the booking details for display and API submission
-    const bookingInfo = {
+    if (!bookingAddress) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide the address where the service will be delivered.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    // Create booking details object
+    const bookingDate = new Date(selectedDate);
+    const [hours, minutes] = selectedTime.split(':');
+    bookingDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+    const newBookingDetails = {
       date: selectedDate,
       time: selectedTime,
       duration: selectedDuration,
       comments: bookingComments,
       address: bookingAddress,
+      addons: selectedAddons,
       formattedDate: selectedDate.toLocaleDateString('en-US', { 
         weekday: 'long', 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric' 
       }),
-      // Format as ISO string for API
-      isoDateTime: new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth(),
-        selectedDate.getDate(),
-        selectedTime.split(':')[0],
-        selectedTime.split(':')[1]
-      ).toISOString()
+      isoDateTime: bookingDate.toISOString()
     };
 
-    setBookingDetails(bookingInfo);
-    setActiveStep(1); // Move to payment step
+    setBookingDetails(newBookingDetails);
+    setActiveStep(1);
   };
 
   const handlePaymentComplete = (transaction) => {
-    setPaymentCompleted(true);
-    setActiveStep(2); // Move to confirmation step
-    
-    toast({
-      title: "Service Request Submitted",
-      description: "Your payment has been authorized and the provider has been notified. You will be redirected to your transactions page.",
-      status: "success",
-      duration: 5000,
-      isClosable: true,
-    });
-    
-    // Redirect to transactions page after a short delay
-    setTimeout(() => {
-      router.push('/client/transactions');
-    }, 3000);
+    console.log("Payment completed with transaction:", transaction);
+    setActiveStep(2);
   };
 
   const handleBack = () => {
@@ -154,6 +156,7 @@ const ServiceRequestButton = ({ service, offer }) => {
       setActiveStep(0);
       setSelectedDate(null);
       setSelectedTime('');
+      setSelectedAddons([]);
       setBookingDetails(null);
       setPaymentCompleted(false);
     }, 300);
@@ -178,6 +181,7 @@ const ServiceRequestButton = ({ service, offer }) => {
       duration: selectedDuration,
       address: bookingAddress,
       comments: bookingComments,
+      addons: selectedAddons
     };
   };
 
@@ -271,6 +275,7 @@ const ServiceRequestButton = ({ service, offer }) => {
                 onDurationSelect={handleDurationSelect}
                 onCommentChange={handleCommentChange}
                 onAddressChange={handleAddressChange}
+                onAddonsChange={handleAddonsChange}
               />
             )}
             
@@ -309,6 +314,16 @@ const ServiceRequestButton = ({ service, offer }) => {
                       {bookingDetails.comments}
                     </Text>
                   )}
+                  {bookingDetails?.addons && bookingDetails.addons.length > 0 && (
+                    <Box mt={2}>
+                      <Text fontWeight="bold">Add-ons:</Text>
+                      {bookingDetails.addons.map((addon) => (
+                        <Text key={addon.id} fontSize="sm" ml={2}>
+                          • {addon.title} (${Number(addon.price).toFixed(2)})
+                        </Text>
+                      ))}
+                    </Box>
+                  )}
                 </Box>
                 <Text>
                   Your payment will only be processed if the provider accepts your request.
@@ -326,7 +341,7 @@ const ServiceRequestButton = ({ service, offer }) => {
                 <Button 
                   colorScheme="blue" 
                   onClick={handleProceedToPayment}
-                  isDisabled={!selectedDate || !selectedTime}
+                  isDisabled={!selectedDate || !selectedTime || !bookingAddress}
                 >
                   Proceed to Payment
                 </Button>

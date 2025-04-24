@@ -138,6 +138,8 @@ export default function ServiceDetailPage({ params }) {
   const [userRole, setUserRole] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [categoryFilters, setCategoryFilters] = useState({});
+  const [serviceAddons, setServiceAddons] = useState([]);
+  const [isLoadingAddons, setIsLoadingAddons] = useState(false);
   
   // For client components, use React.use() to unwrap the params Promise
   const unwrappedParams = React.use(params);
@@ -207,6 +209,9 @@ export default function ServiceDetailPage({ params }) {
           } else {
             setIsOwner(false);
           }
+          
+          // Fetch service add-ons
+          await fetchServiceAddons(data.data.id);
           
           // Fetch category filters if there's metadata
           if (data.data?.metadata && data.data.categoryId) {
@@ -283,6 +288,26 @@ export default function ServiceDetailPage({ params }) {
         });
         
         setCategoryFilters(filtersObject);
+        console.log('Category filters loaded:', filtersObject);
+        
+        // Check for specific filter types
+        const colorFilter = Object.values(filtersObject).find(f => 
+          f.type?.toLowerCase() === 'color' || 
+          f.name?.toLowerCase().includes('color')
+        );
+        const sizeFilter = Object.values(filtersObject).find(f => 
+          f.type?.toLowerCase() === 'size' || 
+          f.name?.toLowerCase().includes('size') ||
+          f.name?.toLowerCase().includes('space')
+        );
+        const capacityFilter = Object.values(filtersObject).find(f => 
+          f.type?.toLowerCase() === 'capacity' || 
+          f.name?.toLowerCase().includes('capacity')
+        );
+        
+        console.log('Color filter:', colorFilter);
+        console.log('Size filter:', sizeFilter);
+        console.log('Capacity filter:', capacityFilter);
       }
     } catch (error) {
       console.error('Error fetching category filters:', error);
@@ -294,12 +319,14 @@ export default function ServiceDetailPage({ params }) {
     if (!service || !service.metadata) return {};
     
     try {
+      let result = {};
       if (typeof service.metadata === 'string') {
         const metadata = JSON.parse(service.metadata);
-        return metadata.filterValues || {};
+        result = metadata.filterValues || {};
       }
       
-      return {};
+      console.log('Extracted filter values:', result);
+      return result;
     } catch (error) {
       console.error('Error parsing metadata:', error);
       return {};
@@ -313,6 +340,33 @@ export default function ServiceDetailPage({ params }) {
     }
     
     return value;
+  };
+  
+  // Helper function to find a filter by type
+  const findFilterByType = (type) => {
+    if (!categoryFilters) return null;
+    
+    // Try different matching strategies
+    let filter = Object.values(categoryFilters).find(f => 
+      f.type?.toLowerCase() === type.toLowerCase()
+    );
+    
+    // If not found, try by name
+    if (!filter) {
+      filter = Object.values(categoryFilters).find(f => 
+        f.name?.toLowerCase().includes(type.toLowerCase())
+      );
+    }
+    
+    // If still not found, try by ID
+    if (!filter) {
+      filter = Object.values(categoryFilters).find(f => 
+        f.id?.toLowerCase().includes(type.toLowerCase())
+      );
+    }
+    
+    console.log(`Finding ${type} filter:`, filter);
+    return filter;
   };
   
   // Handle booking request
@@ -434,6 +488,54 @@ export default function ServiceDetailPage({ params }) {
     }
   }, [service, id]);
   
+  // Add an effect to debug service and filter data when both are loaded
+  useEffect(() => {
+    if (service && Object.keys(categoryFilters).length > 0) {
+      console.log('Service metadata:', service.metadata);
+      console.log('All category filters:', categoryFilters);
+      
+      // Extract and log filter values
+      const filterValues = extractFilterValues(service);
+      console.log('Filter values:', filterValues);
+      
+      // Check for specific filters
+      const colorFilter = findFilterByType('color');
+      const sizeFilter = findFilterByType('size');
+      const capacityFilter = findFilterByType('capacity');
+      
+      console.log('Color filter with icon?', colorFilter?.iconUrl ? 'YES' : 'NO');
+      console.log('Size filter with icon?', sizeFilter?.iconUrl ? 'YES' : 'NO');
+      console.log('Capacity filter with icon?', capacityFilter?.iconUrl ? 'YES' : 'NO');
+    }
+  }, [service, categoryFilters]);
+  
+  const fetchServiceAddons = async (serviceId) => {
+    setIsLoadingAddons(true);
+    try {
+      const response = await fetch(`/api/services/${serviceId}/addons`);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch service add-ons:', response.status);
+        setServiceAddons([]);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        setServiceAddons(data.data);
+        console.log(`Loaded ${data.data.length} add-ons for service`);
+      } else {
+        setServiceAddons([]);
+      }
+    } catch (error) {
+      console.error('Error fetching service add-ons:', error);
+      setServiceAddons([]);
+    } finally {
+      setIsLoadingAddons(false);
+    }
+  };
+  
   if (isLoading) {
     return (
       <Container maxW="container.lg" py={10}>
@@ -531,7 +633,7 @@ export default function ServiceDetailPage({ params }) {
           <Box flex="1" mr={4} mb={4}>
             <Heading as="h1" size="xl" mb={2}>
               {service.name}
-                        </Heading>
+            </Heading>
             
             <Flex align="center" mb={2}>
               <Icon as={FaUser} mr={2} color="blue.500" />
@@ -549,10 +651,61 @@ export default function ServiceDetailPage({ params }) {
               {service.tags && service.tags.map(tag => (
                 <Badge key={tag} colorScheme="gray" mr={2} mb={2}>
                   {tag}
-                    </Badge>
-                  ))}
+                </Badge>
+              ))}
+            </Flex>
+            
+            {/* Specifications right after category */}
+            <Box mb={4}>
+              <Heading as="h3" size="sm" mb={3}>
+                Specifications
+              </Heading>
+              <Box p={4} borderWidth="1px" borderRadius="md">
+                <Flex alignItems="center" flexWrap="wrap" gap={4}>
+                  <Flex alignItems="center">
+                    {(() => {
+                      // Try all possible ways to get the color icon
+                      const iconUrl = service.metadata?.colorIcon || 
+                                     findFilterByType('color')?.iconUrl || 
+                                     Object.values(categoryFilters).find(f => f.name?.toLowerCase().includes('color'))?.iconUrl;
+                      
+                      return iconUrl ? <Image src={iconUrl} alt="Color" boxSize="20px" mr={2} /> : null;
+                    })()}
+                    <Text fontSize="md" fontWeight="bold">Available Colors:</Text>
+                    <Text fontSize="md" mr={4}>{service.colors && service.colors.length > 0 ? service.colors.join(', ') : 'Grey'}</Text>
+                  </Flex>
+                  
+                  <Flex alignItems="center">
+                    {(() => {
+                      // Try all possible ways to get the size/space icon
+                      const iconUrl = service.metadata?.spaceIcon || 
+                                     service.metadata?.sizeIcon || 
+                                     findFilterByType('size')?.iconUrl || 
+                                     findFilterByType('space')?.iconUrl || 
+                                     Object.values(categoryFilters).find(f => f.name?.toLowerCase().includes('size') || f.name?.toLowerCase().includes('space'))?.iconUrl;
+                      
+                      return iconUrl ? <Image src={iconUrl} alt="Space" boxSize="20px" mr={2} /> : null;
+                    })()}
+                    <Text fontSize="md" fontWeight="bold">Space Required:</Text>
+                    <Text fontSize="md" mr={4}>{service.metadata?.spaceRequired || service.metadata?.space || 'Small (under 100 sq ft)'}</Text>
+                  </Flex>
+                  
+                  <Flex alignItems="center">
+                    {(() => {
+                      // Try all possible ways to get the capacity icon
+                      const iconUrl = service.metadata?.capacityIcon || 
+                                     findFilterByType('capacity')?.iconUrl || 
+                                     Object.values(categoryFilters).find(f => f.name?.toLowerCase().includes('capacity') || f.name?.toLowerCase().includes('people'))?.iconUrl;
+                      
+                      return iconUrl ? <Image src={iconUrl} alt="Capacity" boxSize="20px" mr={2} /> : null;
+                    })()}
+                    <Text fontSize="md" fontWeight="bold">Max Capacity:</Text>
+                    <Text fontSize="md">{service.metadata?.maxCapacity || service.metadata?.capacity || '1-5 children'}</Text>
+                  </Flex>
                 </Flex>
               </Box>
+            </Box>
+          </Box>
           
           <Box width={{ base: "100%", md: "auto" }} mb={4}>
             <Stack spacing={4} bg="" p={6} borderRadius="md" width={{ base: "100%", md: "300px" }} boxShadow="sm">
@@ -635,60 +788,52 @@ export default function ServiceDetailPage({ params }) {
           <Text whiteSpace="pre-wrap">{service.description}</Text>
         </Box>
         
-        {/* Service Specifications */}
-        <Box>
-          <Heading as="h2" size="md" mb={4}>
-            Specifications
-          </Heading>
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-            {/* Colors */}
-            {service.colors && service.colors.length > 0 && (
-              <Box p={4} borderWidth="1px" borderRadius="md">
-                <Heading as="h3" size="sm" mb={3}>
-                  Available Colors
-                </Heading>
-                <Flex wrap="wrap" gap={2}>
-                  {service.colors.map((color, index) => (
-                    <Badge 
-                      key={index} 
-                      px={2} 
-                      py={1} 
-                      borderRadius="full"
-                      bg={`${color.toLowerCase()}.100`}
-                      color={`${color.toLowerCase()}.800`}
-                    >
-                      {color}
-                    </Badge>
-                  ))}
-                </Flex>
-              </Box>
-            )}
-            
-            {/* Category Filters */}
-            {service.metadata && (
-              <>
-                {Object.entries(extractFilterValues(service)).map(([filterId, value]) => {
-                  if (!value || (Array.isArray(value) && value.length === 0)) return null;
-                  
-                  // Use the filter name from fetched filters or create a formatted name from the ID
-                  const filterName = categoryFilters[filterId]?.name || 
-                    filterId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-                  
-                  return (
-                    <Box key={filterId} p={4} borderWidth="1px" borderRadius="md">
-                      <Heading as="h3" size="sm" mb={3}>
-                        {filterName}
-                      </Heading>
-                      <Text>
-                        {getFilterDisplay(value)}
+        {/* Add-ons Section */}
+        {serviceAddons && serviceAddons.length > 0 && (
+          <Box mt={6}>
+            <Heading as="h2" size="md" mb={4}>
+              Available Add-ons
+            </Heading>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+              {serviceAddons.map((addon) => (
+                <Flex 
+                  key={addon.id} 
+                  borderWidth="1px" 
+                  borderRadius="md" 
+                  p={4}
+                  align="center"
+                >
+                  {addon.thumbnail && (
+                    <Image 
+                      src={addon.thumbnail} 
+                      alt={addon.title}
+                      boxSize="60px"
+                      borderRadius="md"
+                      mr={4}
+                      objectFit="cover"
+                    />
+                  )}
+                  <Box flex="1">
+                    <Flex justify="space-between" mb={1}>
+                      <Heading as="h3" size="sm">{addon.title}</Heading>
+                      <Text fontWeight="bold" color="green.500">
+                        ${Number(addon.price).toFixed(2)}
                       </Text>
-                    </Box>
-                  );
-                })}
-              </>
-            )}
-          </SimpleGrid>
-        </Box>
+                    </Flex>
+                    {addon.description && (
+                      <Text fontSize="sm" color="gray.600">
+                        {addon.description}
+                      </Text>
+                    )}
+                    {addon.isRequired && (
+                      <Badge colorScheme="red" mt={2}>Required</Badge>
+                    )}
+                  </Box>
+                </Flex>
+              ))}
+            </SimpleGrid>
+          </Box>
+        )}
         
         {service.features && service.features.length > 0 && (
           <Box>

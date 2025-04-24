@@ -19,14 +19,16 @@ import {
   Badge,
   useToast,
   Textarea,
+  Divider
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
 import { FiClock, FiCalendar } from 'react-icons/fi';
+import AddOnSelector from './AddOnSelector';
 
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDurationSelect, onCommentChange, onAddressChange }) => {
+const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDurationSelect, onCommentChange, onAddressChange, onAddonsChange }) => {
   const toast = useToast();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -158,6 +160,12 @@ const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDu
     
     if (onDurationSelect) {
       onDurationSelect(duration);
+    }
+  };
+  
+  const handleAddonsChange = (selectedAddons) => {
+    if (onAddonsChange) {
+      onAddonsChange(selectedAddons);
     }
   };
   
@@ -332,6 +340,14 @@ const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDu
               </FormControl>
             </VStack>
           </Box>
+          
+          {/* Service Add-ons */}
+          {service && service.id && (
+            <AddOnSelector 
+              serviceId={service.id}
+              onAddonsChange={handleAddonsChange}
+            />
+          )}
         </Box>
       )}
       
