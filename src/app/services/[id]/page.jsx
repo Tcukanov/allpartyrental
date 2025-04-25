@@ -657,11 +657,9 @@ export default function ServiceDetailPage({ params }) {
             
             {/* Specifications right after category */}
             <Box mb={4}>
-              <Heading as="h3" size="sm" mb={3}>
-                Specifications
-              </Heading>
-              <Box p={4} borderWidth="1px" borderRadius="md">
-                <Flex alignItems="center" flexWrap="wrap" gap={4}>
+         
+              <Box p={4} borderRadius="md">
+                <Grid alignItems="center" flexWrap="wrap" gap={4}>
                   <Flex alignItems="center">
                     {(() => {
                       // Try all possible ways to get the color icon
@@ -702,7 +700,7 @@ export default function ServiceDetailPage({ params }) {
                     <Text fontSize="md" fontWeight="bold">Max Capacity:</Text>
                     <Text fontSize="md">{service.metadata?.maxCapacity || service.metadata?.capacity || '1-5 children'}</Text>
                   </Flex>
-                </Flex>
+                </Grid>
               </Box>
             </Box>
           </Box>
