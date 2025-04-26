@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+[PROJECT_DESCRIPTION.md](mdc:PROJECT_DESCRIPTION.md)
+- You can @ files here
+- You can use markdown but dont have to

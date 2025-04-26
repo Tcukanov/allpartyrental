@@ -1,29 +1,88 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useToast, HStack, Badge, Icon, Spinner, Select, InputGroup, InputLeftElement, Input, Flex, Divider, Checkbox, CheckboxGroup, Stack } from '@chakra-ui/react';
+import { 
+  Box, 
+  Container, 
+  Heading, 
+  Text, 
+  VStack, 
+  SimpleGrid, 
+  Card, 
+  CardBody, 
+  Image, 
+  Button, 
+  useToast, 
+  HStack, 
+  Badge, 
+  Icon, 
+  Spinner, 
+  Select, 
+  InputGroup, 
+  InputLeftElement, 
+  Input, 
+  Flex 
+} from '@chakra-ui/react';
 import { StarIcon, ViewIcon, SearchIcon } from '@chakra-ui/icons';
-import { useRouter } from 'next/navigation';
-import LocationServiceSearch from '@/components/search/LocationServiceSearch';
 import Link from 'next/link';
 
-export default function ServicesPage() {
-  const router = useRouter();
+type City = {
+  id: string;
+  name: string;
+  slug: string;
+  state: string;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type Service = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  photos: string[];
+  colors?: string[];
+  provider: {
+    name: string;
+    profile?: {
+      address?: string;
+      isProStatus?: boolean;
+    };
+  };
+  city?: City;
+};
+
+type Filter = {
+  id: string;
+  name: string;
+  type: string;
+  options: string[];
+  iconUrl?: string;
+};
+
+type ClientProps = {
+  citySlug: string;
+  categorySlug: string;
+};
+
+export default function LocationServiceClientPage({ citySlug, categorySlug }: ClientProps) {
   const toast = useToast();
-  const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [cities, setCities] = useState([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [city, setCity] = useState<City | null>(null);
+  const [category, setCategory] = useState<Category | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedCity, setSelectedCity] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [sortByPrice, setSortByPrice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   
-  // Add state for category filters
-  const [categoryFilters, setCategoryFilters] = useState([]);
-  const [filterValues, setFilterValues] = useState({});
+  // Category filters
+  const [categoryFilters, setCategoryFilters] = useState<Filter[]>([]);
+  const [filterValues, setFilterValues] = useState<Record<string, string | string[]>>({});
   
   const availableColors = ['Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple', 'Orange', 'White'];
   const sortOptions = [
@@ -32,53 +91,51 @@ export default function ServicesPage() {
     { value: 'price_desc', label: 'Price: High to Low' }
   ];
   
+  // Fetch city and category data
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchLocationAndCategory = async () => {
       try {
         setIsLoading(true);
-        // Only fetch categories and cities here
-        const [categoriesRes, citiesRes] = await Promise.all([
-          fetch('/api/categories'),
-          fetch('/api/cities')
-        ]);
-
-        if (!categoriesRes.ok || !citiesRes.ok) {
-          throw new Error('Failed to fetch data');
-        }
-
-        const categoriesData = await categoriesRes.json();
-        const citiesData = await citiesRes.json();
-
-        setCategories(categoriesData.data || []);
-        setCities(citiesData.data || []);
         
-        // If categories are available, automatically select the first one
-        if (categoriesData.data && categoriesData.data.length > 0) {
-          const softPlayCategory = categoriesData.data.find(cat => cat.name === 'Soft play') || categoriesData.data[0];
-          setSelectedCategory(softPlayCategory.id);
-          
-          // Fetch filters for this category
-          await fetchCategoryFilters(softPlayCategory.id);
+        const [cityRes, categoryRes] = await Promise.all([
+          fetch(`/api/cities/${citySlug}`),
+          fetch(`/api/categories/${categorySlug}`)
+        ]);
+        
+        if (!cityRes.ok || !categoryRes.ok) {
+          throw new Error('Failed to load page data');
         }
+        
+        const cityData = await cityRes.json();
+        const categoryData = await categoryRes.json();
+        
+        if (!cityData.success || !categoryData.success) {
+          throw new Error('Failed to load page data');
+        }
+        
+        setCity(cityData.data);
+        setCategory(categoryData.data);
+        
+        // Fetch filters for this category
+        await fetchCategoryFilters(categoryData.data.id);
+        
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching location and category:', error);
         toast({
           title: 'Error',
-          description: error.message || 'Failed to load data',
+          description: 'Failed to load page data',
           status: 'error',
           duration: 3000,
           isClosable: true,
         });
-      } finally {
-        setIsLoading(false);
       }
     };
     
-    fetchData();
-  }, [toast]);
-
-  // Add function to fetch category filters
-  const fetchCategoryFilters = async (categoryId) => {
+    fetchLocationAndCategory();
+  }, [citySlug, categorySlug, toast]);
+  
+  // Fetch category filters
+  const fetchCategoryFilters = async (categoryId: string) => {
     try {
       const response = await fetch(`/api/categories/filters?categoryId=${categoryId}`);
       
@@ -90,7 +147,6 @@ export default function ServicesPage() {
       
       if (data.success) {
         setCategoryFilters(data.data || []);
-        console.log('Fetched category filters:', data.data);
       } else {
         console.error('Failed to fetch category filters:', data.error);
       }
@@ -98,9 +154,11 @@ export default function ServicesPage() {
       console.error('Error fetching category filters:', error);
     }
   };
-
-  // Function to fetch services with filters
+  
+  // Fetch services with filters
   const fetchServices = async () => {
+    if (!city?.id || !category?.id) return;
+    
     setIsLoading(true);
     setErrorMessage('');
     
@@ -108,21 +166,13 @@ export default function ServicesPage() {
       // Build query parameters
       const queryParams = new URLSearchParams();
       
-      if (selectedCategory) {
-        queryParams.append('categoryId', selectedCategory);
-      }
-      
-      // Note: cityId is a required field in the database schema but not prominently
-      // displayed in the frontend UI. It's included in the query for filtering but
-      // the UI de-emphasizes it. See DEVELOPMENT_NOTES.md for more details.
-      if (selectedCity) {
-        queryParams.append('cityId', selectedCity);
-      }
+      queryParams.append('categoryId', category.id);
+      queryParams.append('cityId', city.id);
       
       if (searchTerm && searchTerm.trim()) {
         queryParams.append('search', searchTerm.trim());
       }
-
+      
       if (selectedColor) {
         queryParams.append('color', selectedColor);
       }
@@ -137,28 +187,21 @@ export default function ServicesPage() {
           if (typeof value === 'string') {
             queryParams.append(`filter_${filterId}`, value);
           } else if (Array.isArray(value) && value.length > 0) {
-            // For multi-select filters, we can join values with comma
             queryParams.append(`filter_${filterId}`, value.join(','));
           }
         }
       });
-
-      // Log the query params for debugging
-      console.log('Fetching services with params:', queryParams.toString());
-
+      
       // Use public API endpoint
       const response = await fetch(`/api/services/public?${queryParams.toString()}`);
       
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'No error details available');
-        console.error(`API error: ${response.status}`, errorText);
         throw new Error(`API error: ${response.status}`);
       }
       
       const data = await response.json();
       
       if (data.success) {
-        // Apply client-side sorting if needed
         let sortedServices = data.data || [];
         
         if (sortByPrice && !queryParams.has('sort')) {
@@ -177,7 +220,6 @@ export default function ServicesPage() {
           setErrorMessage('No services found matching your criteria.');
         }
       } else {
-        console.error('Failed to fetch services:', data.error);
         setErrorMessage('Failed to load services. Please try again later.');
         setServices([]);
       }
@@ -189,44 +231,52 @@ export default function ServicesPage() {
       setIsLoading(false);
     }
   };
-
-  // Use effect to fetch services when filters change
+  
+  // Fetch services when filters change or data is loaded
   useEffect(() => {
-    if (!isLoading || categories.length > 0 || cities.length > 0) {
+    if (city && category) {
       fetchServices();
     }
-  }, [selectedCategory, selectedCity, searchTerm, selectedColor, sortByPrice, filterValues]);
-
-  const handleCityChange = (e) => {
-    setSelectedCity(e.target.value);
-  };
+  }, [city, category, searchTerm, selectedColor, sortByPrice, filterValues]);
   
-  const handleSearchChange = (e) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   };
-
-  const handleColorChange = (e) => {
+  
+  const handleColorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedColor(e.target.value);
   };
   
-  const handleSortChange = (e) => {
+  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSortByPrice(e.target.value);
   };
   
-  // Add handler for filter changes
-  const handleFilterChange = (filterId, value) => {
+  const handleFilterChange = (filterId: string, value: string | string[]) => {
     setFilterValues(prev => ({
       ...prev,
       [filterId]: value
     }));
   };
   
+  if (!city || !category) {
+    return (
+      <Container maxW="container.xl" py={8}>
+        <Box display="flex" justifyContent="center" py={12}>
+          <Spinner size="xl" color="brand.500" />
+        </Box>
+      </Container>
+    );
+  }
+  
   return (
     <Container maxW="container.xl" py={8}>
       <Box>
-        <Heading as="h1" size="xl">Browse Our Services</Heading>
-        <Text color="gray.600" mt={2}>
-          Discover our range of soft play services for all your needs
+        <Heading as="h1" size="2xl" mb={4}>
+          {category.name} Rental in {city.name}
+        </Heading>
+        <Text fontSize="xl" color="gray.600">
+          Find and compare the best {category.name.toLowerCase()} rental services in {city.name}. 
+          Read reviews, compare prices, and book your party equipment today!
         </Text>
       </Box>
 
@@ -247,34 +297,6 @@ export default function ServicesPage() {
               />
             </InputGroup>
           </Box>
-        
-          {/* Location filter */}
-          <Box flex="1" minW="200px">
-            <Text fontWeight="medium" mb={2}>Location</Text>
-            <Select placeholder="All Locations" value={selectedCity} onChange={handleCityChange}>
-              {cities.map(city => (
-                <option key={city.id} value={city.id}>
-                  {city.name}
-                </option>
-              ))}
-            </Select>
-          </Box>
-          
-          {/* Color filter */}
-          {/* <Box flex="1" minW="200px">
-            <Text fontWeight="medium" mb={2}>Filter by Color</Text>
-            <Select 
-              placeholder="All Colors" 
-              value={selectedColor} 
-              onChange={handleColorChange}
-            >
-              {availableColors.map(color => (
-                <option key={color} value={color}>
-                  {color}
-                </option>
-              ))}
-            </Select>
-          </Box> */}
           
           {/* Sort by price */}
           <Box flex="1" minW="200px">
@@ -317,20 +339,17 @@ export default function ServicesPage() {
                       )}
                     </Text>
                     
-                    {/* Render different input types based on filter type */}
                     {filter.options.length === 0 ? (
-                      // Text input for text-only filters
                       <Input
-                        value={filterValues[filter.id] || ''}
+                        value={filterValues[filter.id] as string || ''}
                         onChange={(e) => handleFilterChange(filter.id, e.target.value)}
                         placeholder={`Enter ${filter.name.toLowerCase()}`}
                         size="md"
                       />
                     ) : filter.type === 'color' ? (
-                      // Color selection radio buttons
                       <Select
                         placeholder={`Select ${filter.name}`}
-                        value={filterValues[filter.id] || ''}
+                        value={filterValues[filter.id] as string || ''}
                         onChange={(e) => handleFilterChange(filter.id, e.target.value)}
                       >
                         <option value="">All {filter.name}s</option>
@@ -341,10 +360,9 @@ export default function ServicesPage() {
                         ))}
                       </Select>
                     ) : filter.type === 'size' || filter.type === 'material' ? (
-                      // Single select dropdown
                       <Select
                         placeholder={`Select ${filter.name}`}
-                        value={filterValues[filter.id] || ''}
+                        value={filterValues[filter.id] as string || ''}
                         onChange={(e) => handleFilterChange(filter.id, e.target.value)}
                       >
                         <option value="">All {filter.name}s</option>
@@ -355,10 +373,9 @@ export default function ServicesPage() {
                         ))}
                       </Select>
                     ) : (
-                      // Multi-select checkboxes
                       <Select
                         placeholder={`Select ${filter.name}`}
-                        value={filterValues[filter.id]?.[0] || ''}
+                        value={(filterValues[filter.id] as string[])?.length ? (filterValues[filter.id] as string[])[0] : ''}
                         onChange={(e) => {
                           const value = e.target.value;
                           if (value) {
@@ -463,17 +480,13 @@ export default function ServicesPage() {
                       <HStack justify="space-between">
                         <HStack spacing={1}>
                           <Icon as={StarIcon} color="yellow.400" />
-                          <Text fontSize="sm">
-                            {service.rating ? Number(service.rating).toFixed(1) : '4.5'}
-                          </Text>
+                          <Text fontSize="sm">4.5</Text>
                         </HStack>
                         <HStack spacing={1}>
                           <Icon as={ViewIcon} color="gray.500" />
                           <Text fontSize="sm">
                             {service.city?.name || 
-                            (service.provider?.provider?.businessCity ? 
-                              service.provider.provider.businessCity : 
-                              (service.provider?.name ? `${service.provider.name}'s location` : 'Location unavailable'))}
+                            (service.provider?.profile?.address || city.name)}
                           </Text>
                         </HStack>
                       </HStack>
@@ -497,4 +510,4 @@ export default function ServicesPage() {
       </Flex>
     </Container>
   );
-}
+} 

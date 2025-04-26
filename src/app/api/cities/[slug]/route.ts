@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
+import { DEFAULT_CITY_SETTING_KEY } from '@/lib/cities/default-city';
 
 export async function GET(
   request: NextRequest,
@@ -35,10 +36,20 @@ export async function GET(
       );
     }
 
-    console.log(`City found: ${city.name} (${city.id})`);
+    // Check if this is the default city
+    const defaultCitySetting = await prisma.systemSettings.findUnique({
+      where: { key: DEFAULT_CITY_SETTING_KEY }
+    });
+    
+    const isDefault = defaultCitySetting?.value === city.id;
+
+    console.log(`City found: ${city.name} (${city.id}), isDefault: ${isDefault}`);
     return NextResponse.json({
       success: true,
-      data: city
+      data: {
+        ...city,
+        isDefault
+      }
     }, { status: 200 });
   } catch (error) {
     console.error('Error fetching city:', error);

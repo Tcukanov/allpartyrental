@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
           include: {
             party: {
               select: {
+                id: true,
                 name: true,
                 date: true,
                 startTime: true,

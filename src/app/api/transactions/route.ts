@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth/auth-options';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { createProviderNotification } from '@/lib/notifications/notification-service';
+import { getDefaultCity } from '@/lib/cities/default-city';
 
 /**
  * Create a new transaction for a service request
@@ -144,12 +145,7 @@ export async function POST(request: NextRequest) {
         if (!cityId) {
           console.log('Service missing city ID, fetching a default city');
           
-          // Try to get the first city from the database
-          const defaultCity = await prisma.city.findFirst({
-            orderBy: {
-              name: 'asc'
-            }
-          });
+          const defaultCity = await getDefaultCity();
           
           if (defaultCity) {
             cityId = defaultCity.id;

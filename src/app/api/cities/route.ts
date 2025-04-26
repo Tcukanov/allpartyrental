@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { DEFAULT_CITY_SETTING_KEY, setDefaultCity } from '@/lib/cities/default-city';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       ];
       
       // Create the default cities
-      await Promise.all(
+      const createdCities = await Promise.all(
         defaultCities.map(city => 
           prisma.city.create({
             data: city
@@ -31,7 +32,21 @@ export async function GET(request: NextRequest) {
       );
       
       console.log('Default cities created successfully');
+
+      // Set the first city as default
+      if (createdCities.length > 0) {
+        await setDefaultCity(createdCities[0].id);
+        console.log(`Set ${createdCities[0].name} as the default city`);
+      }
     }
+    
+    // Get the default city ID from system settings
+    const defaultCitySetting = await prisma.systemSettings.findUnique({
+      where: { key: DEFAULT_CITY_SETTING_KEY }
+    });
+    
+    const defaultCityId = defaultCitySetting?.value;
+    console.log(`Default city ID from settings: ${defaultCityId || 'not set'}`);
     
     // Get all cities with full logging
     const cities = await prisma.city.findMany({
@@ -45,7 +60,13 @@ export async function GET(request: NextRequest) {
       console.log('Sample city:', JSON.stringify(cities[0]));
     }
 
-    return NextResponse.json({ success: true, data: cities }, { status: 200 });
+    // Add isDefault flag to each city in the response
+    const citiesWithDefaultFlag = cities.map(city => ({
+      ...city,
+      isDefault: city.id === defaultCityId
+    }));
+
+    return NextResponse.json({ success: true, data: citiesWithDefaultFlag }, { status: 200 });
   } catch (error) {
     console.error('Error fetching cities:', error);
     return NextResponse.json(

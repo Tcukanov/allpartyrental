@@ -29,7 +29,7 @@ import {
   VStack,
   Icon,
 } from '@chakra-ui/react';
-import { ChatIcon } from '@chakra-ui/icons';
+import { ChatIcon, CalendarIcon } from '@chakra-ui/icons';
 import { formatDistanceToNow } from 'date-fns';
 import { OfferStatus } from '@prisma/client';
 
@@ -52,6 +52,7 @@ interface Offer {
   };
   partyService: {
     party: {
+      id: string;
       name: string;
       date: string;
       startTime: string;
@@ -363,7 +364,17 @@ export default function ProviderRequestsPage() {
                 <Tr key={offer.id}>
                   <Td>{offer.client.name}</Td>
                   <Td>{offer.service.name}</Td>
-                  <Td>{offer.partyService.party.name}</Td>
+                  <Td>
+                    <Button 
+                      size="sm"
+                      colorScheme="blue"
+                      variant="solid"
+                      rightIcon={<Icon as={CalendarIcon} />}
+                      onClick={() => router.push(`/provider/party/${offer.partyService.party.id}`)}
+                    >
+                      {offer.partyService.party.name}
+                    </Button>
+                  </Td>
                   <Td>${offer.price}</Td>
                   <Td>{getStatusBadge(offer.status)}</Td>
                   <Td>{formatDistanceToNow(new Date(offer.createdAt), { addSuffix: true })}</Td>

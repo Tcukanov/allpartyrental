@@ -123,6 +123,7 @@ model City {
   name           String
   slug           String         @unique
   state          String
+  isDefault      Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   parties        Party[]
