@@ -30,23 +30,33 @@ export async function GET(
       );
     }
 
-    const service = await prisma.service.findUnique({
-      where: { id },
-      include: {
-        category: {
-          include: {
-            filters: true
-          }
-        }
-      }
-    });
-
-    if (!service) {
+    // Use raw query to fetch the service with all its properties
+    const serviceResults = await prisma.$queryRaw`
+      SELECT s.*, 
+             c.id as "categoryId", c.name as "categoryName", 
+             c.slug as "categorySlug", c.description as "categoryDescription"
+      FROM "Service" s
+      LEFT JOIN "ServiceCategory" c ON s."categoryId" = c.id
+      WHERE s.id = ${id}
+      LIMIT 1
+    `;
+    
+    // Check if service exists
+    if (!Array.isArray(serviceResults) || serviceResults.length === 0) {
       return NextResponse.json(
         { success: false, error: { message: 'Service not found' } },
         { status: 404 }
       );
     }
+    
+    const service = serviceResults[0];
+
+    // Fetch the category filters with a separate raw query
+    const categoryFilters = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter"
+      WHERE "categoryId" = ${service.categoryId}
+      ORDER BY "createdAt" ASC
+    `;
 
     let filterValues = {};
     if (service.metadata) {
@@ -61,14 +71,12 @@ export async function GET(
       }
     }
 
-    const categoryFilters = service.category?.filters || [];
-
     return NextResponse.json({
       success: true,
       data: {
         serviceId: service.id,
         filterValues,
-        categoryFilters,
+        categoryFilters: Array.isArray(categoryFilters) ? categoryFilters : [],
         rawMetadata: service.metadata
       }
     });
@@ -116,11 +124,15 @@ export async function PUT(
       );
     }
 
-    const service = await prisma.service.findUnique({
-      where: { id }
-    });
+    // Check if service exists with raw query
+    const serviceResults = await prisma.$queryRaw`
+      SELECT id, "providerId", "categoryId", name
+      FROM "Service"
+      WHERE id = ${id}
+      LIMIT 1
+    `;
 
-    if (!service) {
+    if (!Array.isArray(serviceResults) || serviceResults.length === 0) {
       return NextResponse.json(
         { success: false, error: { message: 'Service not found' } },
         { status: 404 }
@@ -129,16 +141,29 @@ export async function PUT(
 
     const metadata = JSON.stringify({ filterValues });
 
-    const updatedService = await prisma.service.update({
-      where: { id },
-      data: {
-        metadata
-      },
-      include: {
-        category: true,
-        city: true
-      }
-    });
+    // Update service with raw query
+    await prisma.$executeRaw`
+      UPDATE "Service"
+      SET metadata = ${metadata}::jsonb,
+          "updatedAt" = NOW()
+      WHERE id = ${id}
+    `;
+
+    // Fetch updated service with its relations
+    const updatedServiceResults = await prisma.$queryRaw`
+      SELECT s.*, 
+             c.id as "categoryId", c.name as "categoryName", 
+             c.slug as "categorySlug", c.description as "categoryDescription",
+             ct.id as "cityId", ct.name as "cityName", 
+             ct.slug as "citySlug", ct.state as "cityState"
+      FROM "Service" s
+      LEFT JOIN "ServiceCategory" c ON s."categoryId" = c.id
+      LEFT JOIN "City" ct ON s."cityId" = ct.id
+      WHERE s.id = ${id}
+      LIMIT 1
+    `;
+
+    const updatedService = updatedServiceResults[0];
 
     return NextResponse.json({
       success: true,

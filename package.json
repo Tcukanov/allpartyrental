@@ -4,13 +4,15 @@
     "private": true,
     "scripts": {
         "dev": "next dev",
-        "build": "next build",
+        "build": "prisma generate && next build",
         "start": "next start",
         "lint": "next lint",
         "db:seed": "node prisma/seed.js",
         "prisma:generate": "prisma generate",
         "prisma:migrate": "prisma migrate dev",
-        "setup": "chmod +x setup.sh && ./setup.sh"
+        "setup": "chmod +x setup.sh && ./setup.sh",
+        "postinstall": "prisma generate",
+        "vercel-build": "node prisma/generate-client.js && next build"
     },
     "prisma": {
         "seed": "node prisma/seed.js"
@@ -31,7 +33,7 @@
         "date-fns": "^2.30.0",
         "framer-motion": "^10.16.4",
         "io": "^1.5.3",
-        "next": "^15.2.4",
+        "next": "^15.0.0",
         "next-auth": "^4.23.1",
         "openai": "^4.11.1",
         "prisma": "^5.22.0",
@@ -51,7 +53,7 @@
     },
     "devDependencies": {
         "@types/bcrypt": "^5.0.0",
-        "@types/node": "^20.8.3",
+        "@types/node": "^22.15.3",
         "@types/react": "^18.2.25",
         "@types/react-dom": "^18.2.11",
         "eslint": "^8.51.0",

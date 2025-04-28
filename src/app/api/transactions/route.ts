@@ -13,6 +13,11 @@ import { getFeeSettings } from '@/lib/payment/fee-settings';
  * This endpoint allows a client to initialize a transaction for a service
  */
 export async function POST(request: NextRequest) {
+  // Declare variables at the top level so they're accessible throughout the function
+  let party;
+  let partyService;
+  let offerId;
+  
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -28,10 +33,10 @@ export async function POST(request: NextRequest) {
 
     // Get request data
     const data = await request.json();
-    const { serviceId, offerId, amount, providerId, bookingDate, duration, comments, isFixedPrice, addons } = data;
+    const { serviceId, offerId: requestOfferId, amount, providerId, bookingDate, duration, comments, isFixedPrice, addons } = data;
 
     // Validate request data
-    if ((!serviceId && !offerId) || !amount || !providerId) {
+    if ((!serviceId && !requestOfferId) || !amount || !providerId) {
       return NextResponse.json(
         { success: false, error: { message: 'Missing required fields' } },
         { status: 400 }
@@ -45,12 +50,12 @@ export async function POST(request: NextRequest) {
     };
 
     // Handle transaction with offer
-    if (offerId) {
+    if (requestOfferId) {
       // Create a transaction with the offerId
     const transaction = await prisma.transaction.create({
       data: {
             offer: {
-            connect: { id: offerId }
+            connect: { id: requestOfferId }
           },
           amount: new Prisma.Decimal(amount),
           status: 'PENDING',
@@ -59,7 +64,7 @@ export async function POST(request: NextRequest) {
             connect: {
               // We need to find the party associated with this offer
               id: (await prisma.offer.findUnique({
-                where: { id: offerId },
+                where: { id: requestOfferId },
                 select: { partyService: { select: { partyId: true } } }
               }))?.partyService?.partyId || ''
             }
@@ -69,7 +74,7 @@ export async function POST(request: NextRequest) {
 
       // Get the offer details for the notification
       const offer = await prisma.offer.findUnique({
-        where: { id: offerId },
+        where: { id: requestOfferId },
         include: {
           service: true
         }
@@ -97,6 +102,10 @@ export async function POST(request: NextRequest) {
           userId,
           auth: session.user.id === userId ? "Valid" : "Invalid"
         });
+        
+        // Declare these variables at the top level of the try block
+        let party;
+        let partyService;
         
         // First, fetch the service to get provider information
         const service = await prisma.service.findUnique({
@@ -165,7 +174,6 @@ export async function POST(request: NextRequest) {
         // Instead of using a transaction, perform steps individually with better error handling
         
         // 1. Create a temporary party
-        let party;
         try {
           console.log("Creating party for transaction...");
           
@@ -211,7 +219,6 @@ export async function POST(request: NextRequest) {
         }
         
         // 2. Create a party service connection
-        let partyService;
         try {
           console.log("Creating party service with:", {
             partyId: party.id,
@@ -444,30 +451,28 @@ export async function POST(request: NextRequest) {
         if (err instanceof Prisma.PrismaClientKnownRequestError) {
           // Log detailed error information for specific Prisma errors
           if (err.code === 'P2003') {
-            console.error(`Foreign key constraint violation: ${err.meta?.field_name}`);
-            
             // Check if it's specifically the offerId or partyId constraint that failed
             const fieldName = err.meta?.field_name as string | undefined;
             if (fieldName && fieldName.includes('offerId')) {
-              console.error(`The offer ${offer.id} may have been deleted or is invalid`);
+              console.error(`The offer with ID may have been deleted or is invalid`);
             } else if (fieldName && fieldName.includes('partyId')) {
-              console.error(`The party ${party.id} may have been deleted or is invalid`);
+              console.error(`The party with ID may have been deleted or is invalid`);
             }
           } else if (err.code === 'P2002') {
             console.error(`Unique constraint violation: ${err.meta?.target}`);
             
             // Check if it's the offer's unique constraint that failed
             const target = err.meta?.target as string[] | undefined;
-            if (target && target.includes('offerId')) {
+            if (target && target.includes('offerId') && offerId) {
               // Try to find the existing transaction for this offer
               try {
                 const existingTransaction = await prisma.transaction.findUnique({
-                  where: { offerId: offer.id },
+                  where: { offerId },
                   include: { offer: true }
                 });
                 
                 if (existingTransaction) {
-                  console.log(`Found existing transaction for offer ${offer.id}: ${existingTransaction.id}`);
+                  console.log(`Found existing transaction for offer ${offerId}: ${existingTransaction.id}`);
                   return NextResponse.json({ 
                     success: true, 
                     data: { 
@@ -484,25 +489,42 @@ export async function POST(request: NextRequest) {
         }
         
         // Cleanup the offer, party service, and party we created
-        if (offer && offer.id) {
-          await prisma.offer.delete({ where: { id: offer.id } }).catch(e => console.error('Cleanup failed:', e));
+        if (offerId) {
+          // Skip offer cleanup as we don't have access to the offer object here
+          console.log(`Cannot cleanup offer for offerId: ${offerId} as it's not accessible in this scope`);
         }
-        if (partyService && partyService.id) {
-          await prisma.partyService.delete({ where: { id: partyService.id } }).catch(e => console.error('Cleanup failed:', e));
-        }
-        // Only after deleting party service can we delete the party
-        if (party && party.id) {
-          // Double check that no party services remain before deleting
-          const remainingPartyServices = await prisma.partyService.count({
-            where: { partyId: party.id }
-          });
-          
-          if (remainingPartyServices === 0) {
-            await prisma.party.delete({ where: { id: party.id } }).catch(e => console.error('Cleanup failed:', e));
-          } else {
-            console.log(`Cannot delete party ${party.id} as it still has ${remainingPartyServices} services`);
+        
+        // Safe cleanup function that doesn't rely on variables that might be undefined
+        const safeCleanup = async () => {
+          try {
+            // Check if the transaction failed early and we need to cleanup 
+            // a party service that might have been created
+            if (typeof partyService !== 'undefined' && partyService && partyService.id) {
+              await prisma.partyService.delete({ where: { id: partyService.id } })
+                .catch(e => console.error('Party service cleanup failed:', e));
+            }
+            
+            // Only after deleting party service can we delete the party
+            if (typeof party !== 'undefined' && party && party.id) {
+              // Double check that no party services remain before deleting
+              const remainingPartyServices = await prisma.partyService.count({
+                where: { partyId: party.id }
+              });
+              
+              if (remainingPartyServices === 0) {
+                await prisma.party.delete({ where: { id: party.id } })
+                  .catch(e => console.error('Party cleanup failed:', e));
+              } else {
+                console.log(`Cannot delete party ${party.id} as it still has ${remainingPartyServices} services`);
+              }
+            }
+          } catch (cleanupError) {
+            console.error('Error during cleanup:', cleanupError);
           }
-        }
+        };
+        
+        // Run the cleanup
+        await safeCleanup();
         
         return NextResponse.json(
           { 

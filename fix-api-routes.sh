@@ -1,62 +1,34 @@
 #!/bin/bash
 
-# This script updates all API route files to use Promise-based params for Next.js 15 compatibility
+# Script to fix Next.js API route parameters using the correct destructuring format
 
-# Process one file at a time
-process_file() {
-  local file=$1
-  echo "Processing $file..."
+# Find all API route files
+find src/app/api -type f -name "*.ts" | while read -r file; do
+  echo "Checking $file..."
   
-  # Check if the file has a params parameter with a non-Promise type
-  if grep -q "{ params }: { params: { [a-zA-Z0-9]\+: string " "$file"; then
-    echo "  Updating params type in $file"
-    
-    # First, capture the param name
-    param_name=$(grep -o "params: { \([a-zA-Z0-9]\+\): string" "$file" | sed -E 's/params: \{ ([a-zA-Z0-9]+): string.*/\1/')
-    
-    if [ -n "$param_name" ]; then
-      echo "  Found param name: $param_name"
-      
-      # Replace the params type with Promise-based type
-      sed -i '' "s/{ params }: { params: { $param_name: string }/{ params }: { params: Promise<{ $param_name: string }> }/g" "$file"
-      
-      # Update code to unwrap the params Promise
-      # First, check if there's a line extracting the param from params
-      if grep -q "const { $param_name } = params" "$file"; then
-        # Replace the extraction with unwrapping code
-        sed -i '' "/const { $param_name } = params/c\\
-    // Unwrap the params Promise\\
-    const unwrappedParams = await params;\\
-    const { $param_name } = unwrappedParams;" "$file"
-      else
-        # Add the unwrapping code after the params type
-        sed -i '' "/{ params }: { params: Promise<{ $param_name: string }>/a\\
-  try {\\
-    // Unwrap the params Promise\\
-    const unwrappedParams = await params;\\
-    const { $param_name } = unwrappedParams;" "$file"
-      fi
-      
-      # Replace direct params access with the variable name
-      sed -i '' "s/params.$param_name/$param_name/g" "$file"
-      
-      echo "  Updated $file"
-    else
-      echo "  Could not determine param name in $file"
-    fi
-  else
-    echo "  No params to update in $file"
+  # 1. Fix any route using 'context: { params: ... }' format (incorrect)
+  if grep -q "context: { params: { [a-zA-Z0-9]\+: string }" "$file"; then
+    echo "Fixing incorrect context parameter format in $file"
+    sed -i '' 's/context: { params: { \([a-zA-Z0-9]*\): string }/{ params }: { params: { \1: string }/g' "$file"
   fi
-}
-
-# Find all directories with dynamic route parameters
-find src/app/api -path "*\[*" -type d | while read dir; do
-  # Look for route files in these directories
-  for route_file in "$dir/route.ts" "$dir/route.js"; do
-    if [ -f "$route_file" ]; then
-      process_file "$route_file"
-    fi
-  done
+  
+  # 2. Fix any context.params.id usage (incorrect)
+  if grep -q "const [a-zA-Z0-9]\+ = context\.params\.[a-zA-Z0-9]\+;" "$file"; then
+    echo "Fixing incorrect context.params access in $file"
+    sed -i '' 's/const \([a-zA-Z0-9]*\) = context\.params\.\([a-zA-Z0-9]*\);/const \1 = params.\2;/g' "$file"
+  fi
+  
+  # 3. Fix Promise variants with context (incorrect)
+  if grep -q "context: { params: Promise<{ [a-zA-Z0-9]\+: string }>" "$file"; then
+    echo "Fixing incorrect Promise context format in $file"
+    sed -i '' 's/context: { params: Promise<{ \([a-zA-Z0-9]*\): string }>/{ params }: { params: Promise<{ \1: string }>/g' "$file"
+  fi
+  
+  # 4. Fix Promise parameter access with context (incorrect)
+  if grep -q "const [a-zA-Z0-9]\+ = (await context\.params)\.[a-zA-Z0-9]\+;" "$file"; then
+    echo "Fixing incorrect Promise context.params access in $file"
+    sed -i '' 's/const \([a-zA-Z0-9]*\) = (await context\.params)\.\([a-zA-Z0-9]*\);/const \1 = (await params).\2;/g' "$file"
+  fi
 done
 
-echo "All API route files processed." 
+echo "Done!" 

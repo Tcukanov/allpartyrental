@@ -28,24 +28,24 @@ export async function GET(request: NextRequest) {
     // If categoryId is provided, get filters for that category
     let filters;
     if (categoryId) {
-      filters = await prisma.categoryFilter.findMany({
-        where: { categoryId },
-        orderBy: { createdAt: 'asc' },
-      });
+      filters = await prisma.$queryRaw`
+        SELECT * FROM "CategoryFilter"
+        WHERE "categoryId" = ${categoryId}
+        ORDER BY "createdAt" ASC
+      `;
     } else {
       // Otherwise, get all filters with category information
-      filters = await prisma.categoryFilter.findMany({
-        include: {
-          category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'asc' },
-      });
+      filters = await prisma.$queryRaw`
+        SELECT cf.*, 
+          json_build_object(
+            'id', sc.id,
+            'name', sc.name,
+            'slug', sc.slug
+          ) as category
+        FROM "CategoryFilter" cf
+        JOIN "ServiceCategory" sc ON cf."categoryId" = sc.id
+        ORDER BY cf."createdAt" ASC
+      `;
     }
 
     return NextResponse.json({ success: true, data: filters });
@@ -104,15 +104,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for duplicate filter name for this category
-    const existingFilter = await prisma.categoryFilter.findFirst({
-      where: {
-        categoryId,
-        name: {
-          equals: name,
-          mode: 'insensitive',
-        },
-      },
-    });
+    const existingFilters = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter"
+      WHERE "categoryId" = ${categoryId}
+      AND LOWER(name) = LOWER(${name})
+    `;
+    
+    const existingFilter = Array.isArray(existingFilters) && existingFilters.length > 0 
+      ? existingFilters[0] 
+      : null;
 
     if (existingFilter) {
       return NextResponse.json(
@@ -121,18 +121,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the filter with a type assertion to handle the iconUrl field
-    const filter = await prisma.categoryFilter.create({
-      data: {
-        categoryId,
-        name,
-        type,
-        options: sanitizedOptions,
-        isRequired,
-        // Use type assertion to add iconUrl
-        ...(iconUrl ? { iconUrl } : {})
-      } as any,
-    });
+    // Create the filter using raw query
+    const filterId = await prisma.$queryRaw`
+      INSERT INTO "CategoryFilter" (
+        id, 
+        "categoryId", 
+        name, 
+        type, 
+        options, 
+        "isRequired", 
+        "iconUrl", 
+        "createdAt", 
+        "updatedAt"
+      )
+      VALUES (
+        gen_random_uuid(), 
+        ${categoryId}, 
+        ${name}, 
+        ${type}, 
+        ${JSON.stringify(sanitizedOptions)}::jsonb, 
+        ${isRequired}, 
+        ${iconUrl}, 
+        NOW(), 
+        NOW()
+      )
+      RETURNING id
+    `;
+    
+    // Fetch the created filter
+    const filter = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter" 
+      WHERE id = ${Array.isArray(filterId) && filterId.length > 0 ? filterId[0].id : null}
+    `;
 
     return NextResponse.json({ success: true, data: filter }, { status: 201 });
   } catch (error: any) {

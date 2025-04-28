@@ -43,10 +43,14 @@ export async function PUT(
     // Ensure options is an array
     const sanitizedOptions = Array.isArray(options) ? options : [];
 
-    // Check if filter exists
-    const existingFilter = await prisma.categoryFilter.findUnique({
-      where: { id },
-    });
+    // Check if filter exists using raw query
+    const existingFilters = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter" WHERE id = ${id}
+    `;
+    
+    const existingFilter = Array.isArray(existingFilters) && existingFilters.length > 0 
+      ? existingFilters[0] 
+      : null;
 
     if (!existingFilter) {
       return NextResponse.json(
@@ -55,23 +59,27 @@ export async function PUT(
       );
     }
 
-    // Update the filter with type assertion for iconUrl
-    const updateData = {
-      name,
-      type,
-      options: sanitizedOptions,
-      isRequired: isRequired ?? existingFilter.isRequired,
-    };
+    // Update the filter using raw query
+    await prisma.$executeRaw`
+      UPDATE "CategoryFilter" 
+      SET 
+        name = ${name}, 
+        type = ${type}, 
+        options = ${JSON.stringify(sanitizedOptions)}::jsonb, 
+        "isRequired" = ${isRequired ?? existingFilter.isRequired},
+        "iconUrl" = ${iconUrl !== undefined ? iconUrl : existingFilter.iconUrl},
+        "updatedAt" = NOW()
+      WHERE id = ${id}
+    `;
 
-    // Add iconUrl to the update data if it exists
-    if (iconUrl !== undefined) {
-      Object.assign(updateData, { iconUrl });
-    }
-
-    const updatedFilter = await prisma.categoryFilter.update({
-      where: { id },
-      data: updateData as any,
-    });
+    // Fetch the updated record
+    const updatedFilters = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter" WHERE id = ${id}
+    `;
+    
+    const updatedFilter = Array.isArray(updatedFilters) && updatedFilters.length > 0 
+      ? updatedFilters[0] 
+      : null;
 
     return NextResponse.json({ success: true, data: updatedFilter });
   } catch (error: any) {
@@ -109,10 +117,14 @@ export async function DELETE(
       );
     }
 
-    // Check if filter exists
-    const existingFilter = await prisma.categoryFilter.findUnique({
-      where: { id },
-    });
+    // Check if filter exists using raw query
+    const existingFilters = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter" WHERE id = ${id}
+    `;
+    
+    const existingFilter = Array.isArray(existingFilters) && existingFilters.length > 0 
+      ? existingFilters[0] 
+      : null;
 
     if (!existingFilter) {
       return NextResponse.json(
@@ -121,10 +133,10 @@ export async function DELETE(
       );
     }
 
-    // Delete the filter
-    await prisma.categoryFilter.delete({
-      where: { id },
-    });
+    // Delete the filter using raw query
+    await prisma.$executeRaw`
+      DELETE FROM "CategoryFilter" WHERE id = ${id}
+    `;
 
     return NextResponse.json({ success: true, message: 'Filter deleted successfully' });
   } catch (error: any) {

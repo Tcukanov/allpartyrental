@@ -27,15 +27,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Get filters for this category
-    const filters = await prisma.categoryFilter.findMany({
-      where: { categoryId },
-    });
+    const filters = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter"
+      WHERE "categoryId" = ${categoryId}
+    `;
+    
+    // Ensure filters is treated as an array
+    const filtersArray = Array.isArray(filters) ? filters : [];
 
     return NextResponse.json({
       success: true,
       category,
-      filtersCount: filters.length,
-      filters
+      filtersCount: filtersArray.length,
+      filters: filtersArray
     });
   } catch (error) {
     console.error('Error checking filters:', error);

@@ -49,40 +49,64 @@ async function main() {
   
   for (const filter of filters) {
     try {
-      // Check if filter with this name already exists
-      const existingFilter = await prisma.categoryFilter.findFirst({
-        where: {
-          categoryId: targetCategoryId,
-          name: filter.name
-        }
-      });
+      // Check if filter with this name already exists using raw query
+      const existingFilters = await prisma.$queryRaw`
+        SELECT * FROM "CategoryFilter"
+        WHERE "categoryId" = ${targetCategoryId}
+        AND name = ${filter.name}
+      `;
+      
+      const existingFilter = existingFilters.length > 0 ? existingFilters[0] : null;
       
       if (existingFilter) {
         console.log(`Filter "${filter.name}" already exists for this category. Skipping.`);
         continue;
       }
       
-      // Create the filter
-      const result = await prisma.categoryFilter.create({
-        data: {
-          categoryId: targetCategoryId,
-          name: filter.name,
-          type: filter.type,
-          options: filter.options,
-          isRequired: filter.isRequired
-        }
-      });
+      // Create the filter using raw query
+      const result = await prisma.$executeRaw`
+        INSERT INTO "CategoryFilter" (
+          id,
+          "categoryId",
+          name,
+          type,
+          options,
+          "isRequired",
+          "createdAt",
+          "updatedAt"
+        )
+        VALUES (
+          gen_random_uuid(),
+          ${targetCategoryId},
+          ${filter.name},
+          ${filter.type},
+          ${JSON.stringify(filter.options)}::jsonb,
+          ${filter.isRequired},
+          NOW(),
+          NOW()
+        )
+      `;
       
-      console.log(`Created filter: ${result.name} (${result.id})`);
+      // Get the created filter to log it
+      const createdFilter = await prisma.$queryRaw`
+        SELECT * FROM "CategoryFilter"
+        WHERE "categoryId" = ${targetCategoryId}
+        AND name = ${filter.name}
+        ORDER BY "createdAt" DESC
+        LIMIT 1
+      `;
+      
+      console.log(`Created filter: ${filter.name} (${createdFilter[0]?.id || 'unknown'})`);
     } catch (error) {
       console.error(`Error creating filter "${filter.name}":`, error);
     }
   }
   
-  // Verify filters were created
-  const createdFilters = await prisma.categoryFilter.findMany({
-    where: { categoryId: targetCategoryId }
-  });
+  // Verify filters were created using raw query
+  const createdFilters = await prisma.$queryRaw`
+    SELECT * FROM "CategoryFilter"
+    WHERE "categoryId" = ${targetCategoryId}
+  `;
   
   console.log(`\nFilters for category ${categories[0].name}:`);
   createdFilters.forEach(filter => {

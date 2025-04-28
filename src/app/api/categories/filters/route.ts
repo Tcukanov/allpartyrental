@@ -31,10 +31,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Get filters for the specified category
-    const filters = await prisma.categoryFilter.findMany({
-      where: { categoryId },
-      orderBy: { createdAt: 'asc' },
-    });
+    const filters = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter"
+      WHERE "categoryId" = ${categoryId}
+      ORDER BY "createdAt" ASC
+    `;
 
     return NextResponse.json({ success: true, data: filters });
   } catch (error: any) {

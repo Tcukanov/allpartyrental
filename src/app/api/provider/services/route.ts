@@ -44,18 +44,17 @@ interface ServiceWithMetadata {
 // Helper function to validate required filters
 async function validateRequiredFilters(categoryId: string, filterValues: Record<string, any>) {
   try {
-    // Fetch the category filters to check which ones are required
-    const categoryFilters = await prisma.categoryFilter.findMany({
-      where: { 
-        categoryId,
-        isRequired: true 
-      }
-    });
+    // Fetch the category filters to check which ones are required using raw query
+    const categoryFilters = await prisma.$queryRaw`
+      SELECT * FROM "CategoryFilter"
+      WHERE "categoryId" = ${categoryId}
+      AND "isRequired" = true
+    `;
     
     console.log("Required filters for category:", categoryFilters);
     console.log("Filter values provided:", filterValues);
     
-    if (categoryFilters.length === 0) {
+    if (!Array.isArray(categoryFilters) || categoryFilters.length === 0) {
       // No required filters for this category
       return { valid: true };
     }
@@ -201,17 +200,25 @@ export async function POST(request: Request) {
     // Handle color selection
     let colors: string[] = [];
     try {
-      // Fetch category filters to identify color filters
+      // Fetch category and its filters using raw query instead of relation
       const category = await prisma.serviceCategory.findUnique({
-        where: { id: categoryId },
-        include: { filters: true }
+        where: { id: categoryId }
       });
       
       if (!category) {
         return NextResponse.json({ error: 'Category not found' }, { status: 400 });
       }
       
-      const colorFilters = category.filters.filter(filter => filter.type === 'color');
+      // Get the filters for this category with a separate raw query
+      const categoryFilters = await prisma.$queryRaw`
+        SELECT * FROM "CategoryFilter" 
+        WHERE "categoryId" = ${categoryId}
+      `;
+      
+      // Filter to find color filters
+      const colorFilters = Array.isArray(categoryFilters) 
+        ? categoryFilters.filter(filter => filter.type === 'color')
+        : [];
       
       // Extract color values
       for (const filter of colorFilters) {
