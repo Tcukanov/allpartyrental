@@ -6,8 +6,8 @@ import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
-// Mock settings data (in a real app this would be stored in a database)
-const SETTINGS = {
+// Default settings when none are found in the database
+const DEFAULT_SETTINGS = {
   general: {
     siteName: 'AllPartyRent',
     tagline: 'Rent anything, for any party',
@@ -18,14 +18,15 @@ const SETTINGS = {
   },
   payments: {
     currency: 'USD',
-    platformFeePercent: 5,
+    clientFeePercent: 5.0,
+    providerFeePercent: 12.0,
+    escrowPeriodHours: 24,
+    reviewPeriodHours: 24,
     stripeMode: 'test',
     stripeTestPublicKey: 'pk_test_*****',
     stripeTestSecretKey: 'sk_test_*****',
     stripeLivePublicKey: 'pk_live_*****',
     stripeLiveSecretKey: 'sk_live_*****',
-    escrowPeriodDays: 7,
-    reviewPeriodHours: 24,
   },
   notifications: {
     emailNotifications: true,
@@ -51,6 +52,78 @@ const SETTINGS = {
   }
 };
 
+// Helper function to get settings from SystemSettings table
+async function getSettingsFromDatabase() {
+  // Create a settings object with default values
+  const settings = { ...DEFAULT_SETTINGS };
+  
+  try {
+    // Get all settings from the database
+    const dbSettings = await prisma.systemSettings.findMany();
+    
+    // Organize settings by section
+    dbSettings.forEach(setting => {
+      const [section, key] = setting.key.split('.');
+      
+      if (section && key && settings[section]) {
+        try {
+          // Parse values that should be numbers or booleans
+          if (typeof settings[section][key] === 'number') {
+            settings[section][key] = parseFloat(setting.value);
+          } else if (typeof settings[section][key] === 'boolean') {
+            settings[section][key] = setting.value === 'true';
+          } else {
+            settings[section][key] = setting.value;
+          }
+        } catch (e) {
+          console.error(`Error parsing setting ${setting.key}:`, e);
+        }
+      }
+    });
+    
+    return settings;
+  } catch (error) {
+    console.error('Error retrieving settings from database:', error);
+    return settings;
+  }
+}
+
+// Helper function to save settings to SystemSettings table
+async function saveSettingsToDatabase(newSettings) {
+  try {
+    // Flatten the settings object for storage
+    const flatSettings = [];
+    
+    Object.entries(newSettings).forEach(([section, sectionSettings]) => {
+      Object.entries(sectionSettings).forEach(([key, value]) => {
+        flatSettings.push({
+          key: `${section}.${key}`,
+          value: value.toString() // Convert all values to strings for storage
+        });
+      });
+    });
+    
+    // Create a transaction to update all settings at once
+    await prisma.$transaction(
+      flatSettings.map(setting => 
+        prisma.systemSettings.upsert({
+          where: { key: setting.key },
+          update: { value: setting.value },
+          create: {
+            key: setting.key,
+            value: setting.value
+          }
+        })
+      )
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving settings to database:', error);
+    throw error;
+  }
+}
+
 export async function GET(request) {
   try {
     // Check authentication
@@ -75,8 +148,11 @@ export async function GET(request) {
     
     console.info(`Admin retrieved system settings`);
     
+    // Get settings from database
+    const settings = await getSettingsFromDatabase();
+    
     // Return the settings
-    return NextResponse.json(SETTINGS);
+    return NextResponse.json(settings);
   } catch (error) {
     console.error('Error retrieving settings:', error);
     return NextResponse.json(
@@ -119,12 +195,10 @@ export async function POST(request) {
       );
     }
     
-    // In a real app, you would update these settings in your database
-    // For this example, we're just logging that the settings would be updated
-    console.info(`Admin updated system settings`);
+    // Save the settings to the database
+    await saveSettingsToDatabase(newSettings);
     
-    // Here you would actually save the settings
-    // For example: await prisma.settings.update({ data: newSettings })
+    console.info(`Admin updated system settings`);
     
     // Return success
     return NextResponse.json({

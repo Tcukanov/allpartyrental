@@ -205,6 +205,11 @@ export default function MainLayout({ children }) {
                         Transactions
                       </MenuItem>
                     )}
+                    {session.user.role === 'PROVIDER' && (
+                      <MenuItem as={Link} href="/provider/settings/payments">
+                        Payments
+                      </MenuItem>
+                    )}
                     <MenuItem onClick={handleSignOut}>Sign Out</MenuItem>
                   </MenuList>
                 </Menu>
@@ -299,6 +304,18 @@ export default function MainLayout({ children }) {
                       onClick={onMobileNavClose}
                     >
                       Transactions
+                    </Button>
+                  )}
+                  {session.user.role === 'PROVIDER' && (
+                    <Button
+                      as={Link}
+                      href="/provider/settings/payments"
+                      variant="ghost"
+                      w="full"
+                      justifyContent="flex-start"
+                      onClick={onMobileNavClose}
+                    >
+                      Payments
                     </Button>
                   )}
                   <Button

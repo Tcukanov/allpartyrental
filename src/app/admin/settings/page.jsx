@@ -63,6 +63,8 @@ export default function AdminSettingsPage() {
       stripeLiveSecretKey: '',
       escrowPeriodDays: 0,
       reviewPeriodHours: 0,
+      clientFeePercent: 0,
+      providerFeePercent: 0,
     },
     notifications: {
       emailNotifications: false,
@@ -409,19 +411,41 @@ export default function AdminSettingsPage() {
                       </FormControl>
                       
                       <FormControl>
-                        <FormLabel>Platform Fee (%)</FormLabel>
+                        <FormLabel>Client Fee (%)</FormLabel>
                         <InputGroup>
                           <Input
-                            name="platformFeePercent"
+                            name="clientFeePercent"
                             type="number"
                             min="0"
-                            max="100"
+                            max="20"
                             step="0.1"
-                            value={settings.payments.platformFeePercent}
+                            value={settings.payments.clientFeePercent}
                             onChange={handlePaymentsChange}
                           />
                           <InputRightAddon children="%" />
                         </InputGroup>
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          Fee charged to clients, added on top of the service price
+                        </Text>
+                      </FormControl>
+                      
+                      <FormControl gridColumn={{ md: 'span 2' }}>
+                        <FormLabel>Provider Fee (%)</FormLabel>
+                        <InputGroup>
+                          <Input
+                            name="providerFeePercent"
+                            type="number"
+                            min="0"
+                            max="30"
+                            step="0.1"
+                            value={settings.payments.providerFeePercent}
+                            onChange={handlePaymentsChange}
+                          />
+                          <InputRightAddon children="%" />
+                        </InputGroup>
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                          Fee deducted from the provider's payment when funds are released from escrow
+                        </Text>
                       </FormControl>
                     </SimpleGrid>
                   </CardBody>

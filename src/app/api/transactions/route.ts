@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { createProviderNotification } from '@/lib/notifications/notification-service';
 import { getDefaultCity } from '@/lib/cities/default-city';
+import { getFeeSettings } from '@/lib/payment/fee-settings';
 
 /**
  * Create a new transaction for a service request
@@ -377,150 +378,138 @@ export async function POST(request: NextRequest) {
             amount: amount
           });
           
-          // Use proper Prisma transaction creation without duplication
-          try {
-            // Create a transaction using Prisma's standard approach
-            transaction = await prisma.transaction.create({
-              data: {
-                offerId: offer.id,
-                partyId: party.id,
-                amount: new Prisma.Decimal(amount),
-                status: 'PENDING',
-                clientFeePercent: 5.0,
-                providerFeePercent: 10.0
-              },
-              include: {
+          // Get the current fee settings
+          const { clientFeePercent, providerFeePercent } = await getFeeSettings();
+          
+          // Create a transaction using Prisma's standard approach
+          transaction = await prisma.transaction.create({
+            data: {
+              offerId: offer.id,
+              partyId: party.id,
+              amount: new Prisma.Decimal(amount),
+              status: 'PENDING',
+              clientFeePercent: clientFeePercent,
+              providerFeePercent: providerFeePercent
+            },
+            include: {
+              offer: true,
+              party: true
+            }
+          });
+          
+          console.log(`Created transaction with ID: ${transaction.id}`);
+          
+          // Create notification for the provider
+          await createProviderNotification(offer.providerId, transaction.id, service.name);
+        } catch (prismaError) {
+          // Check if this is a unique constraint error (transaction already exists)
+          if (prismaError instanceof Prisma.PrismaClientKnownRequestError && 
+              prismaError.code === 'P2002') {
+            console.log("Transaction already exists for this offer, retrieving existing transaction");
+            
+            // Retrieve the existing transaction
+            const existingTransaction = await prisma.transaction.findUnique({
+              where: { offerId: offer.id },
+              include: { 
                 offer: true,
                 party: true
               }
             });
             
-            console.log(`Created transaction with ID: ${transaction.id}`);
-            
-            // Create notification for the provider
-            await createProviderNotification(offer.providerId, transaction.id, service.name);
-          } catch (prismaError) {
-            // Check if this is a unique constraint error (transaction already exists)
-            if (prismaError instanceof Prisma.PrismaClientKnownRequestError && 
-                prismaError.code === 'P2002') {
-              console.log("Transaction already exists for this offer, retrieving existing transaction");
-              
-              // Retrieve the existing transaction
-              const existingTransaction = await prisma.transaction.findUnique({
-                where: { offerId: offer.id },
-                include: { 
-                  offer: true,
-                  party: true
-                }
-              });
-              
-              if (existingTransaction) {
-                console.log(`Found existing transaction for offer ${offer.id}: ${existingTransaction.id}`);
-                return NextResponse.json({ 
-                  success: true, 
-                  data: { 
-                    transaction: existingTransaction,
-                    isExisting: true 
-                  } 
-                }, { status: 200 });
-              } else {
-                throw new Error(`Could not find existing transaction for offer ${offer.id} despite unique constraint error`);
-              }
-            }
-            
-            // Rethrow any other error
-            throw prismaError;
-          }
-          
-          return NextResponse.json({ 
-            success: true, 
-            data: { transaction } 
-          }, { status: 201 });
-        } catch (err) {
-          console.error('Error creating transaction:', err);
-          
-          if (err instanceof Prisma.PrismaClientKnownRequestError) {
-            // Log detailed error information for specific Prisma errors
-            if (err.code === 'P2003') {
-              console.error(`Foreign key constraint violation: ${err.meta?.field_name}`);
-              
-              // Check if it's specifically the offerId or partyId constraint that failed
-              const fieldName = err.meta?.field_name as string | undefined;
-              if (fieldName && fieldName.includes('offerId')) {
-                console.error(`The offer ${offer.id} may have been deleted or is invalid`);
-              } else if (fieldName && fieldName.includes('partyId')) {
-                console.error(`The party ${party.id} may have been deleted or is invalid`);
-              }
-            } else if (err.code === 'P2002') {
-              console.error(`Unique constraint violation: ${err.meta?.target}`);
-              
-              // Check if it's the offer's unique constraint that failed
-              const target = err.meta?.target as string[] | undefined;
-              if (target && target.includes('offerId')) {
-                // Try to find the existing transaction for this offer
-                try {
-                  const existingTransaction = await prisma.transaction.findUnique({
-                    where: { offerId: offer.id },
-                    include: { offer: true }
-                  });
-                  
-                  if (existingTransaction) {
-                    console.log(`Found existing transaction for offer ${offer.id}: ${existingTransaction.id}`);
-                    return NextResponse.json({ 
-                      success: true, 
-                      data: { 
-                        transaction: existingTransaction,
-                        isExisting: true 
-                      } 
-                    }, { status: 200 });
-                  }
-                } catch (findError) {
-                  console.error('Error finding existing transaction:', findError);
-                }
-              }
-            }
-          }
-          
-          // Cleanup the offer, party service, and party we created
-          if (offer && offer.id) {
-            await prisma.offer.delete({ where: { id: offer.id } }).catch(e => console.error('Cleanup failed:', e));
-          }
-          if (partyService && partyService.id) {
-            await prisma.partyService.delete({ where: { id: partyService.id } }).catch(e => console.error('Cleanup failed:', e));
-          }
-          // Only after deleting party service can we delete the party
-          if (party && party.id) {
-            // Double check that no party services remain before deleting
-            const remainingPartyServices = await prisma.partyService.count({
-              where: { partyId: party.id }
-            });
-            
-            if (remainingPartyServices === 0) {
-              await prisma.party.delete({ where: { id: party.id } }).catch(e => console.error('Cleanup failed:', e));
+            if (existingTransaction) {
+              console.log(`Found existing transaction for offer ${offer.id}: ${existingTransaction.id}`);
+              return NextResponse.json({ 
+                success: true, 
+                data: { 
+                  transaction: existingTransaction,
+                  isExisting: true 
+                } 
+              }, { status: 200 });
             } else {
-              console.log(`Cannot delete party ${party.id} as it still has ${remainingPartyServices} services`);
+              throw new Error(`Could not find existing transaction for offer ${offer.id} despite unique constraint error`);
             }
           }
           
-          return NextResponse.json(
-            { 
-              success: false, 
-              error: { 
-                message: 'Failed to create transaction record', 
-                details: err instanceof Error ? err.message : String(err) 
-              } 
-            },
-            { status: 500 }
-          );
+          // Rethrow any other error
+          throw prismaError;
         }
+        
+        return NextResponse.json({ 
+          success: true, 
+          data: { transaction } 
+        }, { status: 201 });
       } catch (err) {
-        console.error('Error in direct service transaction:', err);
+        console.error('Error creating transaction:', err);
+        
+        if (err instanceof Prisma.PrismaClientKnownRequestError) {
+          // Log detailed error information for specific Prisma errors
+          if (err.code === 'P2003') {
+            console.error(`Foreign key constraint violation: ${err.meta?.field_name}`);
+            
+            // Check if it's specifically the offerId or partyId constraint that failed
+            const fieldName = err.meta?.field_name as string | undefined;
+            if (fieldName && fieldName.includes('offerId')) {
+              console.error(`The offer ${offer.id} may have been deleted or is invalid`);
+            } else if (fieldName && fieldName.includes('partyId')) {
+              console.error(`The party ${party.id} may have been deleted or is invalid`);
+            }
+          } else if (err.code === 'P2002') {
+            console.error(`Unique constraint violation: ${err.meta?.target}`);
+            
+            // Check if it's the offer's unique constraint that failed
+            const target = err.meta?.target as string[] | undefined;
+            if (target && target.includes('offerId')) {
+              // Try to find the existing transaction for this offer
+              try {
+                const existingTransaction = await prisma.transaction.findUnique({
+                  where: { offerId: offer.id },
+                  include: { offer: true }
+                });
+                
+                if (existingTransaction) {
+                  console.log(`Found existing transaction for offer ${offer.id}: ${existingTransaction.id}`);
+                  return NextResponse.json({ 
+                    success: true, 
+                    data: { 
+                      transaction: existingTransaction,
+                      isExisting: true 
+                    } 
+                  }, { status: 200 });
+                }
+              } catch (findError) {
+                console.error('Error finding existing transaction:', findError);
+              }
+            }
+          }
+        }
+        
+        // Cleanup the offer, party service, and party we created
+        if (offer && offer.id) {
+          await prisma.offer.delete({ where: { id: offer.id } }).catch(e => console.error('Cleanup failed:', e));
+        }
+        if (partyService && partyService.id) {
+          await prisma.partyService.delete({ where: { id: partyService.id } }).catch(e => console.error('Cleanup failed:', e));
+        }
+        // Only after deleting party service can we delete the party
+        if (party && party.id) {
+          // Double check that no party services remain before deleting
+          const remainingPartyServices = await prisma.partyService.count({
+            where: { partyId: party.id }
+          });
+          
+          if (remainingPartyServices === 0) {
+            await prisma.party.delete({ where: { id: party.id } }).catch(e => console.error('Cleanup failed:', e));
+          } else {
+            console.log(`Cannot delete party ${party.id} as it still has ${remainingPartyServices} services`);
+          }
+        }
+        
         return NextResponse.json(
           { 
             success: false, 
             error: { 
-              message: 'Failed to create direct service transaction',
-              details: err instanceof Error ? err.message : String(err)
+              message: 'Failed to create transaction record', 
+              details: err instanceof Error ? err.message : String(err) 
             } 
           },
           { status: 500 }

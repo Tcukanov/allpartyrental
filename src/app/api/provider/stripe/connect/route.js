@@ -30,37 +30,79 @@ export async function GET() {
       );
     }
 
+    // Check if STRIPE_SECRET_KEY exists
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error("Missing STRIPE_SECRET_KEY in environment variables");
+      return NextResponse.json(
+        { error: 'Stripe configuration is missing' },
+        { status: 500 }
+      );
+    }
+
     // Initialize Stripe with secret key from environment variables
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-    // Create an account link for the provider to onboard with Stripe
-    const account = await stripe.accounts.create({
-      type: 'standard',
-      email: provider.email,
-      metadata: {
-        userId: provider.id,
-      },
+    
+    // Check if provider already has a Stripe account
+    const existingProvider = await prisma.provider.findUnique({
+      where: { userId: provider.id },
+      select: { stripeAccountId: true },
     });
 
-    // Update provider with Stripe account ID
-    await prisma.user.update({
-      where: { id: provider.id },
-      data: { stripeAccountId: account.id },
-    });
+    let accountId;
+    
+    if (existingProvider?.stripeAccountId) {
+      // Use existing Stripe account
+      accountId = existingProvider.stripeAccountId;
+      console.log(`Using existing Stripe account: ${accountId}`);
+    } else {
+      // Create a new Stripe account
+      console.log(`Creating new Stripe account for provider: ${provider.id}`);
+      try {
+        const account = await stripe.accounts.create({
+          type: 'standard',
+          email: provider.email,
+          metadata: {
+            userId: provider.id,
+          },
+        });
+        
+        accountId = account.id;
+        
+        // Update provider with Stripe account ID
+        await prisma.provider.update({
+          where: { userId: provider.id },
+          data: { stripeAccountId: account.id },
+        });
+      } catch (stripeError) {
+        console.error('Stripe account creation error:', stripeError);
+        return NextResponse.json(
+          { error: `Stripe account creation failed: ${stripeError.message}` },
+          { status: 500 }
+        );
+      }
+    }
 
     // Create an account link for the user to complete onboarding
-    const accountLink = await stripe.accountLinks.create({
-      account: account.id,
-      refresh_url: `${process.env.NEXTAUTH_URL}/provider/settings?refresh=true`,
-      return_url: `${process.env.NEXTAUTH_URL}/provider/settings?success=true`,
-      type: 'account_onboarding',
-    });
-
-    return NextResponse.json({ url: accountLink.url });
+    try {
+      const accountLink = await stripe.accountLinks.create({
+        account: accountId,
+        refresh_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?refresh=true`,
+        return_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?success=true`,
+        type: 'account_onboarding',
+      });
+      
+      return NextResponse.json({ url: accountLink.url });
+    } catch (linkError) {
+      console.error('Error creating account link:', linkError);
+      return NextResponse.json(
+        { error: `Failed to create onboarding link: ${linkError.message}` },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error creating Stripe Connect link:', error);
     return NextResponse.json(
-      { error: 'Failed to create Stripe Connect link' },
+      { error: `Failed to create Stripe Connect link: ${error.message}` },
       { status: 500 }
     );
   }

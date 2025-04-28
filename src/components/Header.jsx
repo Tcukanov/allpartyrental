@@ -143,9 +143,14 @@ const Header = () => {
                       </MenuItem>
                     )}
                     {session?.user?.role === 'PROVIDER' && (
-                      <MenuItem onClick={() => router.push('/provider/cabinet')}>
-                        Provider Cabinet
-                      </MenuItem>
+                      <>
+                        <MenuItem onClick={() => router.push('/provider/cabinet')}>
+                          Provider Cabinet
+                        </MenuItem>
+                        <MenuItem onClick={() => router.push('/provider/settings/payments')}>
+                          Payments
+                        </MenuItem>
+                      </>
                     )}
                     <MenuItem onClick={() => router.push('/chats')}>Messages</MenuItem>
                     <MenuItem onClick={() => router.push('/profile')}>Profile</MenuItem>
@@ -225,9 +230,14 @@ const Header = () => {
                   )}
                   
                   {session?.user?.role === 'PROVIDER' && (
-                    <Link href="/provider/cabinet" _hover={{ textDecoration: 'none' }} onClick={onMobileNavClose}>
-                      <Text fontWeight="medium">Provider Cabinet</Text>
-                    </Link>
+                    <>
+                      <Link href="/provider/cabinet" _hover={{ textDecoration: 'none' }} onClick={onMobileNavClose}>
+                        <Text fontWeight="medium">Provider Cabinet</Text>
+                      </Link>
+                      <Link href="/provider/settings/payments" _hover={{ textDecoration: 'none' }} onClick={onMobileNavClose}>
+                        <Text fontWeight="medium">Payments</Text>
+                      </Link>
+                    </>
                   )}
                   
                   <Link href="/profile" _hover={{ textDecoration: 'none' }} onClick={onMobileNavClose}>

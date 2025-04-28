@@ -2,6 +2,7 @@
 
 import Stripe from 'stripe';
 import { logger } from '@/lib/logger';
+import { getFeeSettings } from '@/lib/payment/fee-settings';
 
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -21,11 +22,28 @@ export const paymentService = {
     currency = 'usd',
     capture_method = 'manual',
     metadata = {},
-    clientFeePercent = 5.0,
-    providerFeePercent = 0.0 // Provider fee is applied when releasing funds
+    clientFeePercent = null,
+    providerFeePercent = null
   }) => {
     try {
       logger.info(`Creating payment intent for amount: ${amount}`);
+
+      // If fee percentages aren't provided, get them from settings
+      if (clientFeePercent === null || providerFeePercent === null) {
+        try {
+          const feeSettings = await getFeeSettings();
+          if (clientFeePercent === null) {
+            clientFeePercent = feeSettings.clientFeePercent;
+          }
+          if (providerFeePercent === null) {
+            providerFeePercent = feeSettings.providerFeePercent;
+          }
+        } catch (error) {
+          logger.warn('Error retrieving fee settings, using defaults:', error);
+          clientFeePercent = clientFeePercent === null ? 5.0 : clientFeePercent;
+          providerFeePercent = providerFeePercent === null ? 12.0 : providerFeePercent;
+        }
+      }
 
       // Convert amount to cents for Stripe
       const amountInCents = Math.round(amount * 100);
@@ -122,7 +140,7 @@ export const paymentService = {
    * Used when a service is completed and funds are released from escrow
    * This creates a transfer to the provider's connected account
    */
-  releaseFundsToProvider: async (paymentIntentId, providerId) => {
+  releaseFundsToProvider: async (paymentIntentId, providerId, transferGroup = null, amount = null, providerFeePercent = null) => {
     try {
       logger.info(`Releasing funds for payment: ${paymentIntentId} to provider: ${providerId}`);
       
@@ -140,9 +158,25 @@ export const paymentService = {
         throw new Error(`Provider ${providerId} does not have a connected Stripe account`);
       }
       
+      // If providerFeePercent isn't provided, get it from settings or metadata
+      if (providerFeePercent === null) {
+        try {
+          // First try to use the fee from the payment intent metadata
+          providerFeePercent = parseFloat(paymentIntent.metadata.providerFeePercent || '0');
+          
+          // If not found in metadata, get from settings
+          if (isNaN(providerFeePercent) || providerFeePercent <= 0) {
+            const { providerFeePercent: settingsFee } = await getFeeSettings();
+            providerFeePercent = settingsFee;
+          }
+        } catch (error) {
+          logger.warn('Error retrieving provider fee percentage, using default:', error);
+          providerFeePercent = 12.0;
+        }
+      }
+      
       // Calculate platform fee (provider fee percentage)
-      const originalAmount = parseFloat(paymentIntent.metadata.originalAmount || 0);
-      const providerFeePercent = parseFloat(paymentIntent.metadata.providerFeePercent || 0);
+      const originalAmount = amount || parseFloat(paymentIntent.metadata.originalAmount || '0');
       const platformFeeAmount = Math.round((originalAmount * providerFeePercent / 100) * 100);
       
       // Calculate amount to transfer to provider (amount - platform fee)
@@ -157,7 +191,8 @@ export const paymentService = {
         metadata: {
           paymentIntentId,
           providerId,
-          platformFee: platformFeeAmount.toString()
+          platformFee: platformFeeAmount.toString(),
+          providerFeePercent: providerFeePercent.toString()
         }
       });
       

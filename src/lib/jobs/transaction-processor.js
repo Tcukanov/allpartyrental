@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma/client';
 import { paymentService } from '@/lib/payment/service';
 import { logger } from '@/lib/logger';
+import { getFeeSettings } from '@/lib/payment/fee-settings';
 
 /**
  * Processes all transactions with expired review deadlines
@@ -146,9 +147,19 @@ export async function processEscrowReleases() {
           // If there's a payment intent, release the funds to the provider
           if (transaction.paymentIntentId) {
             try {
+              // Get current fee settings or use the transaction's stored values
+              const { providerFeePercent } = 
+                await getFeeSettings().catch(() => ({ 
+                  providerFeePercent: transaction.providerFeePercent 
+                }));
+              
+              // Release funds with the provider fee percentage
               await paymentService.releaseFundsToProvider(
                 transaction.paymentIntentId,
-                transaction.providerId
+                transaction.providerId,
+                null,  // Let the service retrieve the transferGroup
+                null,  // Let the service calculate the amount
+                providerFeePercent  // Use the configured fee percentage
               );
               logger.info(`Released funds to provider for transaction: ${transaction.id}`);
             } catch (error) {

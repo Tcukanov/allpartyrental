@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth/auth-options';
 import { paymentService } from '@/lib/payment/service';
 import { Prisma } from '@prisma/client';
 import { addDays } from 'date-fns';
+import { getFeeSettings } from '@/lib/payment/fee-settings';
 
 /**
  * Process payment for a transaction
@@ -78,20 +79,23 @@ export async function POST(
 
     // Create a payment intent
     try {
+      // Get current fee settings
+      const { clientFeePercent, providerFeePercent } = await getFeeSettings();
+      
       console.log(`Creating payment intent for amount: ${transaction.amount}`);
       const { clientSecret, paymentIntentId } = await paymentService.createPaymentIntent({
         amount: Number(transaction.amount),
         currency: 'usd',
         capture_method: 'manual',
         metadata: {
-        transactionId: transaction.id,
+          transactionId: transaction.id,
           offerId: transaction.offerId,
-          clientId: offer.clientId,
-          providerId: offer.providerId,
-          serviceName: offer.service.name
+          clientId: session.user.id,
+          providerId: transaction.offer.providerId,
+          serviceName: transaction.offer.service.name
         },
-        clientFeePercent: transaction.clientFeePercent,
-        providerFeePercent: transaction.providerFeePercent
+        clientFeePercent: clientFeePercent,
+        providerFeePercent: providerFeePercent
       });
       console.log(`Payment intent created with ID: ${paymentIntentId}`);
       

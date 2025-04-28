@@ -1,6 +1,7 @@
 // src/lib/payment/stripe.js
 
 import Stripe from 'stripe';
+import { getFeeSettings } from '@/lib/payment/fee-settings';
 
 // Initialize Stripe client
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -28,10 +29,27 @@ export const paymentService = {
     providerId, 
     amount, 
     description,
-    clientFeePercent = 5.0,
-    providerFeePercent = 10.0
+    clientFeePercent = null,
+    providerFeePercent = null
   }) => {
     try {
+      // If fee percentages aren't provided, get them from settings
+      if (clientFeePercent === null || providerFeePercent === null) {
+        try {
+          const feeSettings = await getFeeSettings();
+          if (clientFeePercent === null) {
+            clientFeePercent = feeSettings.clientFeePercent;
+          }
+          if (providerFeePercent === null) {
+            providerFeePercent = feeSettings.providerFeePercent;
+          }
+        } catch (error) {
+          console.error('Error retrieving fee settings, using defaults:', error);
+          clientFeePercent = clientFeePercent === null ? 5.0 : clientFeePercent;
+          providerFeePercent = providerFeePercent === null ? 12.0 : providerFeePercent;
+        }
+      }
+
       // Create transfer group ID
       const transferGroup = `offer_${offerId}`;
 
@@ -122,9 +140,20 @@ export const paymentService = {
     providerId, 
     transferGroup, 
     amount,
-    providerFeePercent = 10.0
+    providerFeePercent = null
   }) => {
     try {
+      // If providerFeePercent isn't provided, get it from settings
+      if (providerFeePercent === null) {
+        try {
+          const { providerFeePercent: settingsFee } = await getFeeSettings();
+          providerFeePercent = settingsFee;
+        } catch (error) {
+          console.error('Error retrieving provider fee percentage, using default:', error);
+          providerFeePercent = 12.0;
+        }
+      }
+
       // Get provider's Stripe account ID
       const provider = await getProviderStripeAccount(providerId);
       
