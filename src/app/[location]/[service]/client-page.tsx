@@ -65,23 +65,34 @@ type Filter = {
 };
 
 type ClientProps = {
-  citySlug: string;
-  categorySlug: string;
+  services: Service[];
+  categories: Category[];
+  cities: City[];
+  currentCity: City;
+  currentCategory: Category;
+  categoryFilters: Filter[];
 };
 
-export default function LocationServiceClientPage({ citySlug, categorySlug }: ClientProps) {
+export default function LocationServiceClientPage({ 
+  services: initialServices,
+  categories,
+  cities,
+  currentCity,
+  currentCategory,
+  categoryFilters: initialFilters
+}: ClientProps) {
   const toast = useToast();
-  const [services, setServices] = useState<Service[]>([]);
-  const [city, setCity] = useState<City | null>(null);
-  const [category, setCategory] = useState<Category | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [services, setServices] = useState<Service[]>(initialServices);
+  const [city, setCity] = useState<City>(currentCity);
+  const [category, setCategory] = useState<Category>(currentCategory);
+  const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [sortByPrice, setSortByPrice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   
   // Category filters
-  const [categoryFilters, setCategoryFilters] = useState<Filter[]>([]);
+  const [categoryFilters, setCategoryFilters] = useState<Filter[]>(initialFilters);
   const [filterValues, setFilterValues] = useState<Record<string, string | string[]>>({});
   
   const availableColors = ['Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple', 'Orange', 'White'];
@@ -91,73 +102,24 @@ export default function LocationServiceClientPage({ citySlug, categorySlug }: Cl
     { value: 'price_desc', label: 'Price: High to Low' }
   ];
   
-  // Fetch city and category data
+  // Fetch city and category data - no longer needed since we get data from props
   useEffect(() => {
-    const fetchLocationAndCategory = async () => {
-      try {
-        setIsLoading(true);
-        
-        const [cityRes, categoryRes] = await Promise.all([
-          fetch(`/api/cities/${citySlug}`),
-          fetch(`/api/categories/${categorySlug}`)
-        ]);
-        
-        if (!cityRes.ok || !categoryRes.ok) {
-          throw new Error('Failed to load page data');
-        }
-        
-        const cityData = await cityRes.json();
-        const categoryData = await categoryRes.json();
-        
-        if (!cityData.success || !categoryData.success) {
-          throw new Error('Failed to load page data');
-        }
-        
-        setCity(cityData.data);
-        setCategory(categoryData.data);
-        
-        // Fetch filters for this category
-        await fetchCategoryFilters(categoryData.data.id);
-        
-      } catch (error) {
-        console.error('Error fetching location and category:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load page data',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-      }
-    };
-    
-    fetchLocationAndCategory();
-  }, [citySlug, categorySlug, toast]);
+    // Set initial data from props
+    setCity(currentCity);
+    setCategory(currentCategory);
+    setCategoryFilters(initialFilters);
+    setServices(initialServices);
+  }, [currentCity, currentCategory, initialFilters, initialServices]);
   
-  // Fetch category filters
+  // The fetchCategoryFilters function is no longer needed as we get filters from props
   const fetchCategoryFilters = async (categoryId: string) => {
-    try {
-      const response = await fetch(`/api/categories/filters?categoryId=${categoryId}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch category filters: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setCategoryFilters(data.data || []);
-      } else {
-        console.error('Failed to fetch category filters:', data.error);
-      }
-    } catch (error) {
-      console.error('Error fetching category filters:', error);
-    }
+    // This is kept for reference but not used
+    console.log('Filters already loaded from server for category:', categoryId);
   };
   
   // Fetch services with filters
   const fetchServices = async () => {
-    if (!city?.id || !category?.id) return;
+    if (!city.id || !category.id) return;
     
     setIsLoading(true);
     setErrorMessage('');

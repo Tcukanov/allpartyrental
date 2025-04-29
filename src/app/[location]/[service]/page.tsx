@@ -3,8 +3,50 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma/client';
 import { Box, Container, Heading, Text, SimpleGrid, Card, CardBody, Image, VStack, HStack, Badge, Button } from '@chakra-ui/react';
-import { Service, User, Profile, ServiceCategory, City } from '@prisma/client';
-import LocationServiceClientPage from './client';
+import LocationServiceClientPage from './client-page';
+
+// Define our own types instead of importing from @prisma/client
+type Profile = {
+  id: string;
+  avatar?: string | null;
+  description?: string | null;
+  [key: string]: any;
+};
+
+type User = {
+  id: string;
+  name: string;
+  profile?: Profile | null;
+  [key: string]: any;
+};
+
+type Service = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  photos: string[];
+  provider: User;
+  categoryId: string;
+  cityId?: string | null;
+  [key: string]: any;
+};
+
+type ServiceCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  [key: string]: any;
+};
+
+type City = {
+  id: string;
+  name: string;
+  slug: string;
+  state: string;
+  [key: string]: any;
+};
 
 type ServiceWithProvider = Service & {
   provider: User & {
