@@ -138,30 +138,30 @@ export default function AdminDashboardPage() {
         <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
           <StatCard
             title="Total Users"
-            value={dashboardData.metrics.users.total}
+            value={dashboardData?.metrics?.users?.total || 0}
             icon={FiUsers}
             iconColor="purple.500"
-            helperText={`${dashboardData.metrics.users.new} new today (${dashboardData.metrics.users.percentChange}%)`}
+            helperText={`${dashboardData?.metrics?.users?.new || 0} new today (${dashboardData?.metrics?.users?.percentChange || 0}%)`}
             linkUrl="/admin/users"
             linkText="View Users"
           />
           
           <StatCard
             title="Transactions"
-            value={dashboardData.metrics.transactions.total}
+            value={dashboardData?.metrics?.transactions?.total || 0}
             icon={FiDollarSign}
             iconColor="blue.500"
-            helperText={`${dashboardData.metrics.transactions.new} new today (${dashboardData.metrics.transactions.percentChange}%)`}
+            helperText={`${dashboardData?.metrics?.transactions?.new || 0} new today (${dashboardData?.metrics?.transactions?.percentChange || 0}%)`}
             linkUrl="/admin/transactions"
             linkText="View Transactions"
           />
           
           <StatCard
             title="Total Revenue"
-            value={formatCurrency(dashboardData.metrics.revenue.total)}
+            value={formatCurrency(dashboardData?.metrics?.revenue?.total || 0)}
             icon={FiTrendingUp}
             iconColor="green.500"
-            helperText={`${formatCurrency(dashboardData.metrics.revenue.new)} new today (${dashboardData.metrics.revenue.percentChange}%)`}
+            helperText={`${formatCurrency(dashboardData?.metrics?.revenue?.new || 0)} new today (${dashboardData?.metrics?.revenue?.percentChange || 0}%)`}
             linkUrl="/admin/finances"
             linkText="View Finances"
           />
@@ -172,14 +172,14 @@ export default function AdminDashboardPage() {
           <CardBody>
             <Heading size="md" mb={4}>Transaction Status Distribution</Heading>
             <Box>
-              {Object.entries(dashboardData.transactionStatus).map(([status, count]) => (
+              {Object.entries(dashboardData?.transactionStatus || {}).map(([status, count]) => (
                 <HStack key={status} mb={3}>
                   <Text minW="120px" fontWeight="medium" textTransform="capitalize">
                     {status.replace(/([A-Z])/g, ' $1').toLowerCase()}
                   </Text>
                   <Progress 
                     value={count} 
-                    max={Object.values(dashboardData.transactionStatus).reduce((a, b) => a + b, 0)}
+                    max={Object.values(dashboardData?.transactionStatus || {}).reduce((a, b) => a + b, 0)}
                     colorScheme={getStatusColor(status)}
                     flex="1"
                     borderRadius="full"
@@ -258,11 +258,11 @@ export default function AdminDashboardPage() {
                     <Text fontWeight="medium">API Status:</Text>
                     <Flex align="center">
                       <Icon 
-                        as={dashboardData.systemHealth.apiStatus === 'healthy' ? FiCheckCircle : FiAlertCircle} 
-                        color={dashboardData.systemHealth.apiStatus === 'healthy' ? 'green.500' : 'red.500'} 
+                        as={dashboardData?.systemHealth?.apiStatus === 'healthy' ? FiCheckCircle : FiAlertCircle} 
+                        color={dashboardData?.systemHealth?.apiStatus === 'healthy' ? 'green.500' : 'red.500'} 
                         mr={2} 
                       />
-                      <Text textTransform="capitalize">{dashboardData.systemHealth.apiStatus}</Text>
+                      <Text textTransform="capitalize">{dashboardData?.systemHealth?.apiStatus || 'unknown'}</Text>
                     </Flex>
                   </HStack>
                   
@@ -270,11 +270,11 @@ export default function AdminDashboardPage() {
                     <Text fontWeight="medium">Database Status:</Text>
                     <Flex align="center">
                       <Icon 
-                        as={dashboardData.systemHealth.dbStatus === 'healthy' ? FiCheckCircle : FiAlertCircle} 
-                        color={dashboardData.systemHealth.dbStatus === 'healthy' ? 'green.500' : 'red.500'} 
+                        as={dashboardData?.systemHealth?.dbStatus === 'healthy' ? FiCheckCircle : FiAlertCircle} 
+                        color={dashboardData?.systemHealth?.dbStatus === 'healthy' ? 'green.500' : 'red.500'} 
                         mr={2} 
                       />
-                      <Text textTransform="capitalize">{dashboardData.systemHealth.dbStatus}</Text>
+                      <Text textTransform="capitalize">{dashboardData?.systemHealth?.dbStatus || 'unknown'}</Text>
                     </Flex>
                   </HStack>
                   
@@ -282,17 +282,17 @@ export default function AdminDashboardPage() {
                     <Text fontWeight="medium">Processor Status:</Text>
                     <Flex align="center">
                       <Icon 
-                        as={dashboardData.systemHealth.processorStatus === 'healthy' ? FiCheckCircle : FiAlertCircle} 
-                        color={dashboardData.systemHealth.processorStatus === 'healthy' ? 'green.500' : 'red.500'} 
+                        as={dashboardData?.systemHealth?.processorStatus === 'healthy' ? FiCheckCircle : FiAlertCircle} 
+                        color={dashboardData?.systemHealth?.processorStatus === 'healthy' ? 'green.500' : 'red.500'} 
                         mr={2} 
                       />
-                      <Text textTransform="capitalize">{dashboardData.systemHealth.processorStatus}</Text>
+                      <Text textTransform="capitalize">{dashboardData?.systemHealth?.processorStatus || 'unknown'}</Text>
                     </Flex>
                   </HStack>
                   
                   <HStack justify="space-between">
                     <Text fontWeight="medium">Last Backup:</Text>
-                    <Text>{formatDate(dashboardData.systemHealth.lastBackup)}</Text>
+                    <Text>{formatDate(dashboardData?.systemHealth?.lastBackup || new Date())}</Text>
                   </HStack>
                   
                   <Button 
@@ -317,7 +317,7 @@ export default function AdminDashboardPage() {
           <CardBody>
             <Heading size="md" mb={4}>Recent Activity</Heading>
             <Stack spacing={4} divider={<Divider />}>
-              {dashboardData.recentActivity.map((activity) => (
+              {(dashboardData?.recentActivity || []).map((activity) => (
                 <HStack key={activity.id} justify="space-between">
                   <HStack>
                     <Icon 

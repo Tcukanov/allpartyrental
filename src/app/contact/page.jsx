@@ -119,7 +119,7 @@ export default function ContactPage() {
                     <Icon as={EmailIcon} boxSize={6} color="brand.500" />
                     <VStack align="start" spacing={1}>
                       <Text fontWeight="bold">Email Us</Text>
-                      <Text>support@partymarketplace.com</Text>
+                      <Text>info@party-vendors.com</Text>
                     </VStack>
                   </HStack>
                 </CardBody>
@@ -131,7 +131,7 @@ export default function ContactPage() {
                     <Icon as={PhoneIcon} boxSize={6} color="brand.500" />
                     <VStack align="start" spacing={1}>
                       <Text fontWeight="bold">Call Us</Text>
-                      <Text>(555) 123-4567</Text>
+                      <Text>(929) 290 – 9469</Text>
                     </VStack>
                   </HStack>
                 </CardBody>
@@ -143,7 +143,7 @@ export default function ContactPage() {
                     <Icon as={FaMapMarkerAlt} boxSize={6} color="brand.500" />
                     <VStack align="start" spacing={1}>
                       <Text fontWeight="bold">Location</Text>
-                      <Text>123 Party Street, New York, NY 10001</Text>
+                      <Text>32 Union Square E #1713413, New York, NY 10003</Text>
                     </VStack>
                   </HStack>
                 </CardBody>

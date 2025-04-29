@@ -2,8 +2,15 @@ import React from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma/client';
-import { Box, Container, Text } from '@chakra-ui/react';
-import LocationServiceClientPage from './client-page';
+import { Box, Container, Heading, Text, SimpleGrid, Card, CardBody, Image, VStack, HStack, Badge, Button } from '@chakra-ui/react';
+import { Service, User, Profile, ServiceCategory, City } from '@prisma/client';
+import LocationServiceClientPage from './client';
+
+type ServiceWithProvider = Service & {
+  provider: User & {
+    profile: Profile | null;
+  };
+};
 
 // Metadata is now a function that returns a Promise
 export async function generateMetadata(props: { params: Promise<{ location: string; service: string }> }): Promise<Metadata> {
@@ -111,7 +118,7 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
   }
 
   try {
-    // Find the city first to verify it exists
+    // Find the city first
     const city = await prisma.city.findFirst({
       where: {
         slug: locationSlug,
@@ -123,7 +130,7 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
       notFound();
     }
 
-    // Find the service category to verify it exists
+    // Find the service category
     const category = await prisma.serviceCategory.findFirst({
       where: {
         slug: serviceSlug,
@@ -135,15 +142,89 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
       notFound();
     }
 
-    // Render the client component with the verified slugs
-    return <LocationServiceClientPage citySlug={locationSlug} categorySlug={serviceSlug} />;
+    // Fetch all categories for filters
+    const categories = await prisma.serviceCategory.findMany();
+    
+    // Fetch all cities for filters
+    const cities = await prisma.city.findMany();
+    
+    // Use the correct table name for category filters
+    let categoryFilters = [];
+    try {
+      // Check if the CategoryFilter table exists and fetch filters
+      categoryFilters = await prisma.$queryRaw`
+        SELECT * FROM "CategoryFilter"
+        WHERE "categoryId" = ${category.id}
+        ORDER BY "createdAt" ASC
+      `;
+    } catch (error) {
+      console.error('Error fetching category filters:', error);
+      // Continue with empty array
+    }
+
+    // Fetch services for this location and category
+    const services = await prisma.service.findMany({
+      where: {
+        AND: [
+          { categoryId: category.id },
+          { status: 'ACTIVE' },
+          {
+            OR: [
+              { cityId: city.id }, // Direct match on city
+              {
+                AND: [
+                  // Provider has this city as a service location
+                  {
+                    providerId: {
+                      in: await getProviderIdsWithCity(city.id)
+                    }
+                  },
+                  // The service is either in this city or has no city specified
+                  {
+                    OR: [
+                      { cityId: city.id },
+                      { cityId: null }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      include: {
+        provider: {
+          include: {
+            profile: true
+          }
+        }
+      }
+    });
+
+    // Convert Decimal objects to numbers to avoid serialization issues
+    const serializedServices = services.map(service => ({
+      ...service,
+      price: service.price ? Number(service.price) : 0,
+    }));
+
+    // Now pass the data to the client component
+    return (
+      <LocationServiceClientPage 
+        services={serializedServices}
+        categories={categories}
+        cities={cities}
+        currentCity={city}
+        currentCategory={category}
+        categoryFilters={categoryFilters || []}
+      />
+    );
   } catch (error) {
-    console.error('Error verifying location and service:', error);
+    console.error('Error fetching services:', error);
     return (
       <Container maxW="container.xl" py={8}>
         <Box p={8} textAlign="center" borderWidth="1px" borderRadius="md">
           <Text fontSize="lg" color="red.500">
-            An error occurred while loading the page. Please try again later.
+            An error occurred while loading the services. Please try again later.
           </Text>
         </Box>
       </Container>
