@@ -239,14 +239,16 @@ export default function LocationServiceSearch() {
             type="submit"
             colorScheme="brand"
             size="lg"
-            h="60px"
-            px={8}
-            flex={{ base: "1", md: "1" }}
-            fontSize="md"
+            h={{ base: "70px", md: "60px" }}
+            minH="60px"
+            px={{ base: 10, md: 8 }}
+            flex={{ base: 1.5, md: 1 }}
+            fontSize={{ base: "lg", md: "md" }}
             fontWeight="bold"
             borderRadius={{ base: "0 0 lg lg", md: "0 lg lg 0" }}
-            leftIcon={<SearchIcon boxSize={4} />}
+            leftIcon={<SearchIcon boxSize={{ base: 5, md: 4 }} />}
             isDisabled={!formValid}
+            width="100%"
             _hover={{
               transform: "translateY(-1px)",
               boxShadow: "lg"
