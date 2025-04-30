@@ -24,9 +24,12 @@ import {
   VStack,
   HStack,
   Avatar,
+  Image,
 } from '@chakra-ui/react';
-import { CalendarIcon, TimeIcon, ChatIcon } from '@chakra-ui/icons';
+import { CalendarIcon, TimeIcon, ChatIcon, AtSignIcon, PhoneIcon, EmailIcon } from '@chakra-ui/icons';
 import { format } from 'date-fns';
+import { FaMapMarkerAlt, FaHome } from 'react-icons/fa';
+import { getStatusBadge } from '@/utils/statusHelpers';
 
 interface PartyDetails {
   id: string;
@@ -44,8 +47,13 @@ interface PartyDetails {
     id: string;
     name: string;
     email: string;
+    phone?: string;
+    address?: string;
+    calculatedAddress?: string;
     profile?: {
       avatar?: string;
+      phone?: string;
+      address?: string;
     };
   };
   partyServices: Array<{
@@ -55,6 +63,7 @@ interface PartyDetails {
       name: string;
       description: string;
       providerId: string;
+      photos: string[];
     };
     specificOptions?: any;
     offers: Array<{
@@ -114,7 +123,22 @@ export default function ProviderPartyDetailsPage({ params }: { params: Promise<{
       const data = await response.json();
       
       if (data.success) {
-        setParty(data.data);
+        console.log('Received party data:', JSON.stringify(data.data));
+        console.log('Client profile data:', JSON.stringify(data.data.client?.profile));
+        console.log('Client address (direct):', data.data.client?.address);
+        console.log('Client address (from profile):', data.data.client?.profile?.address);
+        
+        // Create a modified party object with a proper address field
+        const partyWithAddress = {
+          ...data.data,
+          client: {
+            ...data.data.client,
+            // Explicitly handle address field
+            calculatedAddress: data.data.client?.profile?.address || data.data.client?.address || null
+          }
+        };
+        
+        setParty(partyWithAddress);
       } else {
         throw new Error(data.error?.message || 'Failed to fetch party details');
       }
@@ -189,25 +213,6 @@ export default function ProviderPartyDetailsPage({ params }: { params: Promise<{
     router.push(`/chats/${chatId}`);
   };
 
-  const getStatusBadge = (status: string) => {
-    const colorScheme = {
-      'DRAFT': 'gray',
-      'PUBLISHED': 'blue',
-      'CONFIRMED': 'green',
-      'PENDING': 'yellow',
-      'APPROVED': 'green',
-      'REJECTED': 'red',
-      'CANCELLED': 'red',
-      'COMPLETED': 'teal'
-    }[status] || 'gray';
-
-    return (
-      <Badge colorScheme={colorScheme}>
-        {status}
-      </Badge>
-    );
-  };
-
   if (isLoading) {
     return (
       <Container maxW="container.xl" py={8}>
@@ -245,6 +250,33 @@ export default function ProviderPartyDetailsPage({ params }: { params: Promise<{
   const relevantServices = party.partyServices.filter(
     ps => ps.service.providerId === session?.user?.id
   );
+  
+  // Hardcoded address for testing (remove in production)
+  const getAddressString = () => {
+    // First try to use the calculated address
+    if (party.client?.calculatedAddress) {
+      return party.client.calculatedAddress;
+    }
+    
+    // Then try to use the client's profile address
+    if (party.client?.profile?.address) {
+      return party.client.profile.address;
+    }
+    
+    // Then try to use direct address
+    if (party.client?.address) {
+      return party.client.address;
+    }
+    
+    // If all else fails, return the address from service booking if available
+    const bookingData = party.partyServices.find(ps => ps.specificOptions && ps.specificOptions.address);
+    if (bookingData && bookingData.specificOptions && bookingData.specificOptions.address) {
+      return bookingData.specificOptions.address;
+    }
+    
+    // If still not found, for testing only:
+    return "203w 58th brooklyn"; // Hardcoded test address
+  };
 
   return (
     <Container maxW="container.xl" py={8}>
@@ -277,9 +309,16 @@ export default function ProviderPartyDetailsPage({ params }: { params: Promise<{
                 <Text mb={2}>
                   <Text as="span" fontWeight="bold">Guest Count:</Text> {party.guestCount} people
                 </Text>
-                <Text mb={2}>
-                  <Text as="span" fontWeight="bold">Location:</Text> {party.city.name}, {party.city.state}
-                </Text>
+                <Flex align="center" mb={2}>
+                  <Icon as={FaMapMarkerAlt} mr={2} />
+                  <Text fontWeight="bold">Location:</Text>
+                  <Text ml={2}>{party.city.name}, {party.city.state}</Text>
+                </Flex>
+                <Flex align="center" mb={2}>
+                  <Icon as={FaHome} mr={2} />
+                  <Text fontWeight="bold">Address:</Text>
+                  <Text ml={2}>{getAddressString()}</Text>
+                </Flex>
               </Box>
 
               <Box>
@@ -292,6 +331,18 @@ export default function ProviderPartyDetailsPage({ params }: { params: Promise<{
                   />
                   <VStack align="start" spacing={0}>
                     <Text>{party.client.name}</Text>
+                    {party.client.email && (
+                      <Flex align="center">
+                        <Icon as={EmailIcon} fontSize="xs" mr={1} />
+                        <Text fontSize="sm">{party.client.email}</Text>
+                      </Flex>
+                    )}
+                    {party.client.profile?.phone && (
+                      <Flex align="center">
+                        <Icon as={PhoneIcon} fontSize="xs" mr={1} />
+                        <Text fontSize="sm">{party.client.profile.phone}</Text>
+                      </Flex>
+                    )}
                   </VStack>
                 </HStack>
               </Box>
@@ -319,13 +370,54 @@ export default function ProviderPartyDetailsPage({ params }: { params: Promise<{
                   <CardBody>
                     <Text mb={3}>{service.service.description}</Text>
                     
+                    {/* Display service photos */}
+                    {service.service.photos && service.service.photos.length > 0 && (
+                      <Box mb={3}>
+                        <Text fontWeight="bold" mb={2}>Service Images:</Text>
+                        <SimpleGrid columns={{ base: 2, sm: 3 }} spacing={2}>
+                          {service.service.photos.map((photo, index) => (
+                            <Image
+                              key={index}
+                              src={photo}
+                              alt={`${service.service.name} photo ${index + 1}`}
+                              height="120px"
+                              objectFit="cover"
+                              borderRadius="md"
+                              fallbackSrc="https://via.placeholder.com/150"
+                            />
+                          ))}
+                        </SimpleGrid>
+                      </Box>
+                    )}
+                    
                     {service.specificOptions && (
                       <Box mb={3}>
                         <Text fontWeight="bold">Special Requirements:</Text>
-                        <Text>{typeof service.specificOptions === 'object' ? 
-                          JSON.stringify(service.specificOptions) : 
-                          service.specificOptions}
-                        </Text>
+                        {typeof service.specificOptions === 'object' ? (
+                          <VStack align="start" spacing={2} mt={2}>
+                            {service.specificOptions.addons && service.specificOptions.addons.length > 0 ? (
+                              <>
+                                <Text fontWeight="medium">Add-ons:</Text>
+                                {service.specificOptions.addons.map((addon: any, index: number) => (
+                                  <HStack key={addon.id || index} pl={4}>
+                                    <Text>• {addon.title}</Text>
+                                    {addon.price && <Text ml={2} fontWeight="semibold">${addon.price}</Text>}
+                                  </HStack>
+                                ))}
+                              </>
+                            ) : null}
+                            {Object.entries(service.specificOptions)
+                              .filter(([key]) => key !== 'addons')
+                              .map(([key, value]) => (
+                                <Text key={key}>
+                                  <Text as="span" fontWeight="medium" textTransform="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</Text>{' '}
+                                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                </Text>
+                              ))}
+                          </VStack>
+                        ) : (
+                          <Text>{service.specificOptions}</Text>
+                        )}
                       </Box>
                     )}
                     

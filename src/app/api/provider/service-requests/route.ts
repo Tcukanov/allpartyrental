@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       }, { status: 401 });
     }
     
-    const { serviceId, message, requestDate } = await req.json();
+    const { serviceId, message, requestDate, bookingAddress } = await req.json();
     console.log('Service request received:', { serviceId, message, requestDate });
     
     if (!serviceId) {
@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
         partyServices: {
           create: {
             serviceId: service.id,
-            specificOptions: {}
+            specificOptions: {
+              address: bookingAddress || '', // Store the address from the request
+              comments: message || `Request for ${service.name}`
+            }
           }
         }
       },
@@ -120,8 +123,7 @@ export async function POST(req: NextRequest) {
         type: NotificationType.MESSAGE,
         title: 'New Message',
         content: `You have a new message regarding ${service.name}. Click to view chat ID: ${chat.id}`,
-        isRead: false,
-        chatId: chat.id
+        isRead: false
       }
     });
     

@@ -51,26 +51,26 @@ const AddOnSelector = ({ serviceId, onAddonsChange }) => {
     fetchAddons();
   }, [serviceId]);
 
+  // Use useEffect to notify parent component when selectedAddons changes
+  useEffect(() => {
+    if (onAddonsChange) {
+      onAddonsChange(selectedAddons);
+    }
+  }, [selectedAddons, onAddonsChange]);
+
   const handleAddonToggle = (addon) => {
     setSelectedAddons(prev => {
       const isSelected = prev.some(item => item.id === addon.id);
       
-      let newSelected;
       if (isSelected) {
         // Remove from selection
-        newSelected = prev.filter(item => item.id !== addon.id);
+        return prev.filter(item => item.id !== addon.id);
       } else {
         // Add to selection
-        newSelected = [...prev, addon];
+        return [...prev, addon];
       }
-      
-      // Notify parent component about the change
-      if (onAddonsChange) {
-        onAddonsChange(newSelected);
-      }
-      
-      return newSelected;
     });
+    // Don't call onAddonsChange here anymore!
   };
 
   // If there are no addons or we're still loading, don't render anything

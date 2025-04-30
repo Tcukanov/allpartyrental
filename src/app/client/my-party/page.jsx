@@ -482,18 +482,257 @@ export default function MyPartyPage() {
               
               <Divider />
 
+              {/* Add detailed party information section */}
+              <Box>
+                <Text fontWeight="bold" mb={4}>Party Details</Text>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <Box>
+                    <Text color="gray.600">Party Type</Text>
+                    <Text fontWeight="medium">{party.type || "Not specified"}</Text>
+                  </Box>
+                  <Box>
+                    <Text color="gray.600">Number of Guests</Text>
+                    <Text fontWeight="medium">{party.guestCount || "Not specified"}</Text>
+                  </Box>
+                  <Box>
+                    <Text color="gray.600">Budget</Text>
+                    <Text fontWeight="medium">${party.budget?.toFixed(2) || "Not specified"}</Text>
+                  </Box>
+                  <Box>
+                    <Text color="gray.600">Theme</Text>
+                    <Text fontWeight="medium">{party.theme || "Not specified"}</Text>
+                  </Box>
+                </SimpleGrid>
+                
+                {party.description && (
+                  <Box mt={4}>
+                    <Text color="gray.600">Description</Text>
+                    <Text>{party.description}</Text>
+                  </Box>
+                )}
+                
+                {party.specialRequests && (
+                  <Box mt={4}>
+                    <Text color="gray.600">Special Requests</Text>
+                    <Text>{party.specialRequests}</Text>
+                  </Box>
+                )}
+              </Box>
+              
+              <Divider />
+
               <Box>
                 <Text fontWeight="bold" mb={4}>Services</Text>
                 <VStack spacing={3} align="stretch">
                   {party.partyServices.map(service => (
-                    <Flex key={service.id} justify="space-between" align="center">
-                      <Text>{service.service.name}</Text>
-                      <Badge colorScheme={getStatusColor(service.status)}>
-                        {service.status}
-                      </Badge>
-                    </Flex>
+                    <Card key={service.id} variant="outline" p={0} mb={2}>
+                      <CardBody>
+                        <VStack align="stretch" spacing={3}>
+                          <Flex justify="space-between" align="center">
+                            <HStack>
+                              <Text fontWeight="bold">{service.service.name}</Text>
+                              <Badge colorScheme={getStatusColor(service.status)}>
+                                {service.status}
+                              </Badge>
+                            </HStack>
+                            <Text fontWeight="medium" color="green.500">
+                              ${Number(service.service.price).toFixed(2)}
+                            </Text>
+                          </Flex>
+                          
+                          <Text fontSize="sm" color="gray.600">
+                            {service.service.description?.substring(0, 100)}
+                            {service.service.description?.length > 100 ? "..." : ""}
+                          </Text>
+                          
+                          {service.specificOptions && Object.keys(service.specificOptions).length > 0 && (
+                            <Box p={2} bg="gray.50" borderRadius="md">
+                              <Text fontSize="sm" fontWeight="medium" mb={1}>Specific Options:</Text>
+                              <SimpleGrid columns={2} spacing={2} fontSize="sm">
+                                {Object.entries(service.specificOptions).map(([key, value]) => (
+                                  <Box key={key}>
+                                    <Text as="span" fontWeight="medium">{key}: </Text>
+                                    <Text as="span">{value.toString()}</Text>
+                                  </Box>
+                                ))}
+                              </SimpleGrid>
+                            </Box>
+                          )}
+                          
+                          {service.offers && service.offers.length > 0 && (
+                            <Box>
+                              <Text fontSize="sm" fontWeight="medium" mb={2}>Offers:</Text>
+                              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+                                {service.offers.map((offer) => (
+                                  <Card key={offer.id} variant="outline" size="sm" p={2}>
+                                    <HStack justify="space-between">
+                                      <VStack align="start" spacing={0}>
+                                        <Text fontSize="sm">{offer.provider.name}</Text>
+                                        <Text fontSize="xs" color="gray.500">
+                                          Status: <Badge colorScheme={getStatusColor(offer.status)}>{offer.status}</Badge>
+                                        </Text>
+                                      </VStack>
+                                      <Text fontWeight="bold" color="green.500">${Number(offer.amount).toFixed(2)}</Text>
+                                    </HStack>
+                                    <HStack mt={2} spacing={2}>
+                                      <Button 
+                                        size="xs" 
+                                        leftIcon={<ChatIcon />} 
+                                        onClick={() => handleOpenChat(offer)}
+                                        isDisabled={!offer.chat}
+                                      >
+                                        Chat
+                                      </Button>
+                                      <Button 
+                                        size="xs" 
+                                        onClick={() => handleViewOffer(offer)}
+                                      >
+                                        Details
+                                      </Button>
+                                    </HStack>
+                                  </Card>
+                                ))}
+                              </SimpleGrid>
+                            </Box>
+                          )}
+                        </VStack>
+                      </CardBody>
+                    </Card>
                   ))}
                 </VStack>
+              </Box>
+              
+              <Divider />
+              
+              {/* Transaction Details Section */}
+              <Box>
+                <Heading as="h3" size="md" mb={4}>
+                  Transaction Details
+                </Heading>
+                
+                {party.partyServices.some(service => 
+                  service.offers && service.offers.some(offer => offer.transaction)
+                ) ? (
+                  <VStack spacing={4} align="stretch">
+                    {party.partyServices.map(service => {
+                      // Find approved offers with transactions
+                      const approvedOffers = service.offers.filter(
+                        offer => offer.status === 'APPROVED' && offer.transaction
+                      );
+                      
+                      if (approvedOffers.length === 0) return null;
+                      
+                      return approvedOffers.map(offer => (
+                        <Card key={offer.id} variant="outline">
+                          <CardBody>
+                            <VStack align="stretch" spacing={3}>
+                              <HStack justify="space-between">
+                                <Text fontWeight="bold">{service.service.name}</Text>
+                                <Badge 
+                                  colorScheme={
+                                    offer.transaction.status === 'COMPLETED' ? 'green' :
+                                    offer.transaction.status === 'ESCROW' ? 'blue' :
+                                    offer.transaction.status === 'PENDING' ? 'yellow' :
+                                    'gray'
+                                  }
+                                  px={2}
+                                  py={1}
+                                >
+                                  {offer.transaction.status.replace('_', ' ')}
+                                </Badge>
+                              </HStack>
+                              
+                              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                                <Box>
+                                  <Text color="gray.600" fontSize="sm">Payment Details</Text>
+                                  <HStack mt={1}>
+                                    <Text fontWeight="bold">Amount:</Text>
+                                    <Text>${Number(offer.transaction.amount).toFixed(2)}</Text>
+                                  </HStack>
+                                  {offer.transaction.clientFeePercent && (
+                                    <HStack mt={1}>
+                                      <Text fontWeight="bold">Service Fee:</Text>
+                                      <Text>
+                                        {offer.transaction.clientFeePercent}% 
+                                        (${(Number(offer.transaction.amount) * offer.transaction.clientFeePercent / 100).toFixed(2)})
+                                      </Text>
+                                    </HStack>
+                                  )}
+                                  <HStack mt={1}>
+                                    <Text fontWeight="bold">Provider:</Text>
+                                    <Text>{offer.provider.name}</Text>
+                                  </HStack>
+                                </Box>
+                                
+                                <Box>
+                                  <Text color="gray.600" fontSize="sm">Status & Dates</Text>
+                                  <HStack mt={1}>
+                                    <Text fontWeight="bold">Created:</Text>
+                                    <Text>{format(new Date(offer.transaction.createdAt), 'MMM d, yyyy h:mm a')}</Text>
+                                  </HStack>
+                                  {offer.transaction.escrowStartTime && (
+                                    <HStack mt={1}>
+                                      <Text fontWeight="bold">Escrow Start:</Text>
+                                      <Text>{format(new Date(offer.transaction.escrowStartTime), 'MMM d, yyyy h:mm a')}</Text>
+                                    </HStack>
+                                  )}
+                                  {offer.transaction.escrowEndTime && (
+                                    <HStack mt={1}>
+                                      <Text fontWeight="bold">Escrow End:</Text>
+                                      <Text>{format(new Date(offer.transaction.escrowEndTime), 'MMM d, yyyy h:mm a')}</Text>
+                                    </HStack>
+                                  )}
+                                </Box>
+                              </SimpleGrid>
+                              
+                              {offer.transaction.status === 'ESCROW' && (
+                                <HStack spacing={4} mt={2}>
+                                  <Button 
+                                    size="sm" 
+                                    colorScheme="green" 
+                                    leftIcon={<CheckIcon />}
+                                    onClick={() => handleConfirmArrival(offer.transaction.id)}
+                                  >
+                                    Confirm Provider Arrived
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    colorScheme="red" 
+                                    variant="outline"
+                                    onClick={() => handleFileDispute(offer.transaction.id)}
+                                  >
+                                    File Dispute
+                                  </Button>
+                                </HStack>
+                              )}
+                              
+                              {offer.transaction.status === 'PROVIDER_REVIEW' && (
+                                <Box p={3} bg="yellow.50" borderRadius="md">
+                                  <Text fontWeight="medium">This transaction is awaiting provider approval.</Text>
+                                </Box>
+                              )}
+                              
+                              {offer.transaction.status === 'COMPLETED' && (
+                                <Box p={3} bg="green.50" borderRadius="md">
+                                  <Text fontWeight="medium">
+                                    This transaction has been completed. Funds have been released to the provider.
+                                  </Text>
+                                </Box>
+                              )}
+                            </VStack>
+                          </CardBody>
+                        </Card>
+                      ));
+                    })}
+                  </VStack>
+                ) : (
+                  <Box p={4} bg="gray.50" borderRadius="md" textAlign="center">
+                    <Text>No transactions have been created for this party yet.</Text>
+                    <Text mt={2} fontSize="sm" color="gray.500">
+                      Transactions are created when you approve service offers.
+                    </Text>
+                  </Box>
+                )}
               </Box>
               
               <Divider />
@@ -549,7 +788,7 @@ export default function MyPartyPage() {
                   
                   <Box>
                     <Text fontWeight="bold" mb={2}>Service</Text>
-                    <Text>{activeOffer.service.name}</Text>
+                    <Text>{activeOffer.service?.name || 'Service information unavailable'}</Text>
                   </Box>
                   
                   <Box>
@@ -648,7 +887,7 @@ export default function MyPartyPage() {
         <ModalContent>
           {activeOffer && activeOffer.transaction && (
             <>
-              <ModalHeader>Payment for {activeOffer.service.name}</ModalHeader>
+              <ModalHeader>Payment for {activeOffer.service?.name || 'Service'}</ModalHeader>
               <ModalCloseButton />
               <ModalBody>
                 <Elements stripe={stripePromise}>

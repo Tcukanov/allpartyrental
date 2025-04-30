@@ -1,12 +1,14 @@
-# AllPartyRental Platform Documentation
+# AllPartyRent Platform Documentation
 
 ## Project Overview
 
 READ THIS FILE BEFORE ANY REPOSNE OR CODE WRITING.
-npx prisma migrate dev do not use instead use push.
-ONLY USE RAW QUERY WORKING WITH PRISMA.
 
-AllPartyRental is a marketplace platform that connects party equipment/service providers with clients looking to rent party supplies and services. The platform allows providers to list their services and clients to find, compare, and book party rentals in their area.
+AllPartyRent is a marketplace platform that connects party equipment/service providers with clients looking to rent party supplies and services. The platform allows providers to list their services and clients to find, compare, and book party rentals in their area.
+
+##CATEGORIES
+WE ONLY USING NOW SOFT PLAY. IN FUTURE WE WILL ADD 
+BOUNCE HOUSES, PHOTO BOOTH, ETC
 
 ## Tech Stack
 

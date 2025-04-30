@@ -36,6 +36,8 @@ export async function GET(
             profile: {
               select: {
                 avatar: true,
+                address: true,
+                phone: true,
               },
             },
           },
@@ -83,7 +85,15 @@ export async function GET(
 
     // Check if user is authorized to view this party
     const isClient = session.user.id === party.clientId;
-    const isProvider = session.user.role === 'PROVIDER' && party.status === 'PUBLISHED';
+    // Check if user is a provider with either:
+    // 1. The party is published OR
+    // 2. The provider has made an offer for any service in this party
+    const isProvider = session.user.role === 'PROVIDER' && (
+      party.status === 'PUBLISHED' || 
+      party.partyServices.some(ps => 
+        ps.offers.some(offer => offer.providerId === session.user.id)
+      )
+    );
     const isAdmin = session.user.role === 'ADMIN';
 
     if (!isClient && !isProvider && !isAdmin) {
@@ -91,6 +101,42 @@ export async function GET(
         { success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } },
         { status: 403 }
       );
+    }
+    
+    // Add the client's profile address to the top-level client object for easier access
+    if (party.client && party.client.profile) {
+      console.log('Debug - Client profile in API response:', party.client.profile);
+      
+      // Try to find address in partyServices.specificOptions if profile address is not available
+      let address = party.client.profile.address || (party.client as any).address;
+      
+      if (!address) {
+        // Look for address in partyServices specificOptions
+        for (const partyService of party.partyServices) {
+          if (partyService.specificOptions && typeof partyService.specificOptions === 'object') {
+            try {
+              const options = partyService.specificOptions as any;
+              if (options.address) {
+                address = options.address;
+                console.log('Found address in specificOptions:', address);
+                break;
+              }
+            } catch (e) {
+              console.error('Error parsing specificOptions for address:', e);
+            }
+          }
+        }
+      }
+      
+      const responseData = {
+        ...party,
+        client: {
+          ...party.client,
+          // Use type assertion to avoid TypeScript errors
+          address: address
+        }
+      };
+      return NextResponse.json({ success: true, data: responseData }, { status: 200 });
     }
 
     return NextResponse.json({ success: true, data: party }, { status: 200 });

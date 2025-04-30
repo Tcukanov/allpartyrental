@@ -54,6 +54,8 @@ export async function GET(request: NextRequest) {
       }
     });
     
+    console.log('DEBUG - Client Profile Data:', JSON.stringify(profile));
+    
     if (!profile) {
       return NextResponse.json({ 
         success: true, 
