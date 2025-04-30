@@ -65,6 +65,7 @@ export default function HomeContent() {
   }, [testimonials.length]);
 
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [prevSlide, setPrevSlide] = useState(0);
   const slides = [
     {
       image: '/images/main/1.jpeg',
@@ -73,7 +74,7 @@ export default function HomeContent() {
     },
     {
       image: '/images/main/2.jpeg',
-      title: 'Book With Confidence',
+      title: 'Book Your Party With Confidence',
       subtitle: 'Verified vendors, secure payments, and reliable service',
     },
     {
@@ -84,10 +85,12 @@ export default function HomeContent() {
   ];
 
   const nextSlide = useCallback(() => {
+    setPrevSlide(currentSlide);
     setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
-  }, [slides.length]);
+  }, [currentSlide, slides.length]);
 
-  const prevSlide = () => {
+  const prevSlideAction = () => {
+    setPrevSlide(currentSlide);
     setCurrentSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
   };
 
@@ -116,8 +119,9 @@ export default function HomeContent() {
             width="100%"
             height="100%"
             opacity={index === currentSlide ? 1 : 0}
-            transition="opacity 1s ease-in-out"
-            display={index === currentSlide ? "block" : "none"}
+            visibility={index === currentSlide || index === prevSlide ? "visible" : "hidden"}
+            transition="opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1)"
+            zIndex={index === currentSlide ? 1 : 0}
           >
             {/* Background image with overlay */}
             <Box
