@@ -1,10 +1,11 @@
 "use client";
 
-import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useColorModeValue, Center, Icon, Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon, Avatar, Stack, Flex, Divider, Circle } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useColorModeValue, Center, Icon, Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon, Avatar, Stack, Flex, Divider, Circle, IconButton, HStack } from '@chakra-ui/react';
 import LocationServiceSearch from '@/components/search/LocationServiceSearch';
 import Link from 'next/link';
-import { FiSearch, FiCheckCircle, FiClock, FiPackage, FiShield } from 'react-icons/fi';
+import { FiSearch, FiCheckCircle, FiClock, FiPackage, FiShield, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { useState, useEffect, useCallback } from 'react';
+import { ChevronRightIcon, ArrowForwardIcon } from '@chakra-ui/icons';
 
 export default function HomeContent() {
   const bgColor = useColorModeValue('white', 'gray.800');
@@ -43,724 +44,732 @@ export default function HomeContent() {
     "https://images.unsplash.com/photo-1519340241574-2cec6aef0c01?q=80&w=2848&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
   ];
   
-  const [currentPhoto, setCurrentPhoto] = useState(0);
+  // Background slideshow state
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
   
-  // Auto transition for testimonials and photos
+  // Background slideshow images (update paths to the correct filenames)
+  const backgroundImages = [
+    '/images/main/1.jpeg',
+    '/images/main/2.jpeg',
+    '/images/main/3.jpeg'
+  ];
+  
+  // Auto transition for testimonials and background slideshow
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
-      setCurrentPhoto((prev) => (prev + 1) % photos.length);
+      setCurrentBgIndex((prev) => (prev + 1) % backgroundImages.length);
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [testimonials.length, photos.length]);
+  }, [testimonials.length]);
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const slides = [
+    {
+      image: '/images/main/1.jpeg',
+      title: 'Find Everything for Your Perfect Party',
+      subtitle: 'From venues and decorations to catering and entertainment',
+    },
+    {
+      image: '/images/main/2.jpeg',
+      title: 'Book With Confidence',
+      subtitle: 'Verified vendors, secure payments, and reliable service',
+    },
+    {
+      image: '/images/main/3.jpeg',
+      title: 'Create Unforgettable Memories',
+      subtitle: 'Everything you need for special celebrations in one place',
+    },
+  ];
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
+  }, [slides.length]);
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      nextSlide();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [nextSlide]);
 
   return (
     <Box>
-      {/* Hero Section with Gradient Background */}
+      {/* Hero Section with Slideshow */}
       <Box 
-        bg="#fdf9ed" 
-        position="relative"
-        py={16}
+        position="relative" 
+        height={{ base: "600px", md: "700px" }}
         overflow="hidden"
       >
-        {/* Background Elements */}
-        <Box 
-          position="absolute"
-          top="0"
-          left="0"
-          right="0"
-          bottom="0"
-          opacity="0.05"
-          bgImage="url('data:image/svg+xml;charset=utf-8,%3Csvg width=%27100%27 height=%27100%27 viewBox=%270 0 100 100%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cpath d=%27M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z%27 fill=%27%23000000%27 fill-opacity=%270.4%27 fill-rule=%27evenodd%27/%3E%3C/svg%3E')"
-          zIndex="0"
-        />
-
-        <Container maxW="container.xl" position="relative" zIndex="1">
-          <VStack spacing={8} align="center">
-          <Box textAlign="center" maxW="800px">
-              <Heading 
-                as="h1" 
-                size="2xl" 
-                mb={6} 
-                color="gray.800"
-              >
-              Find Party Services in Your Area
-            </Heading>
-              <Text 
-                fontSize="xl" 
-                color="gray.600" 
-                mb={8}
-              >
-              Discover and book the best party services in your location. From bounce houses to catering, we've got everything you need for your next celebration.
-            </Text>
+        {/* Slideshow */}
+        {slides.map((slide, index) => (
+          <Box
+            key={index}
+            position="absolute"
+            top="0"
+            left="0"
+            width="100%"
+            height="100%"
+            opacity={index === currentSlide ? 1 : 0}
+            transition="opacity 1s ease-in-out"
+            display={index === currentSlide ? "block" : "none"}
+          >
+            {/* Background image with overlay */}
+            <Box
+              position="absolute"
+              top="0"
+              left="0"
+              width="100%"
+              height="100%"
+              bgImage={`url(${slide.image})`}
+              bgPosition="center"
+              bgSize="cover"
+              _after={{
+                content: '""',
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                bgGradient: "linear(to-b, rgba(0,0,0,0.3), rgba(0,0,0,0.7))",
+              }}
+            />
             
-              <Box 
-                bg="white" 
-                p={6} 
-                borderRadius="xl" 
-                boxShadow="xl"
-                _dark={{ bg: 'gray.800' }}
-                mb={6}
+            {/* Content */}
+            <Container 
+              maxW="container.xl" 
+              height="100%" 
+              position="relative" 
+              zIndex="1"
+            >
+              <VStack 
+                height="100%" 
+                justifyContent="center" 
+                alignItems={{ base: "center", md: "flex-start" }}
+                textAlign={{ base: "center", md: "left" }}
+                spacing={6}
+                px={{ base: 4, md: 0 }}
               >
-            <LocationServiceSearch />
+                <Heading
+                  as="h1"
+                  fontSize={{ base: "4xl", md: "5xl", lg: "6xl" }}
+                  fontWeight="bold"
+                  color="white"
+                  maxW={{ base: "100%", md: "70%", lg: "60%" }}
+                  lineHeight="1.2"
+                  textShadow="0px 2px 4px rgba(0,0,0,0.3)"
+                  textTransform="uppercase"
+                >
+                  {slide.title}
+                </Heading>
+                
+                <Text
+                  fontSize={{ base: "lg", md: "xl", lg: "2xl" }}
+                  color="white"
+                  maxW={{ base: "100%", md: "60%", lg: "50%" }}
+                  textShadow="0px 1px 3px rgba(0,0,0,0.3)"
+                >
+                  {slide.subtitle}
+                </Text>
+                
+                <VStack spacing={4} pt={4} maxW={{ base: "100%", md: "80%", lg: "60%" }}>
+                  <Heading
+                    as="h3"
+                    fontSize={{ base: "xl", md: "2xl" }}
+                    color="white"
+                    textShadow="0px 1px 3px rgba(0,0,0,0.4)"
+                  >
+                    Find the Perfect Service for Your Event
+                  </Heading>
+                  
+                  <Box 
+                    bg="white" 
+                    p={{ base: 0, md: 0 }}
+                    borderRadius="xl" 
+                    boxShadow="2xl"
+                    w="full"
+                    _dark={{ bg: 'gray.800' }}
+                    overflow="hidden"
+                    maxW={{ base: "100%", md: "900px" }}
+                    mx="auto"
+                    transform="translateY(0)"
+                    transition="transform 0.3s ease-in-out"
+                    _hover={{ transform: "translateY(-2px)" }}
+                  >
+                    <LocationServiceSearch />
+                  </Box>
+                </VStack>
+              </VStack>
+            </Container>
           </Box>
-
-              <Box w="full" mt={4} position="relative">
-                <Image
-                  src="/images/back.png"
-                  alt="Party decorations"
-                  w="full"
-                  h="auto"
-                  objectFit="contain"
-                />
-              </Box>
-            </Box>
-          </VStack>
-        </Container>
+        ))}
       </Box>
 
-      {/* Services Section with Subtle Pattern */}
-       {/*
+      {/* How It Works Section - Modern Design */}
       <Box 
-        py={20} 
-        bg="gray.50" 
+        py={{ base: 16, md: 24 }} 
+        bg="white"
         _dark={{ bg: 'gray.900' }}
         position="relative"
         overflow="hidden"
       >
+        {/* Subtle background pattern */}
         <Box
           position="absolute"
           top="0"
           left="0"
           right="0"
           bottom="0"
-          opacity="0.4"
-          bgImage="url('data:image/svg+xml;charset=utf-8,%3Csvg width=%2720%27 height=%2720%27 viewBox=%270 0 20 20%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cpath d=%27M0 0h20v20H0V0zm10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14z%27 fill=%27%23000%27 fill-opacity=%270.03%27 fill-rule=%27evenodd%27/%3E%3C/svg%3E')"
+          opacity="0.03"
+          bgGradient="linear(to-br, gray.200, transparent)"
+          _dark={{ bgGradient: "linear(to-br, gray.700, transparent)" }}
         />
-
+        
         <Container maxW="container.xl" position="relative">
-          <VStack spacing={12} align="center">
-            <Heading 
-              as="h2" 
-              size="xl" 
-              mb={8} 
-              textAlign="center"
-              position="relative"
-              _after={{
-                content: '""',
-                width: '100px',
-                height: '4px',
-                background: 'brand.500',
-                position: 'absolute',
-                bottom: '-10px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                borderRadius: 'full'
-              }}
-            >
-              Popular Services
-            </Heading>
-
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8} w="full">
-              <Card 
-                bg={bgColor} 
-                borderWidth="1px" 
-                borderColor={borderColor} 
-                overflow="hidden" 
-                transition="transform 0.3s, box-shadow 0.3s"
-                _hover={{
-                  transform: "translateY(-5px)",
-                  boxShadow: "xl",
-                  borderColor: "brand.200"
-                }}
+          <VStack spacing={{ base: 14, md: 20 }}>
+            {/* Section header */}
+            <VStack spacing={4} textAlign="center" maxW="700px" mx="auto">
+              <Text 
+                color="brand.500" 
+                fontWeight="bold" 
+                fontSize="md" 
+                textTransform="uppercase" 
+                letterSpacing="wider"
               >
-                <Box position="relative">
-                <Image
-                  src="https://www.deluxebouncehouse.com/cdn/shop/products/white-bounce-house.jpg?v=1725278985"
-                  alt="Bounce House"
-                  height="200px"
-                  objectFit="cover"
-                    w="full"
-                  />
-                  <Box 
-                    position="absolute" 
-                    top="0" 
-                    left="0" 
+                Simple Process
+              </Text>
+              <Heading 
+                as="h2" 
+                fontSize={{ base: "3xl", md: "4xl" }}
+                fontWeight="bold"
+                lineHeight="1.2"
+              >
+                How It Works
+              </Heading>
+              <Text fontSize={{ base: "md", md: "lg" }} color="gray.600" maxW="600px" pt={2}>
+                Booking party services has never been easier. Follow these simple steps to create your perfect celebration.
+              </Text>
+            </VStack>
+            
+            {/* Process steps */}
+            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 10, md: 8 }} w="full" px={{ base: 4, md: 0 }}>
+              {[
+                {
+                  step: 1,
+                  title: "Search & Compare",
+                  description: "Browse services in your area and compare options based on ratings, prices, and availability.",
+                  icon: FiSearch
+                },
+                {
+                  step: 2,
+                  title: "Book Instantly",
+                  description: "Choose your date and book instantly with our secure payment system. No waiting for quotes.",
+                  icon: FiCheckCircle
+                },
+                {
+                  step: 3,
+                  title: "Enjoy Your Event",
+                  description: "Relax and enjoy your celebration while our trusted providers handle everything for you.",
+                  icon: FiClock
+                }
+              ].map((step) => (
+                <VStack 
+                  key={step.step}
+                  align={{ base: "center", md: "start" }}
+                  textAlign={{ base: "center", md: "left" }}
+                  spacing={5}
+                  p={6}
+                  borderRadius="lg"
+                  bg="white"
+                  _dark={{ bg: "gray.800" }}
+                  boxShadow="lg"
+                  position="relative"
+                  transition="all 0.3s"
+                  _hover={{ transform: "translateY(-8px)", boxShadow: "xl" }}
+                >
+                  {/* Step number */}
+                  <Circle 
+                    size="40px" 
                     bg="brand.500" 
                     color="white" 
-                    px={3} 
-                    py={1}
-                    borderBottomRightRadius="md"
+                    fontWeight="bold"
+                    fontSize="lg"
+                    position="absolute"
+                    top="-20px"
+                    left={{ base: "calc(50% - 20px)", md: "20px" }}
                   >
-                    Popular
-                  </Box>
-                </Box>
-                <CardBody>
-                <Heading size="md" mb={2}>Bounce Houses</Heading>
-                <Text color="gray.600" mb={4}>
-                  Find the perfect bounce house for your party. We offer a wide selection of sizes and themes.
-                </Text>
-                <Button as={Link} href="/new-york/bounce-houses" colorScheme="brand">
-                  View in New York
-                </Button>
-              </CardBody>
-            </Card>
-
-              <Card 
-                bg={bgColor} 
-                borderWidth="1px" 
-                borderColor={borderColor}
-                overflow="hidden"
-                transition="transform 0.3s, box-shadow 0.3s"
-                _hover={{
-                  transform: "translateY(-5px)",
-                  boxShadow: "xl",
-                  borderColor: "brand.200"
-                }}
+                    {step.step}
+                  </Circle>
+                  
+                  {/* Icon */}
+                  <Circle size="70px" bg="brand.50" color="brand.500" _dark={{ bg: "gray.700" }}>
+                    <Icon as={step.icon} boxSize={8} />
+                  </Circle>
+                  
+                  {/* Content */}
+                  <Heading as="h3" size="md" fontWeight="bold">
+                    {step.title}
+                  </Heading>
+                  
+                  <Text color="gray.600" _dark={{ color: "gray.300" }}>
+                    {step.description}
+                  </Text>
+                </VStack>
+              ))}
+            </SimpleGrid>
+            
+            {/* Call to action */}
+            <Box 
+              mt={{ base: 8, md: 14 }}
+              p={{ base: 6, md: 8 }}
+              borderRadius="xl"
+              bgGradient="linear(to-r, brand.500, brand.600)"
+              color="white"
+              textAlign="center"
+              boxShadow="xl"
+              maxW="900px"
+              w="full"
+              mx="auto"
+            >
+              <Heading size="lg" mb={4}>Ready to start planning your perfect event?</Heading>
+              <Text fontSize="lg" mb={6} maxW="600px" mx="auto">
+                Join thousands of happy customers who have used our platform to find the best party services.
+              </Text>
+              <Button 
+                as={Link}
+                href="/services"
+                colorScheme="whiteAlpha"
+                size="lg"
+                fontWeight="bold"
+                px={8}
+                _hover={{ bg: "white", color: "brand.500" }}
               >
-                <Image
-                  src="https://images.unsplash.com/photo-1555244162-803834f70033?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80"
-                  alt="Catering"
-                  height="200px"
-                  objectFit="cover"
-                />
-                <CardBody>
-                <Heading size="md" mb={2}>Catering</Heading>
-                <Text color="gray.600" mb={4}>
-                  Professional catering services for all your party needs. From appetizers to full meals.
-                </Text>
-                <Button as={Link} href="/san-diego/catering" colorScheme="brand">
-                  View in San Diego
-                </Button>
-              </CardBody>
-            </Card>
-
-              <Card 
-                bg={bgColor} 
-                borderWidth="1px" 
-                borderColor={borderColor}
-                overflow="hidden"
-                transition="transform 0.3s, box-shadow 0.3s"
-                _hover={{
-                  transform: "translateY(-5px)",
-                  boxShadow: "xl",
-                  borderColor: "brand.200"
-                }}
-              >
-                <Image
-                  src="https://res.cloudinary.com/luxuryp/images/f_auto,q_auto/ror2cjrfqay5lcozhk71/untitled-design-6"
-                  alt="Decoration"
-                  height="200px"
-                  objectFit="cover"
-                />
-                <CardBody>
-                <Heading size="md" mb={2}>Decoration</Heading>
-                <Text color="gray.600" mb={4}>
-                  Transform your venue with our professional decoration services. Custom themes available.
-                </Text>
-                <Button as={Link} href="/los-angeles/decoration" colorScheme="brand">
-                  View in Los Angeles
-                </Button>
-              </CardBody>
-            </Card>
-          </SimpleGrid>
+                Explore All Services
+              </Button>
+            </Box>
           </VStack>
         </Container>
       </Box>
-*/}
-      {/* How It Works Section */}
+
+      {/* Testimonials - Modern Design */}
       <Box 
-        py={24} 
+        py={{ base: 16, md: 24 }} 
+        bg="gray.50"
+        _dark={{ bg: "gray.800" }}
         position="relative"
         overflow="hidden"
-        bg="white"
-        _dark={{ bg: 'gray.800' }}
       >
-        {/* Background wave pattern */}
-        <Box
-          position="absolute"
-          top="0"
-          left="0"
-          right="0"
-          height="100%"
-          bgImage="url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1440 320%22%3E%3Cpath fill=%22%23f3f4f6%22 fill-opacity=%221%22 d=%22M0,288L48,272C96,256,192,224,288,197.3C384,171,480,149,576,165.3C672,181,768,235,864,250.7C960,267,1056,245,1152,224C1248,203,1344,181,1392,170.7L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z%22%3E%3C/path%3E%3C/svg%3E')"
-          bgRepeat="no-repeat"
-          bgSize="cover"
-          bgPosition="center"
-          opacity="0.8"
-          _dark={{ 
-            filter: "invert(1) brightness(0.2)",
-            opacity: "0.4"
-          }}
-        />
-        
-        <Container maxW="container.xl" position="relative">
-          <Heading 
-            as="h2" 
-            size="xl" 
-            mb={12} 
-            textAlign="center"
-            position="relative"
-            _after={{
-              content: '""',
-              width: '100px',
-              height: '4px',
-              background: 'brand.500',
-              position: 'absolute',
-              bottom: '-10px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              borderRadius: 'full'
-            }}
-          >
-            How It Works
-          </Heading>
-          
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={12} mt={8}>
-            <Box 
-              p={8} 
-              borderRadius="xl" 
-              boxShadow="lg" 
-              bg="white" 
-              _dark={{ bg: 'gray.700' }}
-              transition="all 0.3s"
-              _hover={{ transform: "translateY(-5px)" }}
-              textAlign="center"
-            >
-              <Circle size="80px" bg="brand.100" color="brand.500" mx="auto" mb={6}>
-                <Icon as={FiPackage} boxSize={8} />
-              </Circle>
-              <Heading as="h3" size="md" mb={4}>
-                All in one place
-              </Heading>
-              <Text color="gray.600" _dark={{ color: 'gray.300' }}>
-                Find everything you need in one place - from rentals to entertainers.
-              </Text>
-            </Box>
-
-            <Box 
-              p={8} 
-              borderRadius="xl" 
-              boxShadow="lg" 
-              bg="white" 
-              _dark={{ bg: 'gray.700' }}
-              transition="all 0.3s"
-              _hover={{ transform: "translateY(-5px)" }}
-              textAlign="center"
-            >
-              <Circle size="80px" bg="brand.100" color="brand.500" mx="auto" mb={6}>
-                <Icon as={FiShield} boxSize={8} />
-              </Circle>
-              <Heading as="h3" size="md" mb={4}>
-                Verified Local Vendors
-              </Heading>
-              <Text color="gray.600" _dark={{ color: 'gray.300' }}>
-                Verified providers with reviews and safety checks.
-              </Text>
-            </Box>
-
-            <Box 
-              p={8} 
-              borderRadius="xl" 
-              boxShadow="lg" 
-              bg="white" 
-              _dark={{ bg: 'gray.700' }}
-              transition="all 0.3s"
-              _hover={{ transform: "translateY(-5px)" }}
-              textAlign="center"
-            >
-              <Circle size="80px" bg="brand.100" color="brand.500" mx="auto" mb={6}>
-                <Icon as={FiClock} boxSize={8} />
-              </Circle>
-              <Heading as="h3" size="md" mb={4}>
-                Fast & Easy
-              </Heading>
-              <Text color="gray.600" _dark={{ color: 'gray.300' }}>
-                Book online in minutes. No back-and-forth quotes.
-              </Text>
-            </Box>
-          </SimpleGrid>
-        </Container>
-      </Box>
-
-      {/* Testimonials & FAQ Section */}
-      <Box 
-        py={24} 
-        bg="#fdf9ed"
-        _dark={{ bg: "gray.900" }}
-        position="relative"
-        overflow="hidden"
-        w="full"
-      >
-        {/* Stylized background elements */}
+        {/* Background gradient */}
         <Box
           position="absolute"
           top="0"
           left="0"
           right="0"
           bottom="0"
-          opacity="0.07"
-          bgImage="url('data:image/svg+xml;charset=utf-8,%3Csvg width=%27100%27 height=%27100%27 viewBox=%270 0 100 100%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cpath d=%27M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z%27 fill=%27%23ffffff%27 fill-rule=%27evenodd%27/%3E%3C/svg%3E')"
+          bgGradient="linear(to-br, brand.50, transparent 70%)"
+          _dark={{ bgGradient: "linear(to-br, brand.900, transparent 70%)" }}
+          opacity="0.6"
         />
-
-        <Container maxW="container.xl" position="relative">
-          <Heading 
-            as="h2" 
-            size="xl" 
-            mb={12} 
-            textAlign="center"
-            color="gray.800"
-            position="relative"
-            _after={{
-              content: '""',
-              width: '100px',
-              height: '4px',
-              background: 'brand.500',
-              position: 'absolute',
-              bottom: '-10px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              borderRadius: 'full',
-              opacity: '0.7'
-            }}
-          >
-            What Our Customers Say
-          </Heading>
-          
-          <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
-            {/* Photo Slideshow - Left Side */}
-            <VStack spacing={6}>
-              <Box 
-                borderRadius="xl" 
-                overflow="hidden"
-                boxShadow="dark-lg"
-                position="relative"
-                h="400px"
-                w="full"
-                border="4px solid white"
-                transform="rotate(-1deg)"
+        
+        <Container maxW="container.xl" position="relative" zIndex="1">
+          {/* Section header */}
+          <VStack spacing={{ base: 12, md: 16 }}>
+            <VStack spacing={4} textAlign="center" maxW="700px">
+              <Text 
+                color="brand.500" 
+                fontWeight="bold" 
+                fontSize="md"
+                textTransform="uppercase"
+                letterSpacing="wider"
               >
-                {photos.map((photo, index) => (
-                  <Box
-                    key={index}
-                    position="absolute"
-                    top="0"
-                    left="0"
-                    w="100%"
-                    h="100%"
-                    opacity={currentPhoto === index ? 1 : 0}
-                    transition="opacity 1s ease-in-out"
-                  >
-              <Image
-                      src={photo}
-                      alt={`Customer party photo ${index + 1}`}
-                      objectFit="cover"
-                      w="full"
-                      h="full"
-                    />
-                  </Box>
-                ))}
-                
-                {/* Photo navigation dots */}
-                <Flex 
-                  position="absolute" 
-                  bottom="4" 
-                width="100%"
-                  justify="center" 
-                  zIndex="1"
-                >
-                  {photos.map((_, index) => (
-                    <Box
-                      key={index}
-                      w="3"
-                      h="3"
-                      borderRadius="full"
-                      bg={currentPhoto === index ? "brand.500" : "white"}
-                      mx="1"
-                      cursor="pointer"
-                      onClick={() => setCurrentPhoto(index)}
-                      opacity="0.8"
-                      _hover={{ opacity: 1 }}
-                    />
-                  ))}
-                </Flex>
-              </Box>
+                Testimonials
+              </Text>
+              <Heading 
+                fontSize={{ base: "3xl", md: "4xl" }}
+                fontWeight="bold"
+                lineHeight="1.2"
+              >
+                What Our Customers Say
+              </Heading>
+              <Text fontSize={{ base: "md", md: "lg" }} color="gray.600" maxW="600px" pt={2}>
+                Don't just take our word for it. Here's what people love about our platform.
+              </Text>
             </VStack>
             
-            {/* Testimonials - Right Side */}
-            <Box
-              position="relative"
-              h="400px"
-              borderRadius="xl"
-              overflow="hidden"
-              boxShadow="dark-lg"
-              bg="white"
-              transform="rotate(1deg)"
-              _dark={{ bg: "gray.800" }}
+            {/* Testimonial carousel */}
+            <Box 
+              position="relative" 
+              w="full" 
+              maxW="1100px" 
+              mx="auto"
+              px={{ base: 4, md: 0 }}
             >
-              {/* Background pattern */}
-              <Box
-                position="absolute"
-                top="0"
-                left="0"
-                right="0"
-                bottom="0"
-                opacity="0.03"
-                bgImage="url('data:image/svg+xml;charset=utf-8,%3Csvg width=%2730%27 height=%2730%27 viewBox=%270 0 30 30%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cpath d=%27M15 0C6.716 0 0 6.716 0 15c0 8.284 6.716 15 15 15 8.284 0 15-6.716 15-15 0-8.284-6.716-15-15-15zm0 2c7.18 0 13 5.82 13 13S22.18 28 15 28 2 22.18 2 15 7.82 2 15 2z%27 fill=%27%23000%27 fill-opacity=%271%27 fill-rule=%27evenodd%27/%3E%3C/svg%3E')"
-              />
-              
-              {/* Testimonial content */}
-              <VStack
-                position="relative"
-                justify="center"
-                align="center"
-                h="full"
-                p={8}
-                spacing={6}
+              <SimpleGrid 
+                columns={{ base: 1, md: 2 }} 
+                spacing={{ base: 8, md: 10 }}
+                alignItems="center"
               >
-                <Icon 
-                  viewBox="0 0 24 24" 
-                  boxSize={10} 
-                  color="brand.500"
-                  opacity="0.8"
-                  _dark={{ color: "brand.300" }}
+                {/* Left side: Image gallery */}
+                <Box 
+                  position="relative" 
+                  height={{ base: "300px", md: "450px" }}
+                  overflow="hidden"
+                  borderRadius="xl"
+                  boxShadow="2xl"
                 >
-                  <path
-                    fill="currentColor"
-                    d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z"
-                  />
-                </Icon>
-                
-                {testimonials.map((testimonial, index) => (
-                  <Box
-                    key={testimonial.id}
-                    position="absolute"
-                    opacity={currentTestimonial === index ? 1 : 0}
-                    transform={`translateY(${currentTestimonial === index ? 0 : 20}px)`}
-                    transition="all 0.5s ease"
-                    p={8}
-                    textAlign="center"
-                  >
-                    <Text 
-                      fontSize="xl" 
-                      fontStyle="italic" 
-                      mb={6} 
-                      fontWeight="medium"
-                      color="gray.700"
-                      _dark={{ color: "gray.200" }}
-                    >
-                      "{testimonial.text}"
-                    </Text>
-                    
-                    <Flex direction="column" align="center">
-                      <Avatar 
-                        src={testimonial.avatar} 
-                        name={testimonial.name} 
-                        size="md" 
-                        mb={2}
-                        border="2px solid"
-                        borderColor="brand.500"
-                        _dark={{ borderColor: "brand.300" }}
-                      />
-                      <Text 
-                        fontWeight="bold"
-                        color="gray.800"
-                        _dark={{ color: "white" }}
-                      >
-                        {testimonial.name}
-                      </Text>
-                      <Text 
-                        fontSize="sm" 
-                        color="gray.500"
-                        _dark={{ color: "gray.400" }}
-                      >
-                        {testimonial.location}
-                      </Text>
-                    </Flex>
-                  </Box>
-                ))}
-                
-                {/* Testimonial navigation dots */}
-                <Flex 
-                  position="absolute" 
-                  bottom="4" 
-                  width="100%" 
-                  justify="center"
-                >
-                  {testimonials.map((_, index) => (
+                  {photos.map((photo, index) => (
                     <Box
                       key={index}
-                      w="2"
-                      h="2"
-                      borderRadius="full"
-                      bg={currentTestimonial === index ? "brand.500" : "gray.300"}
-                      mx="1"
-                      cursor="pointer"
-                      onClick={() => setCurrentTestimonial(index)}
-                      _dark={{
-                        bg: currentTestimonial === index ? "brand.300" : "gray.600"
-                      }}
+                      position="absolute"
+                      top="0"
+                      left="0"
+                      width="100%"
+                      height="100%"
+                      opacity={index === currentTestimonial ? 1 : 0}
+                      transition="opacity 1s ease-in-out"
+                      bgImage={`url(${photo})`}
+                      bgSize="cover"
+                      bgPosition="center"
+                      transform={index === currentTestimonial ? "scale(1)" : "scale(1.1)"}
+                      transformOrigin="center"
+                      style={{ transitionProperty: "opacity, transform", transitionDuration: "1.2s" }}
                     />
                   ))}
-                </Flex>
-              </VStack>
+                  
+                  {/* Photo navigation */}
+                  <Flex
+                    position="absolute"
+                    bottom="4"
+                    left="0"
+                    right="0"
+                    justify="center"
+                    zIndex="1"
+                  >
+                    {photos.map((_, index) => (
+                      <Box
+                        key={index}
+                        w="2.5"
+                        h="2.5"
+                        borderRadius="full"
+                        bg={index === currentTestimonial ? "white" : "whiteAlpha.600"}
+                        mx="1"
+                        cursor="pointer"
+                        onClick={() => setCurrentTestimonial(index)}
+                        transition="all 0.3s"
+                        _hover={{ transform: "scale(1.2)" }}
+                      />
+                    ))}
+                  </Flex>
+                </Box>
+                
+                {/* Right side: Testimonial cards */}
+                <Box 
+                  position="relative" 
+                  height={{ base: "auto", md: "450px" }}
+                  display="flex"
+                  alignItems="center"
+                >
+                  {testimonials.map((testimonial, index) => (
+                    <Box
+                      key={testimonial.id}
+                      position={index === currentTestimonial ? "relative" : "absolute"}
+                      visibility={index === currentTestimonial ? "visible" : "hidden"}
+                      opacity={index === currentTestimonial ? 1 : 0}
+                      transform={`translateX(${index === currentTestimonial ? 0 : 50}px)`}
+                      transition="all 0.5s ease"
+                      bg="white"
+                      _dark={{ bg: "gray.700" }}
+                      p={{ base: 6, md: 8 }}
+                      borderRadius="lg"
+                      boxShadow="xl"
+                      w="full"
+                    >
+                      {/* Quote icon */}
+                      <Icon 
+                        viewBox="0 0 24 24" 
+                        boxSize={10} 
+                        color="brand.100"
+                        mb={6}
+                        opacity="0.6"
+                      >
+                        <path
+                          fill="currentColor"
+                          d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z"
+                        />
+                      </Icon>
+                      
+                      {/* Testimonial content */}
+                      <Text 
+                        fontSize={{ base: "lg", md: "xl" }} 
+                        fontWeight="medium" 
+                        lineHeight="1.6"
+                        color="gray.700"
+                        _dark={{ color: "gray.100" }}
+                        mb={8}
+                      >
+                        "{testimonial.text}"
+                      </Text>
+                      
+                      {/* Customer info */}
+                      <Flex align="center">
+                        <Avatar 
+                          src={testimonial.avatar} 
+                          name={testimonial.name} 
+                          size="md" 
+                          mr={4}
+                          border="2px solid"
+                          borderColor="brand.500"
+                        />
+                        <Box>
+                          <Text 
+                            fontWeight="bold"
+                            fontSize="md"
+                          >
+                            {testimonial.name}
+                          </Text>
+                          <Text 
+                            fontSize="sm" 
+                            color="gray.500"
+                            _dark={{ color: "gray.400" }}
+                          >
+                            {testimonial.location}
+                          </Text>
+                        </Box>
+                      </Flex>
+                      
+                      {/* Navigation buttons */}
+                      <Flex 
+                        position="absolute" 
+                        bottom="8" 
+                        right="8" 
+                        gap={2}
+                      >
+                        <IconButton
+                          aria-label="Previous testimonial"
+                          icon={<Icon as={FiChevronLeft} boxSize={5} />}
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="brand"
+                          onClick={() => setCurrentTestimonial((prev) => (prev === 0 ? testimonials.length - 1 : prev - 1))}
+                        />
+                        <IconButton
+                          aria-label="Next testimonial"
+                          icon={<Icon as={FiChevronRight} boxSize={5} />}
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="brand"
+                          onClick={() => setCurrentTestimonial((prev) => (prev + 1) % testimonials.length)}
+                        />
+                      </Flex>
+                    </Box>
+                  ))}
+                </Box>
+              </SimpleGrid>
             </Box>
-          </SimpleGrid>
+          </VStack>
         </Container>
       </Box>
 
-      {/* FAQ Section */}
+      {/* FAQ Section - Modern Design */}
       <Box 
-        py={20} 
-        w="full" 
-        bg="gray.50"
+        py={{ base: 16, md: 24 }} 
+        bg="white"
         _dark={{ bg: "gray.900" }}
         position="relative"
         overflow="hidden"
       >
-        {/* Background dots pattern */}
+        {/* Background pattern */}
         <Box
           position="absolute"
           top="0"
           left="0"
           right="0"
           bottom="0"
-          opacity="0.4"
-          bgImage="url('data:image/svg+xml;charset=utf-8,%3Csvg width=%2720%27 height=%2720%27 viewBox=%270 0 20 20%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27%23000%27 fill-opacity=%270.05%27 fill-rule=%27evenodd%27%3E%3Ccircle cx=%273%27 cy=%273%27 r=%273%27/%3E%3Ccircle cx=%2713%27 cy=%2713%27 r=%273%27/%3E%3C/g%3E%3C/svg%3E')"
+          bgGradient="radial(circle at 20% 100%, brand.50, transparent 60%)"
+          _dark={{ bgGradient: "radial(circle at 20% 100%, gray.800, transparent 60%)" }}
+          opacity="0.7"
         />
         
         <Container maxW="container.xl" position="relative">
-          <Heading 
-            as="h2" 
-            size="xl" 
-            mb={12}
-            textAlign="center"
-            position="relative"
-            _after={{
-              content: '""',
-              width: '100px',
-              height: '4px',
-              background: 'brand.500',
-              position: 'absolute',
-              bottom: '-12px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              borderRadius: 'full'
-            }}
-          >
-            Frequently Asked Questions
-          </Heading>
-          
-          <Box 
-            maxW="800px" 
-            mx="auto"
-            bg="white"
-            _dark={{ bg: "gray.800" }}
-            borderRadius="xl"
-            boxShadow="lg"
-            overflow="hidden"
-          >
-            <Accordion allowToggle borderColor={borderColor}>
-              <AccordionItem>
-                <h2>
-                  <AccordionButton py={4}>
-                    <Box flex="1" textAlign="left" fontWeight="medium">
-                      How does AllPartyRent work?
-                    </Box>
-                    <AccordionIcon />
-                  </AccordionButton>
-                </h2>
-                <AccordionPanel pb={4}>
-                  AllPartyRent is a marketplace that connects party planners with local service providers. 
-                  Browse services by location, book directly through our platform, and pay securely online. 
-                  We verify all vendors to ensure quality service for your event.
-                </AccordionPanel>
-              </AccordionItem>
-              
-              <AccordionItem>
-                <h2>
-                  <AccordionButton py={4}>
-                    <Box flex="1" textAlign="left" fontWeight="medium">
-                      Can I cancel or modify my booking?
-                    </Box>
-                    <AccordionIcon />
-                  </AccordionButton>
-                </h2>
-                <AccordionPanel pb={4}>
-                  Yes, you can modify or cancel your booking through your account dashboard. 
-                  Cancellation policies vary by vendor, but most allow free cancellation up to 48 hours 
-                  before your event. Check the specific terms when booking.
-                </AccordionPanel>
-              </AccordionItem>
-              
-              <AccordionItem>
-                <h2>
-                  <AccordionButton py={4}>
-                    <Box flex="1" textAlign="left" fontWeight="medium">
-                      Are the vendors insured?
-                    </Box>
-                    <AccordionIcon />
-                  </AccordionButton>
-                </h2>
-                <AccordionPanel pb={4}>
-                  All vendors on our platform are required to have appropriate insurance coverage. 
-                  For bounce houses and other equipment rentals, vendors must meet safety standards 
-                  and have liability insurance. You can request insurance verification directly from vendors.
-                </AccordionPanel>
-              </AccordionItem>
-              
-              <AccordionItem>
-                <h2>
-                  <AccordionButton py={4}>
-                    <Box flex="1" textAlign="left" fontWeight="medium">
-                      How far in advance should I book?
-                    </Box>
-                    <AccordionIcon />
-                  </AccordionButton>
-                </h2>
-                <AccordionPanel pb={4}>
-                  We recommend booking at least 2-3 weeks in advance, especially for weekend events 
-                  or during peak season (summer months and holidays). Some popular vendors may require 
-                  even earlier booking. Last-minute bookings are possible but selection may be limited.
-                </AccordionPanel>
-              </AccordionItem>
-              
-              <AccordionItem>
-                <h2>
-                  <AccordionButton py={4}>
-                    <Box flex="1" textAlign="left" fontWeight="medium">
-                      What if something goes wrong with my booking?
-                    </Box>
-                    <AccordionIcon />
-                  </AccordionButton>
-                </h2>
-                <AccordionPanel pb={4}>
-                  Our customer support team is available to help resolve any issues. We offer a satisfaction 
-                  guarantee and can assist with vendor communication, rescheduling, or refunds if services 
-                  don't meet expectations. Contact us immediately if you encounter any problems.
-                </AccordionPanel>
-              </AccordionItem>
-            </Accordion>
-          </Box>
-          
-          <Box mt={12} textAlign="center">
-            <Text mb={4} fontSize="lg">Still have questions?</Text>
-            <Button 
-              as={Link} 
-              href="/contact" 
-              colorScheme="brand" 
-              size="lg"
-              boxShadow="md"
-              _hover={{
-                transform: "translateY(-2px)",
-                boxShadow: "lg"
-              }}
+          <VStack spacing={{ base: 10, md: 16 }}>
+            {/* Section header */}
+            <VStack spacing={4} textAlign="center" maxW="700px">
+              <Text 
+                color="brand.500" 
+                fontWeight="bold"
+                fontSize="md"
+                textTransform="uppercase"
+                letterSpacing="wider"
+              >
+                Questions Answered
+              </Text>
+              <Heading 
+                fontSize={{ base: "3xl", md: "4xl" }}
+                fontWeight="bold"
+                lineHeight="1.2"
+              >
+                Frequently Asked Questions
+              </Heading>
+              <Text fontSize={{ base: "md", md: "lg" }} color="gray.600" maxW="600px" pt={2}>
+                Get answers to the most common questions about our services.
+              </Text>
+            </VStack>
+            
+            {/* FAQ accordion */}
+            <Box 
+              w="full" 
+              maxW="900px" 
+              mx="auto"
             >
-              Contact Us
-            </Button>
-          </Box>
-      </Container>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={{ base: 6, md: 10 }}>
+                <Box>
+                  <Accordion 
+                    allowToggle 
+                    borderColor={borderColor}
+                    bg="white"
+                    _dark={{ bg: "gray.800" }}
+                    borderRadius="xl"
+                    boxShadow="lg"
+                    overflow="hidden"
+                  >
+                    <AccordionItem border="none" borderBottom="1px solid" borderColor="gray.100" _dark={{ borderColor: "gray.700" }}>
+                      <h2>
+                        <AccordionButton py={5} _hover={{ bg: "gray.50" }} _dark={{ _hover: { bg: "gray.700" } }}>
+                          <Box flex="1" textAlign="left" fontWeight="semibold">
+                            How does AllPartyRent work?
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel pb={6} pt={2} px={6} bg="gray.50" _dark={{ bg: "gray.700" }}>
+                        AllPartyRent is a marketplace that connects party planners with local service providers. 
+                        Browse services by location, book directly through our platform, and pay securely online. 
+                        We verify all vendors to ensure quality service for your event.
+                      </AccordionPanel>
+                    </AccordionItem>
+                    
+                    <AccordionItem border="none" borderBottom="1px solid" borderColor="gray.100" _dark={{ borderColor: "gray.700" }}>
+                      <h2>
+                        <AccordionButton py={5} _hover={{ bg: "gray.50" }} _dark={{ _hover: { bg: "gray.700" } }}>
+                          <Box flex="1" textAlign="left" fontWeight="semibold">
+                            Can I cancel or modify my booking?
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel pb={6} pt={2} px={6} bg="gray.50" _dark={{ bg: "gray.700" }}>
+                        Yes, you can modify or cancel your booking through your account dashboard. 
+                        Cancellation policies vary by vendor, but most allow free cancellation up to 48 hours 
+                        before your event. Check the specific terms when booking.
+                      </AccordionPanel>
+                    </AccordionItem>
+                    
+                    <AccordionItem border="none">
+                      <h2>
+                        <AccordionButton py={5} _hover={{ bg: "gray.50" }} _dark={{ _hover: { bg: "gray.700" } }}>
+                          <Box flex="1" textAlign="left" fontWeight="semibold">
+                            Are the vendors insured?
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel pb={6} pt={2} px={6} bg="gray.50" _dark={{ bg: "gray.700" }}>
+                        All vendors on our platform are required to have appropriate insurance coverage. 
+                        For bounce houses and other equipment rentals, vendors must meet safety standards 
+                        and have liability insurance. You can request insurance verification directly from vendors.
+                      </AccordionPanel>
+                    </AccordionItem>
+                  </Accordion>
+                </Box>
+                
+                <Box>
+                  <Accordion 
+                    allowToggle 
+                    borderColor={borderColor}
+                    bg="white"
+                    _dark={{ bg: "gray.800" }}
+                    borderRadius="xl"
+                    boxShadow="lg"
+                    overflow="hidden"
+                  >
+                    <AccordionItem border="none" borderBottom="1px solid" borderColor="gray.100" _dark={{ borderColor: "gray.700" }}>
+                      <h2>
+                        <AccordionButton py={5} _hover={{ bg: "gray.50" }} _dark={{ _hover: { bg: "gray.700" } }}>
+                          <Box flex="1" textAlign="left" fontWeight="semibold">
+                            How far in advance should I book?
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel pb={6} pt={2} px={6} bg="gray.50" _dark={{ bg: "gray.700" }}>
+                        We recommend booking at least 2-3 weeks in advance, especially for weekend events 
+                        or during peak season (summer months and holidays). Some popular vendors may require 
+                        even earlier booking. Last-minute bookings are possible but selection may be limited.
+                      </AccordionPanel>
+                    </AccordionItem>
+                    
+                    <AccordionItem border="none" borderBottom="1px solid" borderColor="gray.100" _dark={{ borderColor: "gray.700" }}>
+                      <h2>
+                        <AccordionButton py={5} _hover={{ bg: "gray.50" }} _dark={{ _hover: { bg: "gray.700" } }}>
+                          <Box flex="1" textAlign="left" fontWeight="semibold">
+                            What if something goes wrong with my booking?
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel pb={6} pt={2} px={6} bg="gray.50" _dark={{ bg: "gray.700" }}>
+                        Our customer support team is available to help resolve any issues. We offer a satisfaction 
+                        guarantee and can assist with vendor communication, rescheduling, or refunds if services 
+                        don't meet expectations. Contact us immediately if you encounter any problems.
+                      </AccordionPanel>
+                    </AccordionItem>
+                    
+                    <AccordionItem border="none">
+                      <h2>
+                        <AccordionButton py={5} _hover={{ bg: "gray.50" }} _dark={{ _hover: { bg: "gray.700" } }}>
+                          <Box flex="1" textAlign="left" fontWeight="semibold">
+                            How do I become a service provider?
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel pb={6} pt={2} px={6} bg="gray.50" _dark={{ bg: "gray.700" }}>
+                        Visit our "Become a Provider" page to apply. You'll need to create an account, 
+                        provide details about your services, pricing, and availability. Our team will 
+                        review your application and contact you to complete the onboarding process.
+                      </AccordionPanel>
+                    </AccordionItem>
+                  </Accordion>
+                </Box>
+              </SimpleGrid>
+            
+              {/* CTA button */}
+              <Box mt={{ base: 12, md: 16 }} textAlign="center">
+                <Button 
+                  as={Link} 
+                  href="/contact" 
+                  colorScheme="brand" 
+                  size="lg"
+                  fontWeight="bold"
+                  px={8}
+                  py={6}
+                  boxShadow="lg"
+                  _hover={{
+                    transform: "translateY(-2px)",
+                    boxShadow: "xl"
+                  }}
+                >
+                  Still have questions? Contact Us
+                </Button>
+              </Box>
+            </Box>
+          </VStack>
+        </Container>
       </Box>
     </Box>
   );

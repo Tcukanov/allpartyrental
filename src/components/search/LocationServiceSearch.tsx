@@ -25,10 +25,15 @@ import {
   ModalBody,
   ModalCloseButton,
   Alert,
-  AlertIcon
+  AlertIcon,
+  Icon,
+  Divider,
+  Flex,
+  Stack
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
+import { FiMapPin, FiGrid } from 'react-icons/fi';
 
 interface City {
   id: string;
@@ -59,9 +64,11 @@ export default function LocationServiceSearch() {
 
   // Colors for different themes
   const formBg = useColorModeValue('white', 'gray.800');
-  const labelColor = useColorModeValue('gray.700', 'gray.300');
+  const labelColor = useColorModeValue('gray.600', 'gray.300');
   const inputBg = useColorModeValue('white', 'gray.700');
-  const borderColor = useColorModeValue('gray.300', 'gray.600');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const iconColor = useColorModeValue('brand.500', 'brand.300');
+  const hoverBg = useColorModeValue('gray.50', 'gray.700');
 
   // Check if form is valid
   useEffect(() => {
@@ -149,71 +156,105 @@ export default function LocationServiceSearch() {
         as="form" 
         onSubmit={handleSearch}
         bg={formBg}
-        p={4}
         borderRadius="lg"
-        boxShadow="md"
+        overflow="hidden"
         w="100%"
+        boxShadow="xl"
       >
-        <VStack spacing={4} align="stretch">
-          <Heading size="sm" textAlign="center" mb={2}>Find the Perfect Service for Your Event</Heading>
-          
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-            {/* Location/City Field */}
-            <FormControl isRequired>
-              <FormLabel fontSize="sm" fontWeight="medium" color={labelColor}>
-                Location
-              </FormLabel>
-              <Select
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value)}
-                bg={inputBg}
-                borderColor={borderColor}
-              >
-                {cities.map((city) => (
-                  <option key={city.id} value={city.id}>
-                    {city.name}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
+        <Flex 
+          direction={{ base: "column", md: "row" }} 
+          align="center"
+          borderRadius="lg"
+        >
+          {/* Location/City Field */}
+          <InputGroup 
+            size="lg" 
+            borderRight={{ base: "none", md: "1px solid" }} 
+            borderColor={borderColor}
+            flex={{ base: "1", md: "2" }}
+          >
+            <InputLeftElement 
+              pointerEvents="none" 
+              h="full" 
+              pl={4}
+              children={<Icon as={FiMapPin} color={iconColor} boxSize={5} />} 
+            />
+            <Select
+              border="none"
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              color={labelColor}
+              fontSize="md"
+              fontWeight="medium"
+              h="60px"
+              pl={14}
+              _hover={{ bg: hoverBg }}
+              _focus={{ boxShadow: "none", bg: hoverBg }}
+            >
+              {cities.map((city) => (
+                <option key={city.id} value={city.id}>
+                  {city.name}
+                </option>
+              ))}
+            </Select>
+          </InputGroup>
 
-            {/* Service Category Field */}
-            <FormControl isRequired>
-              <FormLabel fontSize="sm" fontWeight="medium" color={labelColor}>
-                Service Category
-              </FormLabel>
-              <Select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                bg={inputBg}
-                borderColor={borderColor}
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
+          {/* Service Category Field */}
+          <InputGroup 
+            size="lg" 
+            borderRight={{ base: "none", md: "1px solid" }} 
+            borderColor={borderColor}
+            flex={{ base: "1", md: "2" }}
+            borderTop={{ base: "1px solid", md: "none" }}
+            borderTopColor={{ base: borderColor, md: "none" }}
+          >
+            <InputLeftElement 
+              pointerEvents="none" 
+              h="full" 
+              pl={4}
+              children={<Icon as={FiGrid} color={iconColor} boxSize={5} />} 
+            />
+            <Select
+              border="none"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              color={labelColor}
+              fontSize="md"
+              fontWeight="medium"
+              h="60px"
+              pl={14}
+              _hover={{ bg: hoverBg }}
+              _focus={{ boxShadow: "none", bg: hoverBg }}
+            >
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </Select>
+          </InputGroup>
 
-            {/* Search Button */}
-            <FormControl>
-              <FormLabel fontSize="sm" fontWeight="medium" color={labelColor}>
-                &nbsp;
-              </FormLabel>
-              <Button
-                type="submit"
-                colorScheme="brand"
-                w="100%"
-                h="40px"
-                leftIcon={<SearchIcon />}
-                isDisabled={!formValid}
-              >
-                Search
-              </Button>
-            </FormControl>
-          </SimpleGrid>
-        </VStack>
+          {/* Search Button */}
+          <Button
+            type="submit"
+            colorScheme="brand"
+            size="lg"
+            h="60px"
+            px={8}
+            flex={{ base: "1", md: "1" }}
+            fontSize="md"
+            fontWeight="bold"
+            borderRadius={{ base: "0 0 lg lg", md: "0 lg lg 0" }}
+            leftIcon={<SearchIcon boxSize={4} />}
+            isDisabled={!formValid}
+            _hover={{
+              transform: "translateY(-1px)",
+              boxShadow: "lg"
+            }}
+          >
+            Search
+          </Button>
+        </Flex>
       </Box>
 
       {/* Modal for when user hasn't selected both fields */}
@@ -258,20 +299,17 @@ export default function LocationServiceSearch() {
                 </FormControl>
               )}
               
-              <Button
-                colorScheme="brand"
-                w="full"
+              <Button 
+                colorScheme="brand" 
                 onClick={() => {
                   if (selectedCity && selectedCategory) {
-                    const citySlug = cities.find(c => c.id === selectedCity)?.slug || selectedCity;
-                    const categorySlug = categories.find(c => c.id === selectedCategory)?.slug || selectedCategory;
-                    router.push(`/${citySlug}/${categorySlug}`);
                     onClose();
+                    handleSearch(new Event('submit') as any);
                   }
                 }}
-                isDisabled={!selectedCity || !selectedCategory}
+                mt={2}
               >
-                Search
+                Search Now
               </Button>
             </VStack>
           </ModalBody>
