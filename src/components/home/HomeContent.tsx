@@ -74,7 +74,7 @@ export default function HomeContent() {
     },
     {
       image: '/images/main/2.jpeg',
-      title: 'Book Your Party With Confidence',
+      title: 'Book Your Amazing Party With Confidence',
       subtitle: 'Verified vendors, secure payments, and reliable service',
     },
     {

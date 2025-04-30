@@ -11,39 +11,35 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Find the user by email
+    // Find the user
     const user = await prisma.user.findUnique({
       where: { email },
       select: {
         id: true,
+        email: true,
         password: true,
+        emailVerified: true,
+        accounts: {
+          select: {
+            provider: true
+          }
+        }
       }
     });
     
     if (!user) {
-      // User doesn't exist
-      return NextResponse.json({ 
-        exists: false,
-        isGoogleAccount: false 
-      });
+      // Don't reveal if user exists or not for security
+      return NextResponse.json({ isGoogleAccount: false, needsVerification: false });
     }
     
-    // Check if user has a Google account using raw query
-    const accounts = await prisma.$queryRaw`
-      SELECT * FROM "Account" 
-      WHERE "userId" = ${user.id} AND "provider" = 'google'
-      LIMIT 1
-    `;
-    
     // Check if this is a Google account (has Google provider in accounts AND no password)
-    const isGoogleAccount = Array.isArray(accounts) && accounts.length > 0 && 
-                           (!user.password || user.password.length === 0);
+    const isGoogleAccount = user.accounts.some(account => account.provider === 'google') && 
+      (!user.password || user.password.length === 0);
     
-    return NextResponse.json({
-      exists: true,
-      isGoogleAccount
-    });
+    // Check if email needs verification (has password but no emailVerified timestamp)
+    const needsVerification = user.password && !user.emailVerified;
     
+    return NextResponse.json({ isGoogleAccount, needsVerification });
   } catch (error) {
     console.error('Error checking account:', error);
     return NextResponse.json({ 

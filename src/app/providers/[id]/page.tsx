@@ -70,6 +70,9 @@ export default async function ProviderProfilePage(props: { params: Promise<{ id:
       include: {
         profile: true,
         services: {
+          where: {
+            status: 'ACTIVE'
+          },
           include: {
             category: true,
             city: true

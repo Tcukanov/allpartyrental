@@ -18,7 +18,11 @@ import {
   InputGroup, 
   InputRightElement,
   IconButton,
-  Flex
+  Flex,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon, EmailIcon } from '@chakra-ui/icons';
 import { FcGoogle } from 'react-icons/fc';
@@ -37,6 +41,10 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isGoogleAccount, setIsGoogleAccount] = useState(false);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [devVerificationLink, setDevVerificationLink] = useState('');
+  const error = searchParams.get('error');
   
   // Check if the email is associated with Google when it changes
   useEffect(() => {
@@ -116,6 +124,22 @@ export default function SignInPage() {
         return;
       }
       
+      // Check if email needs verification
+      if (checkData.needsVerification) {
+        toast({
+          title: 'Email Verification Required',
+          description: 'Please verify your email before signing in. Check your inbox for the verification link.',
+          status: 'warning',
+          duration: 6000,
+          isClosable: true,
+        });
+        
+        // Show the resend verification button
+        setNeedsEmailVerification(true);
+        setIsLoading(false);
+        return;
+      }
+      
       const result = await signIn('credentials', {
         redirect: false,
         email,
@@ -174,6 +198,66 @@ export default function SignInPage() {
     }
   };
   
+  const handleResendVerification = async () => {
+    if (!email) {
+      toast({
+        title: 'Email required',
+        description: 'Please enter your email to resend verification.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    
+    setIsResending(true);
+    
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast({
+          title: 'Verification email sent',
+          description: data.message,
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+        
+        // For development, show a button to directly verify
+        if (data.verificationLink) {
+          setDevVerificationLink(data.verificationLink);
+        }
+      } else {
+        toast({
+          title: 'Error',
+          description: data.error?.message || 'Failed to send verification email',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+  
   return (
     <Box minH="100vh" py={12} bg="gray.50">
       <Container maxW="md">
@@ -208,41 +292,61 @@ export default function SignInPage() {
                     type={showPassword ? 'text' : 'password'} 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="********"
-                    isDisabled={isGoogleAccount}
+                    placeholder="Enter your password"
+                    disabled={isGoogleAccount}
                   />
-                  <InputRightElement>
+                  <InputRightElement width="3rem">
                     <IconButton
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
-                      variant="ghost"
+                      h="1.5rem"
                       size="sm"
                       onClick={() => setShowPassword(!showPassword)}
-                      isDisabled={isGoogleAccount}
+                      icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                      variant="ghost"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      disabled={isGoogleAccount}
                     />
                   </InputRightElement>
                 </InputGroup>
               </FormControl>
               
-              <Button 
-                leftIcon={<EmailIcon />}
-                type="submit" 
-                colorScheme="brand" 
-                size="lg" 
+              {needsEmailVerification && (
+                <Box mt={2} textAlign="center">
+                  <Text color="orange.500" fontSize="sm" mb={2}>
+                    Your email needs verification before you can sign in.
+                  </Text>
+                  <Button
+                    variant="link"
+                    colorScheme="blue"
+                    size="sm"
+                    onClick={handleResendVerification}
+                    isLoading={isResending}
+                  >
+                    Resend verification email
+                  </Button>
+                </Box>
+              )}
+              
+              {/* Forgot Password Link */}
+              <Box alignSelf="flex-end">
+                <Link href="/auth/forgot-password" passHref>
+                  <ChakraLink color="blue.500" fontSize="sm">
+                    Forgot Password?
+                  </ChakraLink>
+                </Link>
+              </Box>
+              
+              <Button
+                type="submit"
+                colorScheme="blue"
+                size="lg"
                 width="full"
+                mt={2}
                 isLoading={isLoading}
-                loadingText="Signing in"
-                isDisabled={isGoogleAccount}
+                disabled={isGoogleAccount}
               >
-                Sign In with Email
+                Sign In
               </Button>
             </VStack>
-            
-            <Box textAlign="right" mt={2}>
-              <ChakraLink as={Link} href="/auth/forgot-password" color="brand.500" fontSize="sm">
-                Forgot password?
-              </ChakraLink>
-            </Box>
             
             <Flex align="center" my={4}>
               <Divider flex="1" />
@@ -250,19 +354,19 @@ export default function SignInPage() {
               <Divider flex="1" />
             </Flex>
             
-            <Button 
-              leftIcon={<FcGoogle />}
-              onClick={handleGoogleSignIn} 
-              variant={isGoogleAccount ? "solid" : "outline"}
-              colorScheme={isGoogleAccount ? "green" : undefined}
-              size="lg" 
+            <Divider my={4} />
+            
+            <Button
+              onClick={handleGoogleSignIn}
+              leftIcon={<FcGoogle fontSize="20px" />}
               width="full"
+              colorScheme="gray"
+              variant="outline"
+              size="lg"
               isLoading={isLoading}
               loadingText="Signing in"
-              boxShadow={isGoogleAccount ? "0 0 0 2px #38A169" : undefined}
             >
               Sign In with Google
-              {isGoogleAccount && " (Recommended)"}
             </Button>
           </Box>
           
@@ -274,6 +378,50 @@ export default function SignInPage() {
               </ChakraLink>
             </Text>
           </Box>
+          
+          {error === 'CredentialsSignin' && (
+            <Alert status="error" mb={4} rounded="md">
+              <AlertIcon />
+              <AlertTitle>Invalid credentials!</AlertTitle>
+              <AlertDescription>
+                Please check your email and password and try again.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {error === 'EmailNotVerified' && (
+            <Alert status="warning" mb={4} rounded="md">
+              <AlertIcon />
+              <Box>
+                <AlertTitle>Email verification required!</AlertTitle>
+                <AlertDescription>
+                  Please verify your email before signing in. Check your inbox for the verification link.
+                  
+                  {!devVerificationLink ? (
+                    <Button
+                      ml={2}
+                      size="sm"
+                      colorScheme="yellow"
+                      isLoading={isResending}
+                      onClick={handleResendVerification}
+                    >
+                      Resend verification email
+                    </Button>
+                  ) : (
+                    <Button
+                      as="a"
+                      href={devVerificationLink}
+                      ml={2}
+                      size="sm"
+                      colorScheme="green"
+                    >
+                      Development: Verify Now
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Box>
+            </Alert>
+          )}
         </VStack>
       </Container>
     </Box>

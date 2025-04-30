@@ -71,6 +71,7 @@ interface ServiceFormData {
     available: boolean;
     hours?: { start: string; end: string };
   }>;
+  blockedDates: Date[];
 }
 
 export default function CreateServicePage() {
@@ -103,6 +104,7 @@ export default function CreateServicePage() {
       { day: 'Saturday', available: false },
       { day: 'Sunday', available: false },
     ],
+    blockedDates: [],
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -127,6 +129,9 @@ export default function CreateServicePage() {
     price: '',
     thumbnail: ''
   });
+  
+  // Add handling for blocked dates
+  const [selectedBlockDate, setSelectedBlockDate] = useState<Date | null>(null);
   
   useEffect(() => {
     const fetchCategoriesAndCities = async () => {
@@ -395,164 +400,92 @@ export default function CreateServicePage() {
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setIsLoading(true);
-    setErrors({});
-
+    e.preventDefault();
+    
+    // Validate the form
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setErrors(errors);
+      
+      // Show an error toast
+      toast({
+        title: 'Form Error',
+        description: 'Please fill in all required fields.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      
+      return;
+    }
+    
+    // Process the data
     try {
-      // Check if we have unfilled add-on form fields that might confuse the user
-      const hasPartialAddon = currentAddon.title || currentAddon.price;
+      setIsSubmitting(true);
       
-      if (hasPartialAddon) {
-        // Ask user if they want to include the current add-on or discard it
-        const shouldAddIncomplete = window.confirm(
-          'You have partially filled out an add-on but have not added it to your service. ' +
-          'Click OK to add this add-on or Cancel to ignore it and continue.'
-        );
-        
-        if (shouldAddIncomplete) {
-          // Check if we have enough info to add the add-on
-          if (currentAddon.title && currentAddon.price) {
-            // Add the add-on to the form data
-            addOrUpdateAddon();
-          } else {
-            toast({
-              title: 'Cannot Add Incomplete Add-on',
-              description: 'Please complete the add-on fields or clear them before continuing.',
-              status: 'warning',
-              duration: 3000,
-              isClosable: true,
-            });
-            setIsLoading(false);
-            return;
-          }
-        }
-      }
-
-      // Validate required fields
-      const requiredFields = ['name', 'description', 'price', 'categoryId'];
-      const newErrors: Record<string, string> = {};
+      const selectedDays = formData.weekAvailability
+        .filter(day => day.available)
+        .map(day => day.day);
       
-      requiredFields.forEach((field) => {
-        if (!formData[field as keyof typeof formData]) {
-          newErrors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
-        }
-      });
-
-      // Special validation for categoryId to ensure it's selected from the database
-      if (!formData.categoryId) {
-        newErrors.categoryId = 'Please select a category from the dropdown';
-      }
-
-      // Check if we have any validation errors
-      if (Object.keys(newErrors).length > 0) {
-        setErrors(newErrors);
-        toast({
-          title: 'Please fill in all required fields',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Only include valid filter values (not empty strings or null)
-      const validFilterValues = Object.entries(formData.filterValues).reduce((acc, [key, value]) => {
-        if (value !== '' && value !== null && value !== undefined) {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as Record<string, any>);
-
-      // Construct the data to send to the API
+      // Prepare the service data
       const serviceData = {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        categoryId: formData.categoryId,
+        cityId: formData.cityId,
+        availableDays: selectedDays,
+        availableHoursStart: formData.availableHoursStart,
+        availableHoursEnd: formData.availableHoursEnd,
+        minRentalHours: formData.minRentalHours,
+        maxRentalHours: formData.maxRentalHours,
+        colors: formData.colors,
         photos: uploadedImages,
-        filterValues: validFilterValues,
-        // Format the weekAvailability array to match what the backend expects
-        weekAvailability: formData.weekAvailability,
-        // Include the add-ons data
+        filterValues: formData.filterValues, // Include the filter values
         addons: formData.addons.map(addon => ({
-          title: addon.title,
-          description: addon.description || '',
-          price: parseFloat(addon.price || '0'),
-          thumbnail: addon.thumbnail || null
+          ...addon,
+          price: parseFloat(addon.price)
         })),
+        blockedDates: formData.blockedDates.map(date => date.toISOString()),
       };
-
-      console.log("Submitting service data:", {
-        ...serviceData,
-        // Log key properties for debugging
-        categoryId: serviceData.categoryId,
-        price: serviceData.price,
-        photoCount: serviceData.photos?.length || 0,
-        addonsCount: serviceData.addons?.length || 0
-      });
-
+      
       // Submit the data
-      const response = await fetch('/api/provider/services', {
+      const response = await fetch('/api/services', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(serviceData),
       });
-
-      // Parse the response
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        console.error('Error parsing response:', jsonError);
-        throw new Error('Failed to parse server response');
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create service');
       }
       
-      // Check for success or display error
-      if (!response.ok || !data.success) {
-        console.error('Service creation failed:', data);
-        let errorMessage = data.error?.message || 'Failed to create service';
-        
-        if (data.error?.code === 'VALIDATION_ERROR') {
-          // Handle validation errors
-          if (errorMessage.includes('city')) {
-            setErrors(prev => ({ ...prev, cityId: 'Invalid city' }));
-          }
-          if (errorMessage.includes('category')) {
-            setErrors(prev => ({ ...prev, categoryId: 'Invalid category' }));
-          }
-        }
-        
-        if (data.error?.code === 'DB_ERROR' && errorMessage.includes('Invalid `prisma.service.create()` invocation')) {
-          console.error('Prisma error details:', errorMessage);
-          errorMessage = 'Database error: There may be an issue with the service status. Please try again or contact support.';
-        }
-        
-        throw new Error(errorMessage);
-      }
-      
-      // Success!
+      // Show success message
       toast({
         title: 'Success',
-        description: 'Service created successfully',
+        description: 'Service created successfully.',
         status: 'success',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
       
+      // Redirect to the service detail page or listing
       router.push('/provider/services');
     } catch (error) {
       console.error('Error creating service:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create service',
+        description: error instanceof Error ? error.message : 'Failed to create service.',
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
     } finally {
       setIsSubmitting(false);
-      setIsLoading(false);
     }
   };
   
@@ -688,6 +621,43 @@ export default function CreateServicePage() {
         isClosable: true
       });
     }
+  };
+
+  const handleBlockedDateChange = (date: Date | null) => {
+    setSelectedBlockDate(date);
+  };
+
+  const addBlockedDate = () => {
+    if (!selectedBlockDate) return;
+    
+    // Check if date is already in the blockedDates array
+    const exists = formData.blockedDates.some(
+      date => date.toDateString() === selectedBlockDate.toDateString()
+    );
+    
+    if (!exists) {
+      setFormData(prev => ({
+        ...prev,
+        blockedDates: [...prev.blockedDates, selectedBlockDate]
+      }));
+      
+      setSelectedBlockDate(null);
+    } else {
+      toast({
+        title: 'Date already blocked',
+        description: 'This date is already in your list of blocked dates.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const removeBlockedDate = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      blockedDates: prev.blockedDates.filter((_, i) => i !== index)
+    }));
   };
   
   return (
@@ -1006,6 +976,82 @@ export default function CreateServicePage() {
                 Set the minimum and maximum rental duration for your service.
               </Text>
             </FormControl>
+            
+            {/* Blocked Dates Section */}
+            <Box
+              mt={8}
+              p={6}
+              bg="white"
+              borderRadius="md"
+              boxShadow="md"
+              _dark={{ bg: 'gray.700' }}
+            >
+              <Heading as="h3" size="md" mb={4}>
+                Blocked Dates
+              </Heading>
+              <Text mb={4}>
+                Select dates when your service will not be available.
+              </Text>
+              
+              <HStack spacing={4} alignItems="flex-end" mb={6}>
+                <FormControl>
+                  <FormLabel>Select Date to Block</FormLabel>
+                  <Input
+                    type="date"
+                    value={selectedBlockDate ? selectedBlockDate.toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        handleBlockedDateChange(new Date(val));
+                      } else {
+                        handleBlockedDateChange(null);
+                      }
+                    }}
+                    min={new Date().toISOString().split('T')[0]} // Can't block dates in the past
+                  />
+                </FormControl>
+                
+                <Button 
+                  colorScheme="blue" 
+                  onClick={addBlockedDate}
+                  isDisabled={!selectedBlockDate}
+                  leftIcon={<AddIcon />}
+                >
+                  Add Date
+                </Button>
+              </HStack>
+              
+              {formData.blockedDates.length > 0 ? (
+                <Box mt={4}>
+                  <Text fontWeight="bold" mb={2}>Currently Blocked Dates:</Text>
+                  
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                    {formData.blockedDates.map((date, index) => (
+                      <Flex 
+                        key={index}
+                        justify="space-between"
+                        align="center"
+                        p={3}
+                        bg="gray.50"
+                        _dark={{ bg: 'gray.600' }}
+                        borderRadius="md"
+                      >
+                        <Text>{date.toLocaleDateString()}</Text>
+                        <IconButton
+                          size="sm"
+                          colorScheme="red"
+                          aria-label="Remove date"
+                          icon={<CloseIcon />}
+                          onClick={() => removeBlockedDate(index)}
+                        />
+                      </Flex>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              ) : (
+                <Text color="gray.500" mt={2}>No blocked dates selected.</Text>
+              )}
+            </Box>
             
             <FormControl isInvalid={!!imageError}>
               <FormLabel>Service Images</FormLabel>

@@ -125,6 +125,22 @@ export async function PUT(
       }
     });
     
+    // Handle the case when blockedDates field might not exist
+    let existingBlockedDates: Date[] = [];
+    try {
+      // Try to get the full service to check if blockedDates exists
+      const fullService = await prisma.service.findUnique({
+        where: { id }
+      });
+      // @ts-ignore - Ignore TypeScript errors as the field might not exist
+      if (fullService && Array.isArray(fullService.blockedDates)) {
+        // @ts-ignore
+        existingBlockedDates = fullService.blockedDates;
+      }
+    } catch (error) {
+      console.warn("Could not fetch existing blockedDates, might not exist in the schema:", error);
+    }
+    
     if (!existingService) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Service not found' } },
@@ -154,7 +170,10 @@ export async function PUT(
       availableHoursStart,
       availableHoursEnd,
       minRentalHours,
-      maxRentalHours
+      maxRentalHours,
+      blockedDates,
+      colors,
+      filterValues
     } = body;
     
     // Build update object with only valid fields to avoid schema mismatches
@@ -167,6 +186,17 @@ export async function PUT(
     if (cityId !== undefined) updateData.cityId = cityId || null;
     if (photos !== undefined) updateData.photos = photos;
     if (status !== undefined) updateData.status = status;
+    if (colors !== undefined) updateData.colors = colors;
+    
+    // Handle metadata for filterValues if provided
+    if (filterValues !== undefined) {
+      try {
+        const metadata = JSON.stringify({ filterValues });
+        updateData.metadata = metadata;
+      } catch (error) {
+        console.error("Error stringifying filter values:", error);
+      }
+    }
     
     // Handle availability and rental fields if provided
     if (availableDays !== undefined) {
@@ -191,17 +221,119 @@ export async function PUT(
         (maxRentalHours ? parseInt(String(maxRentalHours)) : existingService.maxRentalHours);
     }
     
-    // Update service
-    const service = await prisma.service.update({
-      where: { id },
-      data: updateData,
-    });
+    // Handle blocked dates if provided
+    if (blockedDates !== undefined) {
+      try {
+        console.log("Processing blockedDates:", blockedDates);
+        
+        // Ensure blockedDates is an array
+        if (!Array.isArray(blockedDates)) {
+          console.warn("blockedDates is not an array, setting to empty array");
+          updateData.blockedDates = [];
+        } else {
+          // Convert blockedDates to Date objects
+          const parsedDates = blockedDates
+            .filter(dateStr => dateStr && typeof dateStr === 'string')
+            .map(dateStr => {
+              try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) {
+                  return null;
+                }
+                return date;
+              } catch (e) {
+                return null;
+              }
+            })
+            .filter(Boolean);
+          
+          console.log("Parsed dates:", parsedDates);
+          // Add to update data
+          updateData.blockedDates = parsedDates;
+        }
+      } catch (error) {
+        console.error("Error processing blockedDates:", error);
+        // Don't add to update data if there's an error
+        delete updateData.blockedDates;
+      }
+    }
     
-    return NextResponse.json({ success: true, data: service }, { status: 200 });
+    // Update service
+    try {
+      console.log("Updating service with data:", updateData);
+      const service = await prisma.service.update({
+        where: { id },
+        data: updateData,
+      });
+      
+      return NextResponse.json({ success: true, data: service }, { status: 200 });
+    } catch (error) {
+      console.error('Prisma error updating service:', error);
+      
+      // Extract detailed error info
+      let errorMessage = 'Database error while updating service';
+      let errorDetails = 'Unknown error';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        errorDetails = error.stack || 'No stack trace';
+        
+        // Check for Prisma-specific error properties
+        // @ts-ignore - Access potential Prisma error properties
+        if (error.code) {
+          // @ts-ignore
+          console.error(`Prisma error code: ${error.code}`);
+        }
+        
+        // @ts-ignore
+        if (error.meta) {
+          // @ts-ignore
+          console.error(`Prisma error meta: ${JSON.stringify(error.meta)}`);
+        }
+      }
+      
+      // Try a fallback approach with just basics
+      try {
+        console.log("Attempting fallback update without blockedDates");
+        const { blockedDates, ...basicUpdateData } = updateData;
+        
+        const service = await prisma.service.update({
+          where: { id },
+          data: basicUpdateData,
+        });
+        
+        return NextResponse.json({ 
+          success: true, 
+          data: service,
+          warning: "Updated without blockedDates due to error"
+        }, { status: 200 });
+      } catch (fallbackError) {
+        console.error("Even fallback approach failed:", fallbackError);
+      }
+      
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { 
+            code: 'DATABASE_ERROR', 
+            message: errorMessage,
+            details: errorDetails
+          } 
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error updating service:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { 
+        success: false, 
+        error: { 
+          code: 'INTERNAL_ERROR', 
+          message: 'Internal server error',
+          details: error instanceof Error ? error.message : 'Unknown error' 
+        } 
+      },
       { status: 500 }
     );
   }

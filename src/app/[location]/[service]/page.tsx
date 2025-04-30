@@ -236,8 +236,15 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
       },
       include: {
         provider: {
-          include: {
-            profile: true
+          select: {
+            id: true,
+            name: true,
+            profile: {
+              select: {
+                address: true,
+                isProStatus: true
+              }
+            }
           }
         }
       }

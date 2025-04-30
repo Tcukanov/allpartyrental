@@ -132,6 +132,9 @@ export async function GET() {
       include: {
         category: true,
         city: true
+      },
+      orderBy: {
+        updatedAt: 'desc' // Show most recently updated services first
       }
     });
 
@@ -186,7 +189,17 @@ export async function POST(request: Request) {
     console.log("Received data:", data);
     
     // Extract filterValues and other data from request
-    const { name, description, price, categoryId, cityId, filterValues, images, addons } = data;
+    const { 
+      name, 
+      description, 
+      price, 
+      categoryId, 
+      cityId, 
+      filterValues, 
+      images, 
+      addons,
+      blockedDates 
+    } = data;
     
     // Validate required fields
     if (!name || !description || !price || !categoryId || !data.photos?.length) {
@@ -251,34 +264,35 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
     
-    // Prepare metadata as a JSON string
-    let metadataString = '';
-    try {
-      metadataString = JSON.stringify({ filterValues });
-    } catch (error) {
-      console.error("Error stringifying filter values:", error);
-      return NextResponse.json({ error: 'Invalid filter values format' }, { status: 400 });
-    }
-    
-    // Create the service first
+    // Define metadata
+    const metadata = {
+      filterValues
+    };
+
+    // Convert blockedDates strings to Date objects if they exist
+    const parsedBlockedDates = blockedDates && Array.isArray(blockedDates) 
+      ? blockedDates.map((dateStr: string) => new Date(dateStr))
+      : [];
+
+    // Create service
     const service = await prisma.service.create({
       data: {
         name,
         description,
-        price: parseFloat(price),
-        status: "PENDING_APPROVAL",
-        providerId,
+        price: parseFloat(price.toString()),
         categoryId,
         cityId: cityId || null,
+        providerId,
         photos: data.photos || [],
         availableDays: data.availableDays || [],
-        availableHoursStart: data.availableHoursStart,
-        availableHoursEnd: data.availableHoursEnd,
-        minRentalHours: data.minRentalHours,
-        maxRentalHours: data.maxRentalHours,
+        availableHoursStart: data.availableHoursStart || null,
+        availableHoursEnd: data.availableHoursEnd || null,
+        minRentalHours: data.minRentalHours || null,
+        maxRentalHours: data.maxRentalHours || null,
         colors,
-        metadata: metadataString
-      } as any // Type assertion to bypass type checking
+        metadata: JSON.stringify(metadata),
+        blockedDates: parsedBlockedDates,
+      }
     });
     
     console.log(`Created service ${service.id}`);
@@ -330,7 +344,7 @@ export async function POST(request: Request) {
     
     const responseService = {
       ...completeService,
-      filterValues: JSON.parse(metadataString).filterValues
+      filterValues: JSON.parse(JSON.stringify(metadata)).filterValues
     };
     
     return NextResponse.json({ 

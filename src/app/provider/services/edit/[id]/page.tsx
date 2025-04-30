@@ -34,8 +34,9 @@ import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
+  Divider,
 } from '@chakra-ui/react';
-import { AddIcon, CloseIcon, ChevronRightIcon } from '@chakra-ui/icons';
+import { AddIcon, CloseIcon, ChevronRightIcon, EditIcon } from '@chakra-ui/icons';
 import NextLink from 'next/link';
 
 interface Category {
@@ -66,6 +67,14 @@ interface Service {
   maxRentalHours: number;
   colors: string[];
   filterValues: Record<string, string | string[]>;
+  addons: Array<{
+    id?: string;
+    title: string;
+    description?: string;
+    price: number;
+    thumbnail?: string | null;
+  }>;
+  blockedDates: string[];
 }
 
 export default function EditServicePage({ params }: { params: Promise<{ id: string }> }) {
@@ -94,6 +103,8 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
     maxRentalHours: 0,
     colors: [],
     filterValues: {},
+    addons: [],
+    blockedDates: [],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -108,6 +119,10 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
   
   // Add state for category filters
   const [categoryFilters, setCategoryFilters] = useState<any[]>([]);
+  
+  // Add blockedDates state
+  const [blockedDates, setBlockedDates] = useState<Date[]>([]);
+  const [selectedBlockDate, setSelectedBlockDate] = useState<Date | null>(null);
   
   useEffect(() => {
     const fetchServiceDetails = async () => {
@@ -160,6 +175,8 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
           maxRentalHours: service.maxRentalHours || 0,
           colors: service.colors || [],
           filterValues: service.filterValues || {},
+          addons: service.addons || [],
+          blockedDates: service.blockedDates || [],
         });
         
         // Set uploaded images
@@ -168,6 +185,27 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
         // Fetch category filters for this service's category
         if (service.categoryId) {
           await fetchCategoryFilters(service.categoryId);
+        }
+        
+        // Parse blocked dates
+        if (service.blockedDates && Array.isArray(service.blockedDates)) {
+          try {
+            console.log("Service blocked dates from API:", service.blockedDates);
+            const parsed = service.blockedDates.map(dateStr => {
+              try {
+                return new Date(dateStr);
+              } catch (e) {
+                console.error("Error parsing date:", dateStr, e);
+                return null;
+              }
+            }).filter(Boolean);
+            
+            console.log("Parsed blocked dates:", parsed);
+            setBlockedDates(parsed);
+          } catch (error) {
+            console.error("Error processing blocked dates:", error);
+            setBlockedDates([]);
+          }
         }
         
       } catch (error) {
@@ -464,6 +502,17 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
     setIsSubmitting(true);
     
     try {
+      // Format blocked dates properly
+      const formattedBlockedDates = blockedDates.map(date => {
+        // Ensure date is properly formatted in ISO format with timezone handling
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}T00:00:00.000Z`;
+      });
+      
+      console.log("Formatted blocked dates:", formattedBlockedDates);
+      
       const response = await fetch(`/api/services/${id}`, {
         method: 'PUT',
         headers: {
@@ -483,11 +532,15 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
           maxRentalHours: formData.maxRentalHours,
           colors: formData.colors,
           filterValues: formData.filterValues,
+          addons: formData.addons,
+          blockedDates: formattedBlockedDates,
         }),
       });
       
+      // Check if there's an error and get the error details
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("API error response:", errorData);
         throw new Error(errorData.error?.message || 'Failed to update service');
       }
       
@@ -560,6 +613,134 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
         return { ...prev, colors: [...colors, color] };
       }
     });
+  };
+  
+  // Add handlers for blocked dates
+  const handleBlockedDateChange = (date: Date | null) => {
+    setSelectedBlockDate(date);
+  };
+
+  const addBlockedDate = () => {
+    if (!selectedBlockDate) return;
+    
+    try {
+      // Normalize the date to avoid timezone issues
+      const normalizedDate = new Date(selectedBlockDate);
+      normalizedDate.setHours(0, 0, 0, 0);
+      
+      // Check if date is already in the blockedDates array
+      const exists = blockedDates.some(date => {
+        // Compare dates by their date parts only (year, month, day)
+        const existingDate = new Date(date);
+        existingDate.setHours(0, 0, 0, 0);
+        return existingDate.getTime() === normalizedDate.getTime();
+      });
+      
+      if (!exists) {
+        setBlockedDates(prev => [...prev, normalizedDate]);
+        setSelectedBlockDate(null);
+      } else {
+        toast({
+          title: 'Date already blocked',
+          description: 'This date is already in your list of blocked dates.',
+          status: 'warning',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error("Error adding blocked date:", error);
+      toast({
+        title: 'Error',
+        description: 'Could not add blocked date. Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const removeBlockedDate = (index: number) => {
+    setBlockedDates(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  // Add a helper function to format dates consistently for display
+  const formatDateForDisplay = (date: Date): string => {
+    try {
+      // Format as a readable date
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (e) {
+      console.error("Error formatting date for display:", e);
+      return "Invalid date";
+    }
+  };
+  
+  // Add a separate debug function for blocked dates
+  const testBlockedDatesUpdate = async () => {
+    if (blockedDates.length === 0) {
+      toast({
+        title: 'No dates to test',
+        description: 'Please add some blocked dates first',
+        status: 'info',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      // Format dates as strings
+      const formattedDates = blockedDates.map(date => {
+        try {
+          return date.toISOString();
+        } catch (e) {
+          console.error("Error formatting date:", date, e);
+          return null;
+        }
+      }).filter(Boolean);
+
+      console.log("Testing update with formatted dates:", formattedDates);
+
+      // Try to update just the blocked dates
+      const response = await fetch(`/api/services/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          blockedDates: formattedDates
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Test update response:", data);
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Failed to update blocked dates');
+      }
+
+      toast({
+        title: 'Test successful',
+        description: 'Blocked dates updated successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+    } catch (error) {
+      console.error("Test update error:", error);
+      toast({
+        title: 'Test failed',
+        description: error instanceof Error ? error.message : 'Failed to update blocked dates',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
   
   return (
@@ -936,6 +1117,92 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
                 </SimpleGrid>
               )}
             </FormControl>
+            
+            {/* Add the Blocked Dates Section */}
+            <Box
+              mt={8}
+              p={6}
+              bg="white"
+              borderRadius="md"
+              boxShadow="md"
+              _dark={{ bg: 'gray.700' }}
+            >
+              <Heading as="h3" size="md" mb={4}>
+                Blocked Dates
+              </Heading>
+              <Text mb={4}>
+                Select dates when your service will not be available.
+              </Text>
+              
+              <HStack spacing={4} alignItems="flex-end" mb={6}>
+                <FormControl>
+                  <FormLabel>Select Date to Block</FormLabel>
+                  <Input
+                    type="date"
+                    value={selectedBlockDate ? selectedBlockDate.toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        handleBlockedDateChange(new Date(val));
+                      } else {
+                        handleBlockedDateChange(null);
+                      }
+                    }}
+                    min={new Date().toISOString().split('T')[0]} // Can't block dates in the past
+                  />
+                </FormControl>
+                
+                <Button 
+                  colorScheme="blue" 
+                  onClick={addBlockedDate}
+                  isDisabled={!selectedBlockDate}
+                  leftIcon={<AddIcon />}
+                >
+                  Add Date
+                </Button>
+                
+                <Button 
+                  colorScheme="teal" 
+                  variant="outline"
+                  onClick={testBlockedDatesUpdate}
+                  leftIcon={<EditIcon />}
+                  isDisabled={blockedDates.length === 0}
+                >
+                  Test Dates Update
+                </Button>
+              </HStack>
+              
+              {blockedDates.length > 0 ? (
+                <Box mt={4}>
+                  <Text fontWeight="bold" mb={2}>Currently Blocked Dates:</Text>
+                  
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                    {blockedDates.map((date, index) => (
+                      <Flex 
+                        key={index}
+                        justify="space-between"
+                        align="center"
+                        p={3}
+                        bg="gray.50"
+                        _dark={{ bg: 'gray.600' }}
+                        borderRadius="md"
+                      >
+                        <Text>{formatDateForDisplay(date)}</Text>
+                        <IconButton
+                          size="sm"
+                          colorScheme="red"
+                          aria-label="Remove date"
+                          icon={<CloseIcon />}
+                          onClick={() => removeBlockedDate(index)}
+                        />
+                      </Flex>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              ) : (
+                <Text color="gray.500" mt={2}>No blocked dates selected.</Text>
+              )}
+            </Box>
             
             <HStack spacing={4} pt={4}>
               <Button

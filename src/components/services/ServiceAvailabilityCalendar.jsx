@@ -45,6 +45,14 @@ const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDu
   const minHours = service?.minRentalHours ? service.minRentalHours : 1;
   const maxHours = service?.maxRentalHours ? service.maxRentalHours : 8;
   
+  // Parse blocked dates
+  const blockedDates = service?.blockedDates 
+    ? service.blockedDates.map(dateStr => {
+        const date = new Date(dateStr);
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      }) 
+    : [];
+  
   // Generate calendar days for current month
   const getDaysInMonth = (year, month) => {
     return new Date(year, month + 1, 0).getDate();
@@ -124,6 +132,22 @@ const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDu
       return;
     }
     
+    // Check if date is blocked
+    const isBlocked = blockedDates.some(
+      blockedDate => blockedDate.getTime() === selected.setHours(0, 0, 0, 0)
+    );
+    
+    if (isBlocked) {
+      toast({
+        title: "Not available",
+        description: "This date has been blocked by the provider",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    
     // Check if the selected day is available
     const dayOfWeek = DAYS_OF_WEEK[selected.getDay()];
     if (!availableDays.includes(dayOfWeek)) {
@@ -196,6 +220,11 @@ const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDu
         selectedDate.getMonth() === month && 
         selectedDate.getFullYear() === year;
       
+      // Check if date is blocked
+      const isBlocked = blockedDates.some(
+        blockedDate => blockedDate.getTime() === date.setHours(0, 0, 0, 0)
+      );
+      
       days.push(
         <GridItem key={day}>
           <Button
@@ -204,14 +233,14 @@ const ServiceAvailabilityCalendar = ({ service, onDateSelect, onTimeSelect, onDu
             h="40px"
             variant={isSelected ? "solid" : "outline"}
             colorScheme={isSelected ? "blue" : "gray"}
-            bg={isSelected ? "blue.500" : isAvailable ? "white" : "gray.100"}
-            color={isSelected ? "white" : isPast ? "gray.400" : isAvailable ? "black" : "gray.600"}
-            opacity={isPast || !isAvailable ? 0.6 : 1}
-            cursor={isPast || !isAvailable ? "not-allowed" : "pointer"}
+            bg={isSelected ? "blue.500" : isBlocked ? "red.100" : isAvailable ? "white" : "gray.100"}
+            color={isSelected ? "white" : isPast ? "gray.400" : isBlocked ? "red.500" : isAvailable ? "black" : "gray.600"}
+            opacity={isPast || !isAvailable || isBlocked ? 0.6 : 1}
+            cursor={(isPast || !isAvailable || isBlocked) ? "not-allowed" : "pointer"}
             _hover={{
-              bg: isPast || !isAvailable ? (isSelected ? "blue.500" : "gray.100") : (isSelected ? "blue.600" : "blue.50")
+              bg: (isPast || !isAvailable || isBlocked) ? (isSelected ? "blue.500" : isBlocked ? "red.100" : "gray.100") : (isSelected ? "blue.600" : "blue.50")
             }}
-            disabled={isPast || !isAvailable}
+            disabled={isPast || !isAvailable || isBlocked}
           >
             {day}
           </Button>

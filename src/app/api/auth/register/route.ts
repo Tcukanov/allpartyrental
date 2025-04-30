@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hash } from 'bcrypt';
 import { prisma } from '@/lib/prisma/client';
 import { UserRole } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import { sendMail, generateVerificationEmailHtml } from '@/lib/mail/send-mail';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,6 +43,10 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await hash(password, 10);
 
+    // Generate verification token
+    const verificationToken = randomBytes(32).toString('hex');
+    const verificationTokenExp = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours
+
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -48,6 +54,8 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         role: role as UserRole,
+        verificationToken,
+        verificationTokenExp,
         profile: {
           create: {
             // Create empty profile
@@ -63,7 +71,29 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, data: user }, { status: 201 });
+    // Send verification email
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    const verificationLink = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
+    
+    const emailHtml = generateVerificationEmailHtml(name, verificationLink);
+    const emailSent = await sendMail({
+      to: email,
+      subject: 'Verify Your Email - Party Vendors',
+      html: emailHtml
+    });
+
+    if (!emailSent) {
+      console.error(`Failed to send verification email to ${email}`);
+    }
+
+    // Return response
+    return NextResponse.json({ 
+      success: true, 
+      data: user,
+      verification: process.env.NODE_ENV === 'development' 
+        ? { link: verificationLink } 
+        : undefined 
+    }, { status: 201 });
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(

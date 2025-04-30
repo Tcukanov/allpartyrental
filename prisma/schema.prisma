@@ -8,27 +8,30 @@ datasource db {
 }
 
 model User {
-  id               String          @id @default(cuid())
-  email            String          @unique
-  password         String?
-  name             String
-  role             UserRole
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  emailVerified    DateTime?
-  accounts         Account[]
-  advertisements   Advertisement[]
-  calendar         Calendar[]
-  receivedMessages Message[]       @relation("ReceivedMessages")
-  sentMessages     Message[]       @relation("SentMessages")
-  notifications    Notification[]
-  receivedOffers   Offer[]         @relation("ClientOffers")
-  offers           Offer[]         @relation("ProviderOffers")
-  clientParties    Party[]         @relation("ClientParties")
-  profile          Profile?
-  provider         Provider?
-  services         Service[]
-  sessions         Session[]
+  id                   String          @id @default(cuid())
+  email                String?         @unique
+  name                 String?
+  role                 UserRole        @default(CLIENT)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  emailVerified        DateTime?
+  image                String?
+  password             String?
+  verificationToken    String?
+  verificationTokenExp DateTime?
+  accounts             Account[]
+  advertisements       Advertisement[]
+  calendar             Calendar[]
+  receivedMessages     Message[]       @relation("ReceivedMessages")
+  sentMessages         Message[]       @relation("SentMessages")
+  notifications        Notification[]
+  receivedOffers       Offer[]         @relation("ClientOffers")
+  offers               Offer[]         @relation("ProviderOffers")
+  clientParties        Party[]         @relation("ClientParties")
+  profile              Profile?
+  provider             Provider?
+  services             Service[]
+  sessions             Session[]
 }
 
 model Profile {
@@ -51,36 +54,19 @@ model Profile {
 }
 
 model Provider {
-  id                  String         @id @default(cuid())
-  userId              String         @unique
-  businessName        String
-  businessDescription String?
-  businessAddress     String?
-  businessCity        String?
-  businessState       String?
-  businessZip         String?
-  businessPhone       String?
-  businessEmail       String?
-  businessWebsite     String?
-  businessLogo        String?
-  ein                 String?
-  taxIdVerified       Boolean        @default(false)
-  bankAccountVerified Boolean        @default(false)
-  stripeAccountId     String?
-  paymentTerms        String?
-  commissionRate      Float          @default(10.0)
-  isApproved          Boolean        @default(false)
-  approvedAt          DateTime?
-  rejectionReason     String?
-  businessType        String?
-  foundedYear         Int?
-  employeeCount       Int?
-  insuranceProvider   String?
-  insurancePolicyNum  String?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  user                User           @relation(fields: [userId], references: [id])
-  serviceCities       ProviderCity[]
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  businessName      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  availability      Json?
+  bio               String?
+  isVerified        Boolean  @default(false)
+  phone             String?
+  vatNumber         String?
+  verificationLevel Int      @default(0)
+  website           String?
+  user              User     @relation(fields: [userId], references: [id])
 }
 
 model Calendar {
@@ -123,9 +109,9 @@ model City {
   name           String
   slug           String         @unique
   state          String
-  isDefault      Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+  isDefault      Boolean        @default(false)
   parties        Party[]
   providerCities ProviderCity[]
   services       Service[]
@@ -150,6 +136,7 @@ model Service {
   minRentalHours      Int?
   colors              String[]        @default([])
   metadata            String?
+  blockedDates        DateTime[]      @default([]) @db.Timestamp
   offers              Offer[]
   partyServices       PartyService[]
   category            ServiceCategory @relation(fields: [categoryId], references: [id])
@@ -287,8 +274,8 @@ model Notification {
   title     String
   content   String
   isRead    Boolean          @default(false)
-  chatId    String?
   createdAt DateTime         @default(now())
+  chatId    String?
   user      User             @relation(fields: [userId], references: [id])
 }
 
@@ -352,10 +339,20 @@ model ProviderCity {
   cityId     String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  city       City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  city       City     @relation(fields: [cityId], references: [id])
 
   @@unique([providerId, cityId])
+}
+
+model BlockedDate {
+  id         String   @id
+  providerId String
+  date       DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+
+  @@index([providerId, date])
 }
 
 enum UserRole {

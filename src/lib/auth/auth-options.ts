@@ -28,10 +28,23 @@ export const authOptions: AuthOptions = {
           where: {
             email: credentials.email,
           },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            password: true,
+            emailVerified: true
+          }
         });
 
-        if (!user || !user.password) {
+        if (!user) {
           throw new Error('Invalid credentials');
+        }
+
+        // If password doesn't exist, user needs to use OAuth
+        if (!user.password) {
+          throw new Error('Please use social login for this account');
         }
 
         const isPasswordValid = await compare(
@@ -41,6 +54,11 @@ export const authOptions: AuthOptions = {
 
         if (!isPasswordValid) {
           throw new Error('Invalid credentials');
+        }
+
+        // Check if email is verified (for credential-based logins)
+        if (!user.emailVerified) {
+          throw new Error('EmailNotVerified');
         }
 
         return {

@@ -219,57 +219,86 @@ export async function GET(request: NextRequest) {
     console.log('Final query where clause:', JSON.stringify(where, null, 2));
 
     // Get services with pagination
-    const services = await prisma.service.findMany({
-      where,
-      include: {
-        category: true,
-        city: true,
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            profile: true,
-            // Include provider business location details
-            provider: {
-              select: {
-                businessName: true,
-                businessCity: true,
-                businessState: true
+    try {
+      console.log('About to execute service query with provider select');
+      
+      // First try without including the provider relation to see if that works
+      const servicesBasic = await prisma.service.findMany({
+        where,
+        include: {
+          category: true,
+          city: true,
+        },
+        orderBy,
+        skip,
+        take: limit,
+      });
+
+      console.log(`Found ${servicesBasic.length} services (basic query without provider)`);
+
+      // Now include only the minimal provider fields needed by the client component
+      const servicesWithMinimalProvider = await prisma.service.findMany({
+        where,
+        include: {
+          category: true,
+          city: true,
+          provider: {
+            select: {
+              id: true,
+              name: true,
+              profile: {
+                select: {
+                  address: true,
+                  isProStatus: true
+                }
               }
             }
-          },
+          }
         },
-      },
-      orderBy,
-      skip,
-      take: limit,
-    });
+        orderBy,
+        skip,
+        take: limit,
+      });
+      
+      console.log(`Found ${servicesWithMinimalProvider.length} services with minimal provider info`);
+      
+      // Use the minimal provider results
+      const services = servicesWithMinimalProvider;
+      
+      // Get total count for pagination
+      const total = await prisma.service.count({ where });
 
-    console.log(`Found ${services.length} services matching criteria`);
-
-    // Get total count for pagination
-    const total = await prisma.service.count({ where });
-
-    return NextResponse.json({
-      success: true,
-      data: services,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-      },
-    });
+      return NextResponse.json({
+        success: true,
+        data: services,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (queryError) {
+      console.error('Prisma query error details:', queryError);
+      throw queryError; // Re-throw to be caught by the outer catch
+    }
   } catch (error) {
     console.error('Error fetching services:', error);
+    // Log more detailed information about the error
+    if (error.meta) {
+      console.error('Prisma error metadata:', error.meta);
+    }
+    if (error.code) {
+      console.error('Prisma error code:', error.code);
+    }
+    
     return NextResponse.json(
       { 
         success: false, 
         error: { 
           message: 'Failed to fetch services',
-          details: error instanceof Error ? error.message : String(error)
+          details: error instanceof Error ? error.message : String(error),
+          code: error.code || 'UNKNOWN_ERROR'
         }
       },
       { status: 500 }

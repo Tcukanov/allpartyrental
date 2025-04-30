@@ -11,16 +11,17 @@ export function CustomPrismaAdapter(prisma: PrismaClient) {
       // Extract fields not in our schema
       const { image, emailVerified, ...restData } = data;
       
-      // Store image in the profile if needed
-      const profileData = image ? { create: { avatar: image } } : undefined;
+      // Store image directly in the user model
+      const userData = {
+        ...restData,
+        role: UserRole.CLIENT,
+        ...(image ? { image } : {}),
+        ...(emailVerified ? { emailVerified } : {})
+      };
       
-      // Add a default role (CLIENT) to the user data
+      // Create user with new schema format
       return prisma.user.create({
-        data: {
-          ...restData,
-          role: UserRole.CLIENT,
-          profile: profileData,
-        },
+        data: userData
       });
     },
   };
