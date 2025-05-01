@@ -51,22 +51,53 @@ async function initializeTransporter() {
   });
 }
 
-// Function to create the production transporter with GoDaddy settings
+// Function to create the production transporter with SMTP settings from environment variables
 function createProductionTransporter() {
-  // Create a transporter using GoDaddy SMTP settings
+  // Check if required environment variables are set
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpSecure = process.env.SMTP_SECURE === 'true';
+  
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    console.error('SMTP configuration missing. Check your environment variables: SMTP_HOST, SMTP_USER, SMTP_PASS');
+    // Fallback to default values if environment variables are not set
+    // This is only for backward compatibility and should be removed once ENV vars are properly set
+    transporter = nodemailer.createTransport({
+      host: smtpHost || 'smtpout.secureserver.net',
+      port: smtpPort || 465,
+      secure: smtpSecure !== undefined ? smtpSecure : true, // use SSL
+      auth: {
+        user: smtpUser || 'info@party-vendors.com',
+        pass: smtpPass || 'Qazzaq33$',
+      },
+      tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+      }
+    });
+    
+    console.warn('Using fallback SMTP configuration. Please set the proper environment variables.');
+    return;
+  }
+  
+  // Create a transporter using SMTP settings from environment variables
   transporter = nodemailer.createTransport({
-    host: 'smtpout.secureserver.net',
-    port: 465,
-    secure: true, // use SSL
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure, // use SSL if set to true
     auth: {
-      user: 'info@party-vendors.com',
-      pass: 'Qazzaq33$',
+      user: smtpUser,
+      pass: smtpPass,
     },
     tls: {
       // Do not fail on invalid certs
       rejectUnauthorized: false
     }
   });
+  
+  console.log(`Using SMTP server: ${smtpHost}:${smtpPort}`);
 }
 
 // Initialize transporter when module is loaded
@@ -90,7 +121,9 @@ export async function sendMail({ to, subject, html, from }: EmailOptions): Promi
     }
     
     // Set default from address if not provided
-    const fromAddress = from || '"Party Vendors" <info@party-vendors.com>';
+    // Use from email from environment variable if available, otherwise use default
+    const defaultFromEmail = process.env.EMAIL_FROM || 'info@party-vendors.com';
+    const fromAddress = from || `"Party Vendors" <${defaultFromEmail}>`;
     
     console.log(`Attempting to send email to: ${to} with subject: ${subject}`);
     
@@ -123,15 +156,17 @@ export async function sendMail({ to, subject, html, from }: EmailOptions): Promi
  * Generate a verification email HTML content
  */
 export function generateVerificationEmailHtml(username: string, verificationLink: string): string {
+  const appName = process.env.APP_NAME || 'Party Vendors';
+  
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #6B46C1; padding: 20px; text-align: center; color: white;">
-        <h1>Party Vendors</h1>
+        <h1>${appName}</h1>
       </div>
       <div style="padding: 20px; border: 1px solid #ddd; border-top: none;">
         <h2>Verify Your Email Address</h2>
         <p>Hello ${username || 'there'},</p>
-        <p>Thank you for signing up with Party Vendors! To complete your registration, please verify your email address by clicking the button below:</p>
+        <p>Thank you for signing up with ${appName}! To complete your registration, please verify your email address by clicking the button below:</p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${verificationLink}" style="background-color: #6B46C1; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">
             Verify Email Address
@@ -141,10 +176,10 @@ export function generateVerificationEmailHtml(username: string, verificationLink
         <p style="word-break: break-all; color: #3182CE;">${verificationLink}</p>
         <p>This link will expire in 24 hours.</p>
         <p>If you did not create an account, you can safely ignore this email.</p>
-        <p>Best regards,<br>The Party Vendors Team</p>
+        <p>Best regards,<br>The ${appName} Team</p>
       </div>
       <div style="text-align: center; padding: 10px; color: #666; font-size: 12px;">
-        <p>&copy; ${new Date().getFullYear()} Party Vendors. All rights reserved.</p>
+        <p>&copy; ${new Date().getFullYear()} ${appName}. All rights reserved.</p>
       </div>
     </div>
   `;
@@ -154,10 +189,12 @@ export function generateVerificationEmailHtml(username: string, verificationLink
  * Generate a password reset email HTML content
  */
 export function generatePasswordResetEmailHtml(username: string, resetLink: string): string {
+  const appName = process.env.APP_NAME || 'Party Vendors';
+  
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #6B46C1; padding: 20px; text-align: center; color: white;">
-        <h1>Party Vendors</h1>
+        <h1>${appName}</h1>
       </div>
       <div style="padding: 20px; border: 1px solid #ddd; border-top: none;">
         <h2>Reset Your Password</h2>
@@ -172,10 +209,10 @@ export function generatePasswordResetEmailHtml(username: string, resetLink: stri
         <p>Or copy and paste this link into your browser:</p>
         <p style="word-break: break-all; color: #3182CE;">${resetLink}</p>
         <p>This link will expire in 24 hours.</p>
-        <p>Best regards,<br>The Party Vendors Team</p>
+        <p>Best regards,<br>The ${appName} Team</p>
       </div>
       <div style="text-align: center; padding: 10px; color: #666; font-size: 12px;">
-        <p>&copy; ${new Date().getFullYear()} Party Vendors. All rights reserved.</p>
+        <p>&copy; ${new Date().getFullYear()} ${appName}. All rights reserved.</p>
       </div>
     </div>
   `;

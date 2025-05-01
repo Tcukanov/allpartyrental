@@ -12,6 +12,7 @@ This document provides details for testing the All Party Rent API endpoints. Use
 - [Notifications](#notifications)
 - [Transactions](#transactions)
 - [Categories & Cities](#categories--cities)
+- [Email Configuration](#email-configuration)
 
 ## Base URL
 
@@ -915,6 +916,50 @@ Gets a specific city by slug.
   "slug": "city-slug",
   "state": "State",
   "country": "Country"
+}
+```
+
+## Email Configuration
+
+The application includes email functionality for features like user verification and password resets. See the [Email Configuration Guide](./docs/email-config.md) for detailed setup instructions.
+
+### POST /auth/verify-email
+Verifies a user's email using a verification token.
+
+**Query Parameters:**
+- `token`: The verification token sent to the user's email
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Email verified successfully"
+}
+```
+
+### POST /auth/resend-verification
+Resends a verification email to the user.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Verification email sent successfully"
+}
+```
+
+In development mode, the response will also include:
+```json
+{
+  "verificationLink": "http://localhost:3000/auth/verify-email?token=verification-token",
+  "token": "verification-token"
 }
 ```
 
