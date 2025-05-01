@@ -117,7 +117,16 @@ export default function SignUpPage() {
       
       // Store verification link for development
       if (data.verification?.link) {
+        // Store it for potential future use but don't display on UI
         setVerificationLink(data.verification.link);
+        
+        // Log to console for developers
+        if (process.env.NODE_ENV === 'development') {
+          console.log('\n----- DEVELOPMENT ONLY -----');
+          console.log('Email verification link:');
+          console.log(data.verification.link);
+          console.log('-----------------------------\n');
+        }
       }
       
       // Set registration success state
@@ -189,17 +198,6 @@ export default function SignUpPage() {
                 <Text mb={4}>
                   Please check your email for a verification link to activate your account.
                 </Text>
-                {verificationLink && (
-                  <Button 
-                    as="a" 
-                    href={verificationLink} 
-                    colorScheme="green" 
-                    size="sm"
-                    mb={2}
-                  >
-                    Development: Verify Email Now
-                  </Button>
-                )}
                 <Button 
                   as={Link} 
                   href="/auth/signin" 
