@@ -69,9 +69,6 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.user.id,
         businessName: user.name || 'My Business',
-        businessEmail: user.email,
-        commissionRate: 10.0, // Default commission rate
-        isApproved: true, // Auto-approve for development
       },
     });
     

@@ -316,7 +316,7 @@ export default function CreateServicePage() {
     });
     
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
   
   // Minimal image processing function - just basic validation
@@ -405,7 +405,7 @@ export default function CreateServicePage() {
     // Validate the form
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
-      setErrors(errors);
+      // No need to set errors here since validateForm already does it
       
       // Show an error toast
       toast({
