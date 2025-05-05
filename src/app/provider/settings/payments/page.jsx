@@ -53,11 +53,23 @@ export default function PaymentsSettingsPage() {
     const platformError = searchParams.get('platform_error');
 
     if (success) {
-      toast.success('Your Stripe account has been connected successfully!');
+      toast({
+        title: 'Success',
+        description: 'Your Stripe account has been connected successfully!',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
       // Check and save the Stripe account ID
       checkStripeAccount();
     } else if (error) {
-      toast.error(`Error connecting to Stripe: ${error}`);
+      toast({
+        title: 'Error',
+        description: `Error connecting to Stripe: ${error}`,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     } else if (platformError) {
       setPaymentAlert({
         status: 'error',

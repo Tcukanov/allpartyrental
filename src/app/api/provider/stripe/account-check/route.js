@@ -52,10 +52,20 @@ export async function POST() {
     }
     
     // Update the provider record with the Stripe account ID
-    await prisma.provider.update({
-      where: { id: user.provider.id },
-      data: { stripeAccountId: matchingAccount.id },
-    });
+    if (user.provider) {
+      await prisma.provider.update({
+        where: { id: user.provider.id },
+        data: { stripeAccountId: matchingAccount.id },
+      });
+    } else {
+      // Create provider record if it doesn't exist
+      await prisma.provider.create({
+        data: {
+          userId: user.id,
+          stripeAccountId: matchingAccount.id
+        }
+      });
+    }
     
     return NextResponse.json({
       success: true,

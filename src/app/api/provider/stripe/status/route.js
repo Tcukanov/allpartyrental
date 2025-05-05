@@ -59,14 +59,21 @@ export async function GET() {
         
         if (matchingAccount) {
           // Update the provider with the found account ID
-          await prisma.provider.upsert({
-            where: { userId: user.id },
-            update: { stripeAccountId: matchingAccount.id },
-            create: {
-              userId: user.id,
-              stripeAccountId: matchingAccount.id
-            }
-          });
+          if (!user.provider) {
+            // Create provider record if it doesn't exist
+            await prisma.provider.create({
+              data: {
+                userId: user.id,
+                stripeAccountId: matchingAccount.id
+              }
+            });
+          } else {
+            // Update existing provider record
+            await prisma.provider.update({
+              where: { userId: user.id },
+              data: { stripeAccountId: matchingAccount.id }
+            });
+          }
           
           console.log(`Found and linked Stripe account ${matchingAccount.id} for provider`);
           

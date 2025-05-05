@@ -95,8 +95,56 @@ export default function ClientTransactionsPage() {
           });
         }
         
-        // Display all transactions without deduplication
-        setTransactions(data);
+        // Deduplicate transactions by party
+        const partyMap = new Map();
+        const uniqueTransactions = data.filter(tx => {
+          // Get the party ID or name from the transaction's offer
+          const partyId = tx.offer?.partyService?.party?.id;
+          const partyName = tx.offer?.partyService?.party?.name;
+          const transactionId = tx.id;
+          
+          // Create a unique key using party ID or fall back to party name
+          const partyKey = partyId || partyName;
+          
+          console.log(`Transaction ${tx.id}: PartyID=${partyId}, PartyName=${partyName}`);
+          
+          // If we can't identify a party at all, keep the transaction
+          if (!partyKey) {
+            console.log(`Transaction ${tx.id}: No party identifier found, keeping transaction`);
+            return true;
+          }
+          
+          // If we haven't seen this party before, add it to the map and keep the transaction
+          if (!partyMap.has(partyKey)) {
+            console.log(`Transaction ${tx.id}: First occurrence of party ${partyKey}, keeping transaction`);
+            partyMap.set(partyKey, tx.id);
+            return true;
+          }
+          
+          // If we have a newer transaction for this party, replace the old one
+          const existingTxId = partyMap.get(partyKey);
+          const existingTx = data.find(t => t.id === existingTxId);
+          const currentTxDate = new Date(tx.createdAt);
+          const existingTxDate = new Date(existingTx.createdAt);
+          
+          console.log(`Transaction ${tx.id}: Comparing dates for party ${partyKey} - current: ${currentTxDate}, existing: ${existingTxDate}`);
+          
+          if (currentTxDate > existingTxDate) {
+            console.log(`Transaction ${tx.id}: Newer transaction found for party ${partyKey}, replacing`);
+            partyMap.set(partyKey, tx.id);
+            return true;
+          }
+          
+          // Otherwise, this is a duplicate, so filter it out
+          console.log(`Transaction ${tx.id}: Duplicate for party ${partyKey}, filtering out`);
+          return false;
+        });
+        
+        console.log(`Filtered ${data.length} transactions to ${uniqueTransactions.length} unique transactions`);
+        console.log(`Unique party keys: ${[...partyMap.keys()].join(', ')}`);
+        
+        // Display filtered transactions
+        setTransactions(uniqueTransactions);
       } catch (err) {
         setError(err.message);
         toast({

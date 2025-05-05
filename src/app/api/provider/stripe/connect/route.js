@@ -79,14 +79,21 @@ export async function GET() {
         });
         
         // Save the account ID in our database
-        await prisma.provider.upsert({
-          where: { userId: provider.id },
-          update: { stripeAccountId: account.id },
-          create: { 
-            userId: provider.id,
-            stripeAccountId: account.id,
-          },
-        });
+        if (!provider.provider) {
+          // Create provider record if it doesn't exist
+          await prisma.provider.create({
+            data: { 
+              userId: provider.id,
+              stripeAccountId: account.id,
+            },
+          });
+        } else {
+          // Update existing provider record
+          await prisma.provider.update({
+            where: { userId: provider.id },
+            data: { stripeAccountId: account.id },
+          });
+        }
         
         // Create an account link for onboarding
         const accountLink = await stripe.accountLinks.create({
