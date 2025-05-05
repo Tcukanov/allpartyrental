@@ -328,11 +328,9 @@ export default function SignInPage() {
               
               {/* Forgot Password Link */}
               <Box alignSelf="flex-end">
-                <Link href="/auth/forgot-password" passHref>
-                  <ChakraLink color="blue.500" fontSize="sm">
-                    Forgot Password?
-                  </ChakraLink>
-                </Link>
+                <ChakraLink as={Link} href="/auth/forgot-password" color="blue.500" fontSize="sm">
+                  Forgot Password?
+                </ChakraLink>
               </Box>
               
               <Button

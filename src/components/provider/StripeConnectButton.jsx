@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button, useToast } from '@chakra-ui/react';
 import { FaStripe } from 'react-icons/fa';
 
-const StripeConnectButton = ({ onSuccess }) => {
+const StripeConnectButton = ({ onSuccess, isReconnect = false }) => {
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
 
@@ -19,12 +19,17 @@ const StripeConnectButton = ({ onSuccess }) => {
         },
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to initiate Stripe Connect');
-      }
-      
       const data = await response.json();
+      
+      if (!response.ok) {
+        // Check if this is a platform setup error with a custom URL
+        if (data.platformSetupRequired && data.url) {
+          window.location.href = data.url;
+          return;
+        }
+        
+        throw new Error(data.error || 'Failed to initiate Stripe Connect');
+      }
       
       // Redirect to Stripe Connect onboarding
       if (data.url) {
@@ -52,11 +57,11 @@ const StripeConnectButton = ({ onSuccess }) => {
       leftIcon={<FaStripe />}
       colorScheme="purple"
       isLoading={isLoading}
-      loadingText="Connecting..."
+      loadingText={isReconnect ? "Reconnecting..." : "Connecting..."}
       onClick={handleConnect}
       size="lg"
     >
-      Connect with Stripe
+      {isReconnect ? "Update Stripe Account" : "Connect with Stripe"}
     </Button>
   );
 };

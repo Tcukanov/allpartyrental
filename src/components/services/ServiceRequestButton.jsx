@@ -15,7 +15,11 @@ import {
   VStack,
   useToast,
   Box,
-  Flex
+  Flex,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription
 } from '@chakra-ui/react';
 import { CheckIcon } from '@chakra-ui/icons';
 import { Elements } from '@stripe/react-stripe-js';
@@ -24,8 +28,21 @@ import ServiceRequestPayment from '../payment/ServiceRequestPayment';
 import ServiceAvailabilityCalendar from './ServiceAvailabilityCalendar';
 import { useRouter } from 'next/navigation';
 
-// Initialize Stripe with your publishable key
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+// Initialize Stripe with your publishable key if available
+const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+console.log("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY value:", stripeKey ? "Key exists" : "Key missing");
+console.log("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:", process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.substring(0, 10) + "..." : "undefined");
+const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
+
+if (!stripeKey) {
+  console.error("Stripe publishable key is missing or invalid. Payment processing will not work.");
+} else {
+  console.log("Stripe initialization started");
+  stripePromise.then(
+    stripe => console.log("Stripe loaded successfully:", !!stripe),
+    error => console.error("Stripe failed to load:", error)
+  );
+}
 
 // Steps for the booking process
 const steps = [
@@ -280,16 +297,28 @@ const ServiceRequestButton = ({ service, offer }) => {
             )}
             
             {activeStep === 1 && (
-              <Box>
-                <Elements stripe={stripePromise}>
-                  <ServiceRequestPayment 
-                    service={service} 
-                    offer={offer}
-                    onPaymentComplete={handlePaymentComplete}
-                    onCancel={handleCancel}
-                    bookingDetails={bookingDetails}
-                  />
-                </Elements>
+              <Box px={6} pb={6}>
+                {!stripePromise ? (
+                  <Alert status="error" mb={4}>
+                    <AlertIcon />
+                    <Box>
+                      <AlertTitle>Stripe configuration error</AlertTitle>
+                      <AlertDescription>
+                        Payment processing is not available at the moment. Please try again later.
+                      </AlertDescription>
+                    </Box>
+                  </Alert>
+                ) : (
+                  <Elements stripe={stripePromise}>
+                    <ServiceRequestPayment 
+                      service={service} 
+                      offer={offer}
+                      bookingDetails={bookingDetails} 
+                      onPaymentComplete={handlePaymentComplete}
+                      onCancel={handleBack}
+                    />
+                  </Elements>
+                )}
               </Box>
             )}
             

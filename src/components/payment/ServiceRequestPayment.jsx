@@ -23,11 +23,11 @@ import {
   Flex,
   Badge,
   Checkbox,
-  Link,
+  Link as ChakraLink,
 } from '@chakra-ui/react';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { formatCurrency } from '@/lib/utils/formatters';
-import NextLink from 'next/link';
+import Link from 'next/link';
 
 const CARD_ELEMENT_OPTIONS = {
   style: {
@@ -86,10 +86,14 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
     if (!stripe || !elements) {
       toast({
         title: "Stripe not loaded",
-        description: "Please try again later.",
+        description: "The payment system is currently unavailable. Please try again later or contact support.",
         status: "error",
         duration: 5000,
         isClosable: true,
+      });
+      console.error("Stripe is not initialized:", { 
+        stripeExists: !!stripe, 
+        elementsExist: !!elements 
       });
       return;
     }
@@ -106,8 +110,34 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
     }
     
     setIsProcessing(true);
+    setCardError(null);
     
     try {
+      // Test the Stripe connection first
+      console.log("Testing Stripe connection...");
+      
+      try {
+        const testResponse = await fetch('/api/debug/stripe-test');
+        const testData = await testResponse.json();
+        console.log("Stripe test result:", testData);
+        
+        if (!testData.success) {
+          throw new Error(`Stripe test failed: ${testData.error}`);
+        }
+      } catch (stripeTestError) {
+        console.error("Stripe test failed:", stripeTestError);
+        toast({
+          title: "Payment System Error",
+          description: "There's an issue with our payment system. Please try again later.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Now proceed with booking
       // First, validate that we have either an offer or a service
       if (!offer && !service) {
         throw new Error('No service or offer provided');
@@ -233,6 +263,67 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
           if (transactionCreated) {
             throw debugError; // If transaction was created but payment failed, don't try again with regular flow
           }
+          
+          // Try a direct payment as a last resort
+          console.log("Trying direct payment as fallback...");
+          try {
+            const directPaymentResponse = await fetch('/api/debug/direct-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                amount: totalAmount,
+                title: service.name || 'Service booking',
+                currency: 'usd'
+              }),
+            });
+            
+            if (!directPaymentResponse.ok) {
+              const errorData = await directPaymentResponse.json();
+              console.error("Direct payment failed:", errorData);
+              throw new Error(errorData.error || `Direct payment failed with status ${directPaymentResponse.status}`);
+            }
+            
+            const directPaymentData = await directPaymentResponse.json();
+            console.log("Direct payment intent created:", directPaymentData);
+            
+            if (directPaymentData.success && directPaymentData.clientSecret) {
+              // Confirm card payment directly
+              const { error, paymentIntent } = await stripe.confirmCardPayment(directPaymentData.clientSecret, {
+                payment_method: {
+                  card: elements.getElement(CardElement),
+                },
+              });
+              
+              if (error) {
+                throw new Error(error.message);
+              }
+              
+              if (paymentIntent.status === 'requires_capture' || paymentIntent.status === 'succeeded') {
+                setIsComplete(true);
+                toast({
+                  title: "Direct payment successful!",
+                  description: "Your payment has been authorized. The provider will be notified about your request.",
+                  status: "success",
+                  duration: 5000,
+                  isClosable: true,
+                });
+                
+                if (onPaymentComplete) {
+                  onPaymentComplete({ id: directPaymentData.paymentIntentId, status: 'direct_payment' });
+                }
+                
+                return; // Exit the function after successful direct payment
+              }
+            }
+            
+            throw new Error('Direct payment setup failed');
+          } catch (directPaymentError) {
+            console.error("Direct payment fallback failed:", directPaymentError);
+            // Continue with regular flow if direct payment fails
+          }
+          
           // Continue with regular flow if no transaction was created
         }
       }
@@ -256,7 +347,7 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
             addons: bookingDetails?.addons || [] // Include selected add-ons
           }),
         });
-      
+        
         let errorData;
       
         // Handle authentication errors
@@ -590,7 +681,7 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
                 onChange={(e) => setTermsAccepted(e.target.checked)}
                 colorScheme="blue"
               >
-                I accept the <NextLink href="/terms" passHref legacyBehavior><Link color="blue.500">Terms of Service</Link></NextLink> and <NextLink href="/terms/soft-play" passHref legacyBehavior><Link color="blue.500">Soft Play Service Agreement</Link></NextLink>
+                I accept the <ChakraLink as={Link} href="/terms" color="blue.500">Terms of Service</ChakraLink> and <ChakraLink as={Link} href="/terms/soft-play" color="blue.500">Soft Play Service Agreement</ChakraLink>
               </Checkbox>
             </FormControl>
           </Box>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useToast, HStack, Badge, Icon, Spinner, Select, InputGroup, InputLeftElement, Input, Flex, Divider, Checkbox, CheckboxGroup, Stack } from '@chakra-ui/react';
-import { StarIcon, ViewIcon, SearchIcon } from '@chakra-ui/icons';
+import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useToast, HStack, Badge, Icon, Spinner, Select, InputGroup, InputLeftElement, Input, Flex, Divider, Checkbox, CheckboxGroup, Stack, useDisclosure, IconButton, Collapse } from '@chakra-ui/react';
+import { StarIcon, ViewIcon, SearchIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import LocationServiceSearch from '@/components/search/LocationServiceSearch';
 import Link from 'next/link';
@@ -20,6 +20,7 @@ export default function ServicesPage() {
   const [selectedColor, setSelectedColor] = useState('');
   const [sortByPrice, setSortByPrice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const { isOpen, onToggle } = useDisclosure();
   
   // Add state for category filters
   const [categoryFilters, setCategoryFilters] = useState([]);
@@ -223,276 +224,289 @@ export default function ServicesPage() {
   
   return (
     <Container maxW="container.xl" py={8}>
-      <Box>
-        <Heading as="h1" size="xl">Browse Our Services</Heading>
-        <Text color="gray.600" mt={2}>
-          Discover our range of soft play services for all your needs
-        </Text>
-      </Box>
+        <Box>
+          <Heading as="h1" size="xl">Browse Our Services</Heading>
+          <Text color="gray.600" mt={2}>
+            Discover our range of soft play services for all your needs
+          </Text>
+        </Box>
 
       {/* Top Filters Bar */}
       <Box mt={6} bg="white" p={4} borderRadius="lg" boxShadow="md">
-        <Flex w="full" wrap="wrap" gap={4}>
-          {/* Search input */}
-          <Box flex="1" minW="200px">
-            <Text fontWeight="medium" mb={2}>Search</Text>
-            <InputGroup>
-              <InputLeftElement pointerEvents="none">
-                <SearchIcon color="gray.300" />
-              </InputLeftElement>
-              <Input 
-                placeholder="Search services..." 
-                value={searchTerm}
-                onChange={handleSearchChange}
-              />
-            </InputGroup>
-          </Box>
-        
-          {/* Location filter */}
-          <Box flex="1" minW="200px">
-            <Text fontWeight="medium" mb={2}>Location</Text>
-            <Select placeholder="All Locations" value={selectedCity} onChange={handleCityChange}>
-              {cities.map(city => (
-                <option key={city.id} value={city.id}>
-                  {city.name}
-                </option>
-              ))}
-            </Select>
-          </Box>
-          
-          {/* Color filter */}
+            <Flex w="full" wrap="wrap" gap={4}>
+              {/* Search input */}
+              <Box flex="1" minW="200px">
+                <Text fontWeight="medium" mb={2}>Search</Text>
+                <InputGroup>
+                  <InputLeftElement pointerEvents="none">
+                    <SearchIcon color="gray.300" />
+                  </InputLeftElement>
+                  <Input 
+                    placeholder="Search services..." 
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                  />
+                </InputGroup>
+              </Box>
+            
+              {/* Location filter */}
+              <Box flex="1" minW="200px">
+                <Text fontWeight="medium" mb={2}>Location</Text>
+                <Select placeholder="All Locations" value={selectedCity} onChange={handleCityChange}>
+                  {cities.map(city => (
+                    <option key={city.id} value={city.id}>
+                      {city.name}
+                    </option>
+                  ))}
+                </Select>
+              </Box>
+              
+              {/* Color filter */}
           {/* <Box flex="1" minW="200px">
-            <Text fontWeight="medium" mb={2}>Filter by Color</Text>
-            <Select 
-              placeholder="All Colors" 
-              value={selectedColor} 
-              onChange={handleColorChange}
-            >
-              {availableColors.map(color => (
-                <option key={color} value={color}>
-                  {color}
-                </option>
-              ))}
-            </Select>
+                <Text fontWeight="medium" mb={2}>Filter by Color</Text>
+                <Select 
+                  placeholder="All Colors" 
+                  value={selectedColor} 
+                  onChange={handleColorChange}
+                >
+                  {availableColors.map(color => (
+                    <option key={color} value={color}>
+                      {color}
+                    </option>
+                  ))}
+                </Select>
           </Box> */}
-          
-          {/* Sort by price */}
-          <Box flex="1" minW="200px">
-            <Text fontWeight="medium" mb={2}>Sort by Price</Text>
-            <Select
-              value={sortByPrice}
-              onChange={handleSortChange}
-            >
-              {sortOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Box>
-        </Flex>
+              
+              {/* Sort by price */}
+              <Box flex="1" minW="200px">
+                <Text fontWeight="medium" mb={2}>Sort by Price</Text>
+                <Select
+                  value={sortByPrice}
+                  onChange={handleSortChange}
+                >
+                  {sortOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </Box>
+            </Flex>
       </Box>
 
       <Flex mt={6} gap={6} flexDirection={{ base: "column", md: "row" }}>
         {/* Left Sidebar with Additional Filters only */}
-        {categoryFilters.length > 0 && (
+            {categoryFilters.length > 0 && (
           <Box w={{ base: "100%", md: "300px" }} flexShrink={0}>
             <Box bg="white" p={4} borderRadius="lg" boxShadow="md">
-              <Heading as="h3" size="md" mb={4}>Additional Filters</Heading>
+              <Flex justifyContent="space-between" alignItems="center" mb={4}>
+                <Heading as="h3" size="md">Additional Filters</Heading>
+                <IconButton 
+                  display={{ base: "flex", md: "none" }}
+                  icon={isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                  onClick={onToggle}
+                  variant="ghost"
+                  aria-label={isOpen ? "Hide filters" : "Show filters"}
+                  size="md"
+                  fontSize="24px"
+                />
+              </Flex>
               
-              <VStack spacing={4} align="stretch">
-                {categoryFilters.map(filter => (
-                  <Box key={filter.id}>
-                    <Text fontWeight="medium" mb={2}>
-                      {filter.name}
-                      {filter.iconUrl && (
-                        <Image
-                          src={filter.iconUrl}
-                          alt={filter.name}
-                          boxSize="16px"
-                          display="inline-block"
-                          ml={2}
-                          verticalAlign="middle"
+              <Box display={{ base: isOpen ? "block" : "none", md: "block" }}>
+                <VStack spacing={4} align="stretch">
+                  {categoryFilters.map(filter => (
+                    <Box key={filter.id}>
+                      <Text fontWeight="medium" mb={2}>
+                        {filter.name}
+                        {filter.iconUrl && (
+                          <Image
+                            src={filter.iconUrl}
+                            alt={filter.name}
+                            boxSize="16px"
+                            display="inline-block"
+                            ml={2}
+                            verticalAlign="middle"
+                          />
+                        )}
+                      </Text>
+                      
+                      {/* Render different input types based on filter type */}
+                      {filter.options.length === 0 ? (
+                        // Text input for text-only filters
+                        <Input
+                          value={filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                          placeholder={`Enter ${filter.name.toLowerCase()}`}
+                          size="md"
                         />
+                      ) : filter.type === 'color' ? (
+                        // Color selection radio buttons
+                        <Select
+                          placeholder={`Select ${filter.name}`}
+                          value={filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                        >
+                          <option value="">All {filter.name}s</option>
+                          {filter.options.map(option => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : filter.type === 'size' || filter.type === 'material' ? (
+                        // Single select dropdown
+                        <Select
+                          placeholder={`Select ${filter.name}`}
+                          value={filterValues[filter.id] || ''}
+                          onChange={(e) => handleFilterChange(filter.id, e.target.value)}
+                        >
+                          <option value="">All {filter.name}s</option>
+                          {filter.options.map(option => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        // Multi-select checkboxes
+                        <Select
+                          placeholder={`Select ${filter.name}`}
+                          value={filterValues[filter.id]?.[0] || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value) {
+                              handleFilterChange(filter.id, [value]);
+                            } else {
+                              handleFilterChange(filter.id, []);
+                            }
+                          }}
+                        >
+                          <option value="">Any {filter.name}</option>
+                          {filter.options.map(option => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </Select>
                       )}
-                    </Text>
-                    
-                    {/* Render different input types based on filter type */}
-                    {filter.options.length === 0 ? (
-                      // Text input for text-only filters
-                      <Input
-                        value={filterValues[filter.id] || ''}
-                        onChange={(e) => handleFilterChange(filter.id, e.target.value)}
-                        placeholder={`Enter ${filter.name.toLowerCase()}`}
-                        size="md"
-                      />
-                    ) : filter.type === 'color' ? (
-                      // Color selection radio buttons
-                      <Select
-                        placeholder={`Select ${filter.name}`}
-                        value={filterValues[filter.id] || ''}
-                        onChange={(e) => handleFilterChange(filter.id, e.target.value)}
-                      >
-                        <option value="">All {filter.name}s</option>
-                        {filter.options.map(option => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </Select>
-                    ) : filter.type === 'size' || filter.type === 'material' ? (
-                      // Single select dropdown
-                      <Select
-                        placeholder={`Select ${filter.name}`}
-                        value={filterValues[filter.id] || ''}
-                        onChange={(e) => handleFilterChange(filter.id, e.target.value)}
-                      >
-                        <option value="">All {filter.name}s</option>
-                        {filter.options.map(option => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </Select>
-                    ) : (
-                      // Multi-select checkboxes
-                      <Select
-                        placeholder={`Select ${filter.name}`}
-                        value={filterValues[filter.id]?.[0] || ''}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value) {
-                            handleFilterChange(filter.id, [value]);
-                          } else {
-                            handleFilterChange(filter.id, []);
-                          }
-                        }}
-                      >
-                        <option value="">Any {filter.name}</option>
-                        {filter.options.map(option => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </Select>
-                    )}
-                  </Box>
-                ))}
-              </VStack>
+                    </Box>
+                  ))}
+                </VStack>
+              </Box>
             </Box>
-          </Box>
-        )}
+              </Box>
+            )}
         
         {/* Right Side - Content Area */}
         <Box flex="1">
-          {isLoading ? (
-            <Box display="flex" justifyContent="center" py={12}>
-              <Spinner size="xl" color="brand.500" />
-            </Box>
-          ) : services.length === 0 ? (
-            <Box p={8} textAlign="center" borderWidth="1px" borderRadius="md">
-              <Text fontSize="lg">{errorMessage}</Text>
-              <Text mt={2} color="gray.600">
-                Try changing your filters or search term.
-              </Text>
-              {errorMessage.includes('Failed to load') && (
-                <Button mt={4} colorScheme="brand" onClick={fetchServices}>
-                  Try Again
-                </Button>
-              )}
-            </Box>
-          ) : (
+        {isLoading ? (
+          <Box display="flex" justifyContent="center" py={12}>
+            <Spinner size="xl" color="brand.500" />
+          </Box>
+        ) : services.length === 0 ? (
+          <Box p={8} textAlign="center" borderWidth="1px" borderRadius="md">
+            <Text fontSize="lg">{errorMessage}</Text>
+            <Text mt={2} color="gray.600">
+              Try changing your filters or search term.
+            </Text>
+            {errorMessage.includes('Failed to load') && (
+              <Button mt={4} colorScheme="brand" onClick={fetchServices}>
+                Try Again
+              </Button>
+            )}
+          </Box>
+        ) : (
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-              {services.map((service) => (
-                <Card key={service.id} cursor="pointer" overflow="hidden" transition="transform 0.3s" _hover={{ transform: 'translateY(-5px)' }}>
-                  <Box position="relative" h="200px">
-                    <Image 
-                      src={Array.isArray(service.photos) && service.photos.length > 0 
-                        ? service.photos[0] 
-                        : '/images/placeholder.jpg'}
-                      alt={service.name} 
-                      objectFit="cover"
-                      w="100%" 
-                      h="100%"
-                    />
-                    <Badge
+            {services.map((service) => (
+              <Card key={service.id} cursor="pointer" overflow="hidden" transition="transform 0.3s" _hover={{ transform: 'translateY(-5px)' }}>
+                <Box position="relative" h="200px">
+                  <Image 
+                    src={Array.isArray(service.photos) && service.photos.length > 0 
+                      ? service.photos[0] 
+                      : '/images/placeholder.jpg'}
+                    alt={service.name} 
+                    objectFit="cover"
+                    w="100%" 
+                    h="100%"
+                  />
+                  <Badge
+                    position="absolute"
+                    top={2}
+                    right={2}
+                    colorScheme="brand"
+                    fontSize="sm"
+                    px={2}
+                    py={1}
+                    borderRadius="md"
+                  >
+                    ${Number(service.price).toFixed(2)}
+                  </Badge>
+                  {service.colors && service.colors.length > 0 && (
+                    <HStack
                       position="absolute"
-                      top={2}
-                      right={2}
-                      colorScheme="brand"
-                      fontSize="sm"
-                      px={2}
-                      py={1}
-                      borderRadius="md"
+                      bottom={2}
+                      left={2}
+                      spacing={1}
                     >
-                      ${Number(service.price).toFixed(2)}
-                    </Badge>
-                    {service.colors && service.colors.length > 0 && (
-                      <HStack
-                        position="absolute"
-                        bottom={2}
-                        left={2}
-                        spacing={1}
-                      >
-                        {service.colors.slice(0, 3).map(color => (
-                          <Box
-                            key={color}
-                            w="15px"
-                            h="15px"
-                            borderRadius="full"
-                            bg={color.toLowerCase()}
-                            border="1px solid white"
-                          />
-                        ))}
-                        {service.colors.length > 3 && (
-                          <Badge bg="white" color="gray.500" fontSize="xs">
-                            +{service.colors.length - 3}
-                          </Badge>
-                        )}
-                      </HStack>
-                    )}
-                  </Box>
-                  
-                  <CardBody>
-                    <VStack spacing={3} align="stretch">
-                      <Heading size="md">{service.name}</Heading>
-                      <Text color="gray.600" noOfLines={2}>
-                        {service.description}
-                      </Text>
+                      {service.colors.slice(0, 3).map(color => (
+                        <Box
+                          key={color}
+                          w="15px"
+                          h="15px"
+                          borderRadius="full"
+                          bg={color.toLowerCase()}
+                          border="1px solid white"
+                        />
+                      ))}
+                      {service.colors.length > 3 && (
+                        <Badge bg="white" color="gray.500" fontSize="xs">
+                          +{service.colors.length - 3}
+                        </Badge>
+                      )}
+                    </HStack>
+                  )}
+                </Box>
+                
+                <CardBody>
+                  <VStack spacing={3} align="stretch">
+                    <Heading size="md">{service.name}</Heading>
+                    <Text color="gray.600" noOfLines={2}>
+                      {service.description}
+                    </Text>
 
-                      <HStack justify="space-between">
-                        <HStack spacing={1}>
-                          <Icon as={StarIcon} color="yellow.400" />
-                          <Text fontSize="sm">
-                            {service.rating ? Number(service.rating).toFixed(1) : '4.5'}
-                          </Text>
-                        </HStack>
-                        <HStack spacing={1}>
-                          <Icon as={ViewIcon} color="gray.500" />
-                          <Text fontSize="sm">
-                            {service.city?.name || 
-                            (service.provider?.provider?.businessCity ? 
-                              service.provider.provider.businessCity : 
-                              (service.provider?.name ? `${service.provider.name}'s location` : 'Location unavailable'))}
-                          </Text>
-                        </HStack>
+                    <HStack justify="space-between">
+                      <HStack spacing={1}>
+                        <Icon as={StarIcon} color="yellow.400" />
+                        <Text fontSize="sm">
+                          {service.rating ? Number(service.rating).toFixed(1) : '4.5'}
+                        </Text>
                       </HStack>
+                      <HStack spacing={1}>
+                        <Icon as={ViewIcon} color="gray.500" />
+                        <Text fontSize="sm">
+                          {service.city?.name || 
+                           (service.provider?.provider?.businessCity ? 
+                            service.provider.provider.businessCity : 
+                            (service.provider?.name ? `${service.provider.name}'s location` : 'Location unavailable'))}
+                        </Text>
+                      </HStack>
+                    </HStack>
 
-                      <Button 
-                        as={Link}
-                        href={`/services/${service.id}`}
-                        colorScheme="brand" 
-                        size="sm"
-                        mt={2}
-                      >
-                        View Details
-                      </Button>
-                    </VStack>
-                  </CardBody>
-                </Card>
-              ))}
-            </SimpleGrid>
-          )}
+                    <Button 
+                      as={Link}
+                      href={`/services/${service.id}`}
+                      colorScheme="brand" 
+                      size="sm"
+                      mt={2}
+                    >
+                      View Details
+                    </Button>
+                  </VStack>
+                </CardBody>
+              </Card>
+            ))}
+          </SimpleGrid>
+        )}
         </Box>
       </Flex>
     </Container>

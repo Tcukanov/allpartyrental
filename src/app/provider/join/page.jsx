@@ -633,7 +633,7 @@ export default function ProviderJoinPage() {
                               isChecked={formData.acceptTerms}
                               onChange={handleChange}
                             >
-                              I agree to the <Link href="/terms" passHref><Text as="span" color="brand.500" textDecoration="underline">Terms and Conditions</Text></Link> and <Link href="/privacy" passHref><Text as="span" color="brand.500" textDecoration="underline">Privacy Policy</Text></Link>
+                              I agree to the <Text as="span" color="brand.500" textDecoration="underline" onClick={() => window.open('/terms', '_blank')} cursor="pointer">Terms and Conditions</Text> and <Text as="span" color="brand.500" textDecoration="underline" onClick={() => window.open('/privacy', '_blank')} cursor="pointer">Privacy Policy</Text>
                             </Checkbox>
                           </FormControl>
                           

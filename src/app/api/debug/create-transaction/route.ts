@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     
     // Get the service ID from the request
     const data = await request.json();
-    const { serviceId } = data;
+    const { serviceId, bookingDate, duration = 2, comments = '' } = data;
     
     if (!serviceId) {
       return NextResponse.json(
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log(`Attempting to create test transaction for user ${userId}, service ${serviceId}`);
+    console.log(`Creating debug transaction for user ${userId}, service ${serviceId}`);
     
     // 1. Verify the user exists
     const user = await prisma.user.findUnique({
@@ -44,7 +44,10 @@ export async function POST(request: NextRequest) {
     
     // 2. Verify the service exists
     const service = await prisma.service.findUnique({
-      where: { id: serviceId }
+      where: { id: serviceId },
+      include: {
+        provider: true
+      }
     });
     
     if (!service) {
@@ -54,81 +57,62 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Use a Prisma transaction to create all required objects atomically
-    const result = await prisma.$transaction(async (tx) => {
-      // Create test party
-      const party = await tx.party.create({
-        data: {
-          name: "Test Party",
-          date: new Date(),
-          startTime: "12:00",
-          duration: 2,
-          guestCount: 10,
-          status: "DRAFT",
-          clientId: userId,
-          cityId: service.cityId
+    // If the service doesn't have a provider, we can't proceed
+    if (!service.providerId) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Service does not have a provider' } },
+        { status: 400 }
+      );
+    }
+    
+    // Create the transaction directly
+    const transaction = await prisma.transaction.create({
+      data: {
+        amount: new Prisma.Decimal(service.price),
+        status: 'PENDING',
+        clientFeePercent: 5.0,
+        providerFeePercent: 10.0,
+        party: {
+          create: {
+            name: "Test booking",
+            date: bookingDate ? new Date(bookingDate) : new Date(),
+            startTime: "12:00",
+            duration: duration,
+            guestCount: 2,
+            status: "PENDING",
+            clientId: userId,
+            cityId: service.cityId || null,
+            address: "Test Address",
+            notes: comments || "Debug booking"
+          }
+        },
+        offer: {
+          create: {
+            clientId: userId,
+            providerId: service.providerId,
+            serviceId: service.id,
+            price: new Prisma.Decimal(service.price),
+            description: comments || "Debug booking request",
+            photos: [],
+            status: "PENDING"
+          }
         }
-      });
-      
-      console.log(`Created test party: ${party.id}`);
-      
-      // Create test party service
-      const partyService = await tx.partyService.create({
-        data: {
-          partyId: party.id,
-          serviceId: service.id
-        }
-      });
-      
-      console.log(`Created test party service: ${partyService.id}`);
-      
-      // Create test offer
-      const offer = await tx.offer.create({
-        data: {
-          clientId: userId,
-          providerId: service.providerId,
-          serviceId: service.id,
-          partyServiceId: partyService.id,
-          price: new Prisma.Decimal(service.price),
-          description: "Test offer",
-          photos: [],
-          status: "PENDING"
-        }
-      });
-      
-      console.log(`Created test offer: ${offer.id}`);
-      
-      // Create test transaction
-      const transaction = await tx.transaction.create({
-        data: {
-          offerId: offer.id,
-          partyId: party.id,
-          amount: new Prisma.Decimal(service.price),
-          status: "PENDING",
-          clientFeePercent: 5.0,
-          providerFeePercent: 10.0
-        }
-      });
-      
-      console.log(`Created test transaction: ${transaction.id}`);
-      
-      return {
-        party,
-        partyService,
-        offer,
-        transaction
-      };
+      }
     });
+    
+    console.log(`Created debug transaction: ${transaction.id}`);
     
     return NextResponse.json({
       success: true,
-      message: "Test transaction created successfully",
-      data: result
+      message: "Debug transaction created successfully",
+      data: {
+        transaction
+      }
     });
   } catch (error) {
-    console.error("Error creating test transaction:", error);
+    console.error("Error creating debug transaction:", error);
     
-    let errorMessage = "Failed to create test transaction";
+    let errorMessage = "Failed to create debug transaction";
     let details = null;
     
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

@@ -44,7 +44,8 @@ export async function POST(
             provider: true,
             service: true
           }
-        }
+        },
+        party: true
       }
     });
 
@@ -56,12 +57,64 @@ export async function POST(
       );
     }
 
-    // Check user authorization
-    const offer = transaction.offer;
-    const isClient = session.user.id === offer.clientId;
+    console.log('Transaction data:', JSON.stringify(transaction, null, 2));
+
+    // Check user authorization - either the client or admin
+    let clientId = null;
+    let providerId = null;
+    let serviceName = 'Service';
+
+    if (transaction.offer) {
+      clientId = transaction.offer.clientId;
+      providerId = transaction.offer.providerId;
+      serviceName = transaction.offer.service?.name || 'Offer Service';
+    } else if (transaction.party) {
+      clientId = transaction.party.clientId;
+      
+      // For direct service transactions, we need to get the provider ID
+      // Get the service info if it exists
+      if (transaction.offerId) {
+        // Look up the service info
+        const offerService = await prisma.service.findFirst({
+          where: {
+            offers: {
+              some: {
+                id: transaction.offerId
+              }
+            }
+          }
+        });
+
+        if (offerService) {
+          providerId = offerService.providerId;
+          serviceName = offerService.name || 'Service';
+        }
+      }
+    }
+
+    // If we couldn't determine the client ID, return an error
+    if (!clientId) {
+      console.error(`Could not determine client for transaction ${id}`);
+      return NextResponse.json(
+        { success: false, error: { message: 'Transaction data is incomplete - missing client information' } },
+        { status: 400 }
+      );
+    }
+
+    // If we couldn't determine the provider ID, return an error
+    if (!providerId) {
+      console.error(`Could not determine provider for transaction ${id}`);
+      return NextResponse.json(
+        { success: false, error: { message: 'Transaction data is incomplete - missing provider information' } },
+        { status: 400 }
+      );
+    }
+
+    const isClient = session.user.id === clientId;
+    const isAdmin = session.user.role === 'ADMIN';
     
-    if (!isClient && session.user.role !== 'ADMIN') {
-      console.error(`Unauthorized access: User ${session.user.id} trying to process payment for client ${offer.clientId}`);
+    if (!isClient && !isAdmin) {
+      console.error(`Unauthorized access: User ${session.user.id} trying to process payment for client ${clientId}`);
       return NextResponse.json(
         { success: false, error: { message: 'Unauthorized - only the client can process this payment' } },
         { status: 403 }
@@ -89,10 +142,10 @@ export async function POST(
         capture_method: 'manual',
         metadata: {
           transactionId: transaction.id,
-          offerId: transaction.offerId,
-          clientId: session.user.id,
-          providerId: transaction.offer.providerId,
-          serviceName: transaction.offer.service.name
+          offerId: transaction.offerId || '',
+          clientId: clientId,
+          providerId: providerId,
+          serviceName: serviceName
         },
         clientFeePercent: clientFeePercent,
         providerFeePercent: providerFeePercent

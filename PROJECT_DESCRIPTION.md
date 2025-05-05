@@ -3,6 +3,8 @@
 ## Project Overview
 
 READ THIS FILE BEFORE ANY REPOSNE OR CODE WRITING.
+DO NOT USE MIGRATE DEV USE PUSH INSTEAD.
+PLEASE DO NOT USE HARDCODE, ONLY WHERE'S NO OPTION.
 
 AllPartyRent is a marketplace platform that connects party equipment/service providers with clients looking to rent party supplies and services. The platform allows providers to list their services and clients to find, compare, and book party rentals in their area.
 
@@ -12,7 +14,7 @@ BOUNCE HOUSES, PHOTO BOOTH, ETC
 
 ## Tech Stack
 
-- **Frontend**: Next.js 13+ (App Router), React, Chakra UI
+- **Frontend**: Next.js 15.0 (App Router), React, Chakra UI
 - **Backend**: Next.js API Routes (serverless functions)
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: NextAuth.js

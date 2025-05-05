@@ -20,7 +20,7 @@ export async function GET() {
     // Check if user is a provider
     const provider = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { id: true, role: true, email: true },
+      include: { provider: true }
     });
 
     if (!provider || provider.role !== 'PROVIDER') {
@@ -43,61 +43,83 @@ export async function GET() {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     
     // Check if provider already has a Stripe account
-    const existingProvider = await prisma.provider.findUnique({
-      where: { userId: provider.id },
-      select: { stripeAccountId: true },
-    });
-
-    let accountId;
-    
-    if (existingProvider?.stripeAccountId) {
-      // Use existing Stripe account
-      accountId = existingProvider.stripeAccountId;
-      console.log(`Using existing Stripe account: ${accountId}`);
-    } else {
-      // Create a new Stripe account
-      console.log(`Creating new Stripe account for provider: ${provider.id}`);
+    if (provider.provider?.stripeAccountId) {
+      // Provider already has a Stripe account, create account link
       try {
-        const account = await stripe.accounts.create({
-          type: 'standard',
-          email: provider.email,
-          metadata: {
-            userId: provider.id,
-          },
+        const accountLink = await stripe.accountLinks.create({
+          account: provider.provider.stripeAccountId,
+          refresh_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?refresh=true`,
+          return_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?success=true`,
+          type: 'account_onboarding',
         });
         
-        accountId = account.id;
+        return NextResponse.json({ url: accountLink.url });
+      } catch (error) {
+        console.error('Error creating account link:', error);
         
-        // Update provider with Stripe account ID
-        await prisma.provider.update({
-          where: { userId: provider.id },
-          data: { stripeAccountId: account.id },
-        });
-      } catch (stripeError) {
-        console.error('Stripe account creation error:', stripeError);
+        // If the error is because the account link expired, we can create a new account link
+        // or provide a link to the dashboard
         return NextResponse.json(
-          { error: `Stripe account creation failed: ${stripeError.message}` },
+          { error: `Failed to create account link: ${error.message}` },
           { status: 500 }
         );
       }
-    }
-
-    // Create an account link for the user to complete onboarding
-    try {
-      const accountLink = await stripe.accountLinks.create({
-        account: accountId,
-        refresh_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?refresh=true`,
-        return_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?success=true`,
-        type: 'account_onboarding',
-      });
-      
-      return NextResponse.json({ url: accountLink.url });
-    } catch (linkError) {
-      console.error('Error creating account link:', linkError);
-      return NextResponse.json(
-        { error: `Failed to create onboarding link: ${linkError.message}` },
-        { status: 500 }
-      );
+    } else {
+      // For new providers, create a new Stripe account and then an account link
+      try {
+        // Create a new account
+        const account = await stripe.accounts.create({
+          type: 'express',
+          country: 'US',
+          email: provider.email,
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+        });
+        
+        // Save the account ID in our database
+        await prisma.provider.upsert({
+          where: { userId: provider.id },
+          update: { stripeAccountId: account.id },
+          create: { 
+            userId: provider.id,
+            stripeAccountId: account.id,
+          },
+        });
+        
+        // Create an account link for onboarding
+        const accountLink = await stripe.accountLinks.create({
+          account: account.id,
+          refresh_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?refresh=true`,
+          return_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?success=true`,
+          type: 'account_onboarding',
+        });
+        
+        return NextResponse.json({ url: accountLink.url });
+      } catch (error) {
+        console.error('Error creating Stripe account or link:', error);
+        
+        // Check for platform setup errors
+        if (error.message && 
+            (error.message.includes('Please review the responsibilities') || 
+             error.message.includes('platform-profile'))) {
+          // This is a platform setup error, redirect with platform_error parameter
+          return NextResponse.json(
+            { 
+              error: 'Stripe Connect platform setup required', 
+              platformSetupRequired: true,
+              url: `${process.env.NEXTAUTH_URL}/provider/settings/payments?platform_error=true`
+            },
+            { status: 400 }
+          );
+        }
+        
+        return NextResponse.json(
+          { error: `Failed to set up Stripe account: ${error.message}` },
+          { status: 500 }
+        );
+      }
     }
   } catch (error) {
     console.error('Error creating Stripe Connect link:', error);
