@@ -531,9 +531,9 @@ export default function EditPartyPage() {
       <Container maxW="container.md" py={8}>
         <VStack spacing={8} align="stretch">
           <Box>
-            <Heading as="h1" size="xl">Edit Party</Heading>
+            <Heading as="h1" size="xl">Edit Booking</Heading>
             <Text color="gray.600" mt={2}>
-              Update your party details
+              Update your booking information
             </Text>
           </Box>
           

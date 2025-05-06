@@ -38,7 +38,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon, ChatIcon, StarIcon } from '@chakra-ui/icons';
 import { useSession } from 'next-auth/react';
-import { FaComment, FaEye, FaBuilding, FaIdCard, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaComment, FaEye, FaBuilding, FaIdCard, FaPlus, FaTrash, FaMoneyBillWave } from 'react-icons/fa';
 import { BsChatDots, BsFillGeoAltFill } from 'react-icons/bs';
 import NextLink from 'next/link';
 
@@ -280,6 +280,7 @@ export default function ProviderCabinetPage() {
   const [isAddingCity, setIsAddingCity] = useState(false);
   const [selectedCityId, setSelectedCityId] = useState('');
   const [isLoadingCities, setIsLoadingCities] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState(false);
 
   // Clear any outdated localStorage values but preserve important data
   useEffect(() => {
@@ -531,6 +532,22 @@ export default function ProviderCabinetPage() {
           avatar: profileData.avatar || '',
           socialLinks: profileData.socialLinks || {}
         });
+      }
+      
+      // Fetch Stripe connection status
+      try {
+        const stripeStatusResponse = await fetch('/api/provider/stripe/status');
+        const stripeStatusData = await stripeStatusResponse.json();
+        
+        console.log('Stripe status response:', stripeStatusData);
+        
+        // The API returns isConnected property, not success/connected
+        setStripeConnected(!!stripeStatusData.isConnected);
+        console.log('Stripe connected status set to:', !!stripeStatusData.isConnected);
+      } catch (stripeError) {
+        console.error('Error fetching Stripe status:', stripeError);
+        // Default to false if there's an error
+        setStripeConnected(false);
       }
       
       // Fetch requests data with chats
@@ -1139,34 +1156,24 @@ export default function ProviderCabinetPage() {
   // Calculate profile completion percentage
   useEffect(() => {
     const calculateProfileCompletion = () => {
-      const { companyName, contactPerson, email, phone, address, website, googleBusinessUrl, description, avatar } = profileData;
+      const { companyName, contactPerson, phone, website, avatar, description } = profileData;
+      
       let completion = 0;
-
-      if (companyName) completion += 10;
+      
+      // Basic profile - 60%
+      if (companyName) completion += 20;
       if (contactPerson) completion += 10;
-      if (email) completion += 10;
-      if (phone) completion += 10;
-      if (address) completion += 10;
-      if (website) completion += 10;
-      if (googleBusinessUrl) completion += 10;
-      if (description) completion += 10;
+      if (phone) completion += 30;
+      
+      // Extended profile - 40%
+      if (website) completion += 20;
       if (avatar) completion += 10;
+      if (description) completion += 10;
 
       setProfileCompletionPercent(completion);
     };
 
     calculateProfileCompletion();
-  }, [profileData]);
-
-  // Calculate business verification status
-  useEffect(() => {
-    const calculateBusinessVerification = () => {
-      const { googleBusinessUrl } = profileData;
-      setBusinessVerified(googleBusinessUrl.startsWith('https://g.page/'));
-      setHasEIN(googleBusinessUrl.includes('EIN'));
-    };
-
-    calculateBusinessVerification();
   }, [profileData]);
 
   // Calculate service count
@@ -1660,16 +1667,6 @@ export default function ProviderCabinetPage() {
                       </FormControl>
                       
                       <FormControl>
-                        <FormLabel>Business Address (Optional)</FormLabel>
-                        <Input 
-                          name="address"
-                          value={profileData.address}
-                          onChange={handleProfileChange}
-                          placeholder="Enter your business address"
-                        />
-                      </FormControl>
-                      
-                      <FormControl>
                         <FormLabel>Website (Optional)</FormLabel>
                         <Input 
                           name="website"
@@ -1679,108 +1676,19 @@ export default function ProviderCabinetPage() {
                         />
                       </FormControl>
                       
-                      <FormControl>
-                        <FormLabel>Google Business URL (Optional)</FormLabel>
-                        <Flex>
-                          <Input 
-                            name="googleBusinessUrl"
-                            value={profileData.googleBusinessUrl}
-                            onChange={handleProfileChange}
-                            placeholder="https://g.page/your-business"
-                            mr={2}
-                          />
-                          <Button 
-                            colorScheme="blue" 
-                            size="md" 
-                            isDisabled={!profileData.googleBusinessUrl}
-                            onClick={async () => {
-                              if (!profileData.googleBusinessUrl) return;
-                              
-                              try {
-                                const response = await fetch('/api/google/ratings', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ googleBusinessUrl: profileData.googleBusinessUrl })
-                                });
-                                
-                                const result = await response.json();
-                                
-                                if (result.success) {
-                                  // Update profile data with ratings
-                                  setProfileData(prev => ({
-                                    ...prev,
-                                    googleBusinessRating: result.data.googleBusinessRating,
-                                    googleBusinessReviews: result.data.googleBusinessReviews
-                                  }));
-                                  
-                                  toast({
-                                    title: 'Ratings Updated',
-                                    description: `Successfully fetched ratings: ${result.data.googleBusinessRating}/5 (${result.data.googleBusinessReviews} reviews)`,
-                                    status: 'success',
-                                    duration: 5000,
-                                    isClosable: true
-                                  });
-                                } else {
-                                  throw new Error(result.error?.message || 'Failed to fetch ratings');
-                                }
-                              } catch (error) {
-                                console.error('Error fetching ratings:', error);
-                                toast({
-                                  title: 'Error',
-                                  description: error.message || 'Failed to fetch Google Business ratings',
-                                  status: 'error',
-                                  duration: 5000,
-                                  isClosable: true
-                                });
-                              }
-                            }}
-                          >
-                            Fetch Ratings
-                          </Button>
-                        </Flex>
-                        <Text fontSize="xs" color="gray.500" mt={1}>
-                          Your Google Business rating will appear on your service listings
-                        </Text>
-                        {profileData.googleBusinessRating && (
-                          <Flex align="center" mt={2} bg="gray.50" p={2} borderRadius="md">
-                            <Image src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_74x24dp.png" h="20px" mr={2} alt="Google" />
-                            <Flex align="center" mr={2}>
-                              {Array(5).fill('').map((_, i) => (
-                                <StarIcon
-                                  key={i}
-                                  color={i < Math.floor(profileData.googleBusinessRating) ? 'yellow.400' : 'gray.300'}
-                                  mr={0.5}
-                                  boxSize={3}
-                                />
-                              ))}
-                            </Flex>
-                            <Text fontWeight="medium" fontSize="sm">{profileData.googleBusinessRating}</Text>
-                            {profileData.googleBusinessReviews && (
-                              <Text fontSize="xs" ml={1} color="gray.600">({profileData.googleBusinessReviews} reviews)</Text>
-                            )}
-                          </Flex>
-                        )}
-                      </FormControl>
-                      
                       <FormControl gridColumn={{ md: "span 2" }}>
-                        <FormLabel>Description</FormLabel>
-                        <Textarea 
+                        <FormLabel>Company Description</FormLabel>
+                        <Textarea
                           name="description"
                           value={profileData.description}
                           onChange={handleProfileChange}
+                          placeholder="Describe your services and experience"
                           rows={4}
                         />
                       </FormControl>
                       
                       <FormControl>
-                        <FormLabel>Logo/Avatar</FormLabel>
-                        <Box borderWidth="1px" borderRadius="md" p={2} width="fit-content">
-                          <Button size="sm">Upload Image</Button>
-                        </Box>
-                      </FormControl>
-                      
-                      <FormControl>
-                        <FormLabel>Social Links (Optional)</FormLabel>
+                        <FormLabel>Instagram</FormLabel>
                         <Input 
                           name="instagramUrl"
                           value={profileData.socialLinks?.instagram || ""}
@@ -1795,8 +1703,11 @@ export default function ProviderCabinetPage() {
                             }));
                           }}
                           placeholder="Instagram URL" 
-                          mb={2} 
                         />
+                      </FormControl>
+                      
+                      <FormControl>
+                        <FormLabel>Facebook</FormLabel>
                         <Input 
                           name="facebookUrl"
                           value={profileData.socialLinks?.facebook || ""}
@@ -2224,53 +2135,79 @@ export default function ProviderCabinetPage() {
             </CardBody>
           </Card>
           
-          {/* Business Information Card */}
+          {/* Service Stats Card */}
           <Card>
-            <CardHeader bg="blue.50" _dark={{ bg: "blue.900" }}>
+            <CardHeader bg="purple.50" _dark={{ bg: "purple.900" }}>
               <HStack>
-                <Icon as={FaBuilding} boxSize="6" color="blue.500" />
-                <Heading size="md">Business Information</Heading>
+                <Icon as={FaPlus} boxSize="6" color="purple.500" />
+                <Heading size="md">Services</Heading>
               </HStack>
             </CardHeader>
             <CardBody>
-              <Text mb={4}>Complete your business details including Tax ID (EIN) to receive payments</Text>
+              <Text mb={4}>Create and manage your service offerings</Text>
               
-              <HStack spacing={2} mb={4}>
-                <Badge colorScheme={businessVerified ? "green" : "yellow"}>
-                  {businessVerified ? "Verified" : "Verification Needed"}
-                </Badge>
-                {hasEIN && <Badge colorScheme="blue">EIN Provided</Badge>}
-              </HStack>
+              <SimpleGrid columns={2} spacing={4} mb={4}>
+                <Box textAlign="center" p={3} borderWidth="1px" borderRadius="md">
+                  <Heading size="md">{serviceCount}</Heading>
+                  <Text fontSize="sm">Active Services</Text>
+                </Box>
+                <Box textAlign="center" p={3} borderWidth="1px" borderRadius="md">
+                  <Heading size="md">{services.length - serviceCount}</Heading>
+                  <Text fontSize="sm">Inactive</Text>
+                </Box>
+              </SimpleGrid>
               
               <Button 
-                as={NextLink}
-                href="/provider/cabinet/business"
-                colorScheme="blue" 
-                leftIcon={<FaIdCard />}
-                size="sm"
-                width="full"
+                colorScheme="purple" 
+                leftIcon={<FaPlus />}
+                onClick={() => {
+                  setCurrentService({
+                    id: null,
+                    name: '',
+                    categoryId: '',
+                    price: '',
+                    description: '',
+                    availability: [],
+                    isActive: true,
+                    image: null
+                  });
+                  setIsEditing(true);
+                  window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                  });
+                }}
               >
-                Manage Business Info
+                Create New Service
               </Button>
             </CardBody>
           </Card>
-          
-          {/* Services Card */}
+
+          {/* Stripe Connect Card */}
           <Card>
-            <CardHeader>
-              <Heading size="md">Your Services</Heading>
+            <CardHeader bg="green.50" _dark={{ bg: "green.900" }}>
+              <HStack>
+                <Icon as={FaMoneyBillWave} boxSize="6" color="green.500" />
+                <Heading size="md">Payments</Heading>
+              </HStack>
             </CardHeader>
             <CardBody>
-              <Text mb={4}>You have {serviceCount} active services</Text>
+              <Text mb={4}>Connect with Stripe to receive payments from clients</Text>
+              
+              <HStack spacing={2} mb={4}>
+                <Badge colorScheme={stripeConnected ? "green" : "red"}>
+                  {stripeConnected ? "Connected" : "Not Connected"}
+                </Badge>
+                {stripeConnected && <Badge colorScheme="green">Ready to Receive Payments</Badge>}
+              </HStack>
               
               <Button 
                 as={NextLink}
-                href="/provider/services" 
-                colorScheme="blue" 
-                size="sm"
-                width="full"
+                href="/provider/settings/payments"
+                colorScheme="green" 
+                leftIcon={<FaMoneyBillWave />}
               >
-                Manage Services
+                {stripeConnected ? "Manage Stripe Account" : "Connect Stripe Account"}
               </Button>
             </CardBody>
           </Card>

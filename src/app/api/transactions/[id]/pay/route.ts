@@ -159,11 +159,12 @@ export async function POST(
       await prisma.transaction.update({
         where: { id },
         data: {
+          status: 'PROVIDER_REVIEW',
           paymentIntentId,
           reviewDeadline
         }
       });
-      console.log(`Transaction ${id} updated with payment intent ${paymentIntentId}`);
+      console.log(`Transaction ${id} updated with payment intent ${paymentIntentId} and status changed to PROVIDER_REVIEW`);
 
     return NextResponse.json({
       success: true,

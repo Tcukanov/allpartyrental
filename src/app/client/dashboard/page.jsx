@@ -74,13 +74,13 @@ export default function ClientDashboardPage() {
         const activePartiesResponse = await fetch('/api/client/parties?status=active');
         if (!activePartiesResponse.ok) throw new Error('Failed to fetch active parties');
         const activePartiesData = await activePartiesResponse.json();
-        setActiveParties(activePartiesData);
+        setActiveParties(activePartiesData.data || []);
         
         // Fetch past parties
         const pastPartiesResponse = await fetch('/api/client/parties?status=completed');
         if (!pastPartiesResponse.ok) throw new Error('Failed to fetch past parties');
         const pastPartiesData = await pastPartiesResponse.json();
-        setPastParties(pastPartiesData);
+        setPastParties(pastPartiesData.data || []);
         
         // Fetch statistics
         const statisticsResponse = await fetch('/api/client/statistics');
@@ -153,13 +153,13 @@ export default function ClientDashboardPage() {
         <Heading as="h1" size="xl">Client Dashboard</Heading>
         
         <SimpleGrid columns={{ base: 1, md: 2, lg: 2 }} spacing={6}>
-          <Card cursor="pointer" onClick={() => router.push('/client/my-party')}>
+          <Card cursor="pointer" onClick={() => router.push('/client/my-bookings')}>
             <CardBody>
               <VStack spacing={4} align="center">
                 <Icon as={CalendarIcon} w={8} h={8} color="brand.500" />
-                <Text fontWeight="bold">My Parties</Text>
+                <Text fontWeight="bold">My Bookings</Text>
                 <Text fontSize="sm" color="gray.600" textAlign="center">
-                  View and manage your parties
+                  View and manage your service bookings
                 </Text>
               </VStack>
             </CardBody>
@@ -171,7 +171,7 @@ export default function ClientDashboardPage() {
                 <Icon as={CheckCircleIcon} w={8} h={8} color="green.500" />
                 <Text fontWeight="bold">My Transactions</Text>
                 <Text fontSize="sm" color="gray.600" textAlign="center">
-                  View your booked services
+                  View your payment history
                 </Text>
               </VStack>
             </CardBody>
@@ -200,15 +200,15 @@ export default function ClientDashboardPage() {
                 <Icon as={MdEvent} w={12} h={12} color="gray.300" />
                 <Text fontSize="lg" fontWeight="medium">No Recent Activity</Text>
                 <Text color="gray.600">
-                  You haven't created any parties or events yet.
+                  You haven't made any service bookings yet.
                 </Text>
                 <Button
                   mt={4}
                   colorScheme="brand"
                   leftIcon={<AddIcon />}
-                  onClick={() => router.push('/client/new-party')}
+                  onClick={() => router.push('/services')}
                 >
-                  Create Your First Party
+                  Browse Services
                 </Button>
               </VStack>
             </Card>
@@ -219,7 +219,7 @@ export default function ClientDashboardPage() {
                   <CardHeader>
                     <HStack>
                       <Icon as={MdCelebration} color="purple.500" />
-                      <Text fontWeight="bold">Upcoming Parties</Text>
+                      <Text fontWeight="bold">Upcoming Bookings</Text>
                     </HStack>
                   </CardHeader>
                   <CardBody>
@@ -229,7 +229,8 @@ export default function ClientDashboardPage() {
                           <HStack justify="space-between" mb={2}>
                             <Heading as="h4" size="sm">{party.name}</Heading>
                             <Badge colorScheme={getStatusColor(party.status)}>
-                              {party.status}
+                              {party.status === 'DRAFT' ? 'PENDING' : 
+                               party.status === 'PUBLISHED' ? 'CONFIRMED' : party.status}
                             </Badge>
                           </HStack>
                           <Text fontSize="sm" mb={2}>{formatDate(party.date)}</Text>
@@ -239,7 +240,7 @@ export default function ClientDashboardPage() {
                             </Text>
                             <Button
                               as={Link}
-                              href={`/client/my-party?id=${party.id}`}
+                              href={`/client/my-bookings?id=${party.id}`}
                               size="xs"
                               colorScheme="brand"
                             >
@@ -252,12 +253,12 @@ export default function ClientDashboardPage() {
                       {activeParties.length > 3 && (
                         <Button
                           as={Link}
-                          href="/client/my-party"
+                          href="/client/my-bookings"
                           variant="link"
                           colorScheme="brand"
                           alignSelf="center"
                         >
-                          View All Parties
+                          View All Bookings
                         </Button>
                       )}
                     </VStack>
@@ -308,7 +309,7 @@ export default function ClientDashboardPage() {
                   <CardHeader>
                     <HStack>
                       <Icon as={MdHistory} color="gray.500" />
-                      <Text fontWeight="bold">Past Parties</Text>
+                      <Text fontWeight="bold">Past Bookings</Text>
                     </HStack>
                   </CardHeader>
                   <CardBody>
@@ -326,7 +327,7 @@ export default function ClientDashboardPage() {
                             </Text>
                             <Button
                               as={Link}
-                              href={`/client/my-party?id=${party.id}`}
+                              href={`/client/my-bookings?id=${party.id}`}
                               size="xs"
                               colorScheme="brand"
                             >
@@ -339,12 +340,12 @@ export default function ClientDashboardPage() {
                       {pastParties.length > 3 && (
                         <Button
                           as={Link}
-                          href="/client/my-party"
+                          href="/client/my-bookings"
                           variant="link"
                           colorScheme="brand"
                           alignSelf="center"
                         >
-                          View All Parties
+                          View All Bookings
                         </Button>
                       )}
                     </VStack>
@@ -361,7 +362,7 @@ export default function ClientDashboardPage() {
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
             <Button
               as={Link}
-              href="/client/new-party"
+              href="/services"
               height="auto"
               p={6}
               colorScheme="brand"
@@ -369,38 +370,23 @@ export default function ClientDashboardPage() {
               leftIcon={<AddIcon boxSize={5} />}
             >
               <VStack spacing={2} textAlign="center">
-                <Text fontWeight="bold">Create New Party</Text>
-                <Text fontSize="sm">Plan your next celebration</Text>
+                <Text fontWeight="bold">Browse Services</Text>
+                <Text fontSize="sm">Find services for your next event</Text>
               </VStack>
             </Button>
             
             <Button
               as={Link}
-              href="/services"
+              href="/client/profile"
               height="auto"
               p={6}
               colorScheme="blue"
               variant="outline"
-              leftIcon={<StarIcon boxSize={5} />}
+              leftIcon={<SettingsIcon boxSize={5} />}
             >
               <VStack spacing={2} textAlign="center">
-                <Text fontWeight="bold">Browse Services</Text>
-                <Text fontSize="sm">Find vendors for your event</Text>
-              </VStack>
-            </Button>
-            
-            <Button
-              as={Link}
-              href="/client/calendar/add"
-              height="auto"
-              p={6}
-              colorScheme="purple"
-              variant="outline"
-              leftIcon={<CalendarIcon boxSize={5} />}
-            >
-              <VStack spacing={2} textAlign="center">
-                <Text fontWeight="bold">Add to Calendar</Text>
-                <Text fontSize="sm">Remember important dates</Text>
+                <Text fontWeight="bold">My Profile</Text>
+                <Text fontSize="sm">View and edit your profile</Text>
               </VStack>
             </Button>
           </SimpleGrid>

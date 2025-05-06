@@ -65,48 +65,74 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Create the transaction directly
+    // Create the debug transaction and related entities step by step
+    
+    // 1. Create the Party first
+    const party = await prisma.party.create({
+      data: {
+        name: "Test booking",
+        date: bookingDate ? new Date(bookingDate) : new Date(),
+        startTime: "12:00",
+        duration: duration,
+        guestCount: 2,
+        status: "DRAFT", // Valid PartyStatus enum value
+        clientId: userId,
+        cityId: service.cityId || "default-city-id", // Provide a fallback
+      }
+    });
+    
+    console.log(`Created party: ${party.id}`);
+    
+    // 2. Create the PartyService
+    const partyService = await prisma.partyService.create({
+      data: {
+        partyId: party.id,
+        serviceId: service.id,
+        specificOptions: {}
+      }
+    });
+    
+    console.log(`Created party service: ${partyService.id}`);
+    
+    // 3. Create the Offer
+    const offer = await prisma.offer.create({
+      data: {
+        clientId: userId,
+        providerId: service.providerId,
+        serviceId: service.id,
+        partyServiceId: partyService.id,
+        price: new Prisma.Decimal(service.price),
+        description: comments || "Debug booking request",
+        photos: [],
+        status: "PENDING" // Valid OfferStatus enum value
+      }
+    });
+    
+    console.log(`Created offer: ${offer.id}`);
+    
+    // 4. Finally create the Transaction
     const transaction = await prisma.transaction.create({
       data: {
         amount: new Prisma.Decimal(service.price),
-        status: 'PENDING',
+        status: "PENDING", // Valid TransactionStatus enum value
         clientFeePercent: 5.0,
         providerFeePercent: 10.0,
-        party: {
-          create: {
-            name: "Test booking",
-            date: bookingDate ? new Date(bookingDate) : new Date(),
-            startTime: "12:00",
-            duration: duration,
-            guestCount: 2,
-            status: "PENDING",
-            clientId: userId,
-            cityId: service.cityId || null,
-            address: "Test Address",
-            notes: comments || "Debug booking"
-          }
-        },
-        offer: {
-          create: {
-            clientId: userId,
-            providerId: service.providerId,
-            serviceId: service.id,
-            price: new Prisma.Decimal(service.price),
-            description: comments || "Debug booking request",
-            photos: [],
-            status: "PENDING"
-          }
-        }
+        partyId: party.id,
+        offerId: offer.id
       }
     });
     
     console.log(`Created debug transaction: ${transaction.id}`);
     
+    // Return all the created entities
     return NextResponse.json({
       success: true,
       message: "Debug transaction created successfully",
       data: {
-        transaction
+        transaction,
+        offer,
+        party,
+        partyService
       }
     });
   } catch (error) {

@@ -347,7 +347,7 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
             addons: bookingDetails?.addons || [] // Include selected add-ons
           }),
         });
-        
+      
         let errorData;
       
         // Handle authentication errors

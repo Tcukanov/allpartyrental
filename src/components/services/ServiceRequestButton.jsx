@@ -301,7 +301,7 @@ const ServiceRequestButton = ({ service, offer }) => {
                 {!stripePromise ? (
                   <Alert status="error" mb={4}>
                     <AlertIcon />
-                    <Box>
+              <Box>
                       <AlertTitle>Stripe configuration error</AlertTitle>
                       <AlertDescription>
                         Payment processing is not available at the moment. Please try again later.
@@ -309,15 +309,15 @@ const ServiceRequestButton = ({ service, offer }) => {
                     </Box>
                   </Alert>
                 ) : (
-                  <Elements stripe={stripePromise}>
-                    <ServiceRequestPayment 
-                      service={service} 
-                      offer={offer}
+                <Elements stripe={stripePromise}>
+                  <ServiceRequestPayment 
+                    service={service} 
+                    offer={offer}
                       bookingDetails={bookingDetails} 
-                      onPaymentComplete={handlePaymentComplete}
+                    onPaymentComplete={handlePaymentComplete}
                       onCancel={handleBack}
-                    />
-                  </Elements>
+                  />
+                </Elements>
                 )}
               </Box>
             )}

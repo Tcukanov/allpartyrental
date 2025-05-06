@@ -40,7 +40,6 @@ const TransactionStatusBadge = ({ status }) => {
     'PENDING': { color: 'gray', label: 'Pending' },
     'PROVIDER_REVIEW': { color: 'yellow', label: 'Awaiting Provider Review' },
     'DECLINED': { color: 'red', label: 'Declined' },
-    'ESCROW': { color: 'blue', label: 'In Escrow' },
     'COMPLETED': { color: 'green', label: 'Completed' },
     'REFUNDED': { color: 'purple', label: 'Refunded' },
     'CANCELLED': { color: 'orange', label: 'Cancelled' }
@@ -183,11 +182,11 @@ export default function ClientTransactionsPage() {
   );
   
   const activeTransactions = filteredTransactions.filter(
-    tx => tx.status === 'ESCROW'
+    tx => tx.status === 'COMPLETED' && tx.escrowEndTime && new Date(tx.escrowEndTime) > new Date()
   );
   
   const completedTransactions = filteredTransactions.filter(
-    tx => tx.status === 'COMPLETED'
+    tx => tx.status === 'COMPLETED' && (!tx.escrowEndTime || new Date(tx.escrowEndTime) <= new Date())
   );
   
   const cancelledTransactions = filteredTransactions.filter(

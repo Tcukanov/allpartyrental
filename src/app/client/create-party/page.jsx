@@ -1227,7 +1227,7 @@ export default function PartyConfiguratorPage() {
           isClosable: true,
         });
         
-        router.push(`/client/my-party?id=${data.data.id}`);
+        router.push(`/client/my-bookings?id=${data.data.id}`);
       } else {
         // No photos, use JSON submission
         // Prepare party data
@@ -1275,7 +1275,7 @@ export default function PartyConfiguratorPage() {
           isClosable: true,
         });
 
-        router.push(`/client/my-party?id=${data.data.id}`);
+        router.push(`/client/my-bookings?id=${data.data.id}`);
       }
     } catch (error) {
       console.error('Error creating party:', error);

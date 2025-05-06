@@ -40,7 +40,6 @@ const TransactionStatusBadge = ({ status }) => {
     'PENDING': { color: 'gray', label: 'Pending' },
     'PROVIDER_REVIEW': { color: 'yellow', label: 'Action Required' },
     'DECLINED': { color: 'red', label: 'Declined' },
-    'ESCROW': { color: 'blue', label: 'In Escrow' },
     'COMPLETED': { color: 'green', label: 'Completed' },
     'REFUNDED': { color: 'purple', label: 'Refunded' },
     'CANCELLED': { color: 'orange', label: 'Cancelled' }
@@ -110,11 +109,11 @@ export default function ProviderTransactionsPage() {
   );
   
   const activeTransactions = transactions.filter(
-    tx => tx.status === 'ESCROW'
+    tx => tx.status === 'COMPLETED' && tx.escrowEndTime && new Date(tx.escrowEndTime) > new Date()
   );
   
   const completedTransactions = transactions.filter(
-    tx => tx.status === 'COMPLETED'
+    tx => tx.status === 'COMPLETED' && (!tx.escrowEndTime || new Date(tx.escrowEndTime) <= new Date())
   );
   
   const cancelledTransactions = transactions.filter(
@@ -169,7 +168,7 @@ export default function ProviderTransactionsPage() {
           tx.id === selectedTransaction.id
             ? { 
                 ...tx, 
-                status: actionType === 'approve' ? 'ESCROW' : 'DECLINED' 
+                status: actionType === 'approve' ? 'COMPLETED' : 'DECLINED' 
               }
             : tx
         )
@@ -178,7 +177,7 @@ export default function ProviderTransactionsPage() {
       toast({
         title: actionType === 'approve' ? 'Request Approved' : 'Request Declined',
         description: actionType === 'approve' 
-          ? 'Payment has been processed and placed in escrow.' 
+          ? 'Transaction is now complete. Payment will be released after 24 hours.' 
           : 'The client has been notified and will receive a refund.',
         status: 'success',
         duration: 5000,

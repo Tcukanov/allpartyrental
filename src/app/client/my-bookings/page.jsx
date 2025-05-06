@@ -21,9 +21,9 @@ import {
   useToast,
   Image
 } from '@chakra-ui/react';
-import { CalendarIcon, CheckCircleIcon, ChatIcon } from '@chakra-ui/icons';
+import { CalendarIcon, CheckCircleIcon, ChatIcon, ArrowBackIcon } from '@chakra-ui/icons';
 import { FaCalendarAlt, FaUser, FaMoneyBillWave, FaMapMarkerAlt } from 'react-icons/fa';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
 import { MdHistory } from 'react-icons/md';
@@ -33,6 +33,7 @@ import { TimeIcon } from '@chakra-ui/icons';
 export default function MyBookingsPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +41,52 @@ export default function MyBookingsPage() {
   const [error, setError] = useState(null);
   const [completedParties, setCompletedParties] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [selectedParty, setSelectedParty] = useState(null);
+  
+  // Get booking ID from query params
+  const bookingId = searchParams.get('id');
+  
+  // Fetch a specific booking if ID is provided in URL
+  useEffect(() => {
+    const fetchSelectedBooking = async () => {
+      if (!bookingId || sessionStatus !== 'authenticated') return;
+      
+      try {
+        setIsLoading(true);
+        
+        console.log('Fetching booking with ID:', bookingId);
+        const response = await fetch(`/api/parties/${bookingId}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to fetch booking:', response.status, errorText);
+          throw new Error(`Failed to fetch booking: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          console.log('Fetched booking data:', data.data);
+          setSelectedParty(data.data);
+        } else {
+          throw new Error(data.error?.message || 'Failed to fetch booking details');
+        }
+      } catch (error) {
+        console.error('Fetch booking error:', error);
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to load booking details',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchSelectedBooking();
+  }, [bookingId, sessionStatus, toast]);
   
   useEffect(() => {
     const fetchApprovedServices = async () => {
@@ -218,11 +265,11 @@ export default function MyBookingsPage() {
   
   const handleViewParty = (partyId) => {
     if (partyId) {
-      router.push(`/client/my-party?id=${partyId}`);
+      router.push(`/client/my-bookings?id=${partyId}`);
     } else {
       toast({
-        title: 'Party Not Found',
-        description: 'Cannot find party details.',
+        title: 'Booking Not Found',
+        description: 'Cannot find booking details.',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -237,6 +284,12 @@ export default function MyBookingsPage() {
     } catch (error) {
       return dateString;
     }
+  };
+  
+  // Handle back button from specific booking view
+  const handleBackToBookings = () => {
+    setSelectedParty(null);
+    router.push('/client/my-bookings');
   };
   
   if (sessionStatus === 'loading' || isLoading) {
@@ -254,109 +307,281 @@ export default function MyBookingsPage() {
     return null;
   }
   
-  return (
-    <Container maxW="container.xl" py={8}>
-      <VStack spacing={8} align="stretch">
-        <Box>
-          <Heading as="h1" size="xl">My Bookings</Heading>
-          <Text color="gray.600" mt={2}>
-            View all services that have been booked for your parties
-          </Text>
-        </Box>
-        
-        {error && (
-          <Box p={4} bg="red.50" color="red.500" borderRadius="md">
-            <Text>{error}</Text>
-          </Box>
-        )}
-        
-        {approvedServices.length === 0 ? (
+  // Show single booking details when ID is provided
+  if (selectedParty) {
+    return (
+      <Container maxW="container.xl" py={8}>
+        <VStack spacing={6} align="stretch">
+          <Flex align="center">
+            <Button 
+              leftIcon={<ArrowBackIcon />} 
+              variant="ghost" 
+              onClick={handleBackToBookings}
+              mr={4}
+            >
+              Back to Bookings
+            </Button>
+            <Heading as="h1" size="xl">{selectedParty.name}</Heading>
+          </Flex>
+          
           <Card>
             <CardBody>
-              <VStack spacing={4} py={10} align="center">
-                <Icon as={CheckCircleIcon} boxSize={12} color="gray.300" />
-                <Heading as="h3" size="md">No Bookings</Heading>
-                <Text color="gray.500" textAlign="center">
-                  You don't have any booked services yet. Create a party and request services to get started.
-                </Text>
+              <VStack spacing={6} align="stretch">
+                <Flex justify="space-between" align="center">
+                  <HStack>
+                    <Icon as={CalendarIcon} color="brand.500" />
+                    <Text fontWeight="bold">Event Details</Text>
+                  </HStack>
+                  <Badge colorScheme={
+                    selectedParty.status === 'COMPLETED' ? 'green' : 
+                    selectedParty.status === 'IN_PROGRESS' ? 'orange' : 
+                    selectedParty.status === 'CANCELLED' ? 'red' : 
+                    selectedParty.status === 'DRAFT' ? 'gray' : 'blue'
+                  }>
+                    {selectedParty.status === 'DRAFT' ? 'PENDING' : 
+                     selectedParty.status === 'PUBLISHED' ? 'CONFIRMED' : selectedParty.status}
+                  </Badge>
+                </Flex>
+                
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  <Box>
+                    <Text color="gray.600">Date</Text>
+                    <Text fontWeight="medium">{formatPartyDate(selectedParty.date)}</Text>
+                  </Box>
+                  <Box>
+                    <Text color="gray.600">Time</Text>
+                    <Text fontWeight="medium">{selectedParty.startTime || 'Not specified'}</Text>
+                  </Box>
+                  <Box>
+                    <Text color="gray.600">Location</Text>
+                    <Text fontWeight="medium">{selectedParty.city?.name || 'Not specified'}</Text>
+                  </Box>
+                  <Box>
+                    <Text color="gray.600">Guest Count</Text>
+                    <Text fontWeight="medium">{selectedParty.guestCount || 'Not specified'}</Text>
+                  </Box>
+                </SimpleGrid>
+                
+                {selectedParty.description && (
+                  <Box>
+                    <Text color="gray.600">Description</Text>
+                    <Text>{selectedParty.description}</Text>
+                  </Box>
+                )}
+                
+                <Divider />
+                
+                <Box>
+                  <Text fontWeight="bold" mb={4}>Booked Services</Text>
+                  {selectedParty.partyServices && selectedParty.partyServices.length > 0 ? (
+                    <VStack spacing={4} align="stretch">
+                      {selectedParty.partyServices.map(service => {
+                        // Find approved offers for this service
+                        const approvedOffer = service.offers?.find(offer => offer.status === 'APPROVED');
+                        
+                        return (
+                          <Card key={service.id} variant="outline">
+                            <CardBody>
+                              <VStack align="stretch" spacing={3}>
+                                <Flex justify="space-between" align="center">
+                                  <HStack>
+                                    <Text fontWeight="bold">{service.service.name}</Text>
+                                    <Badge colorScheme={
+                                      service.status === 'COMPLETED' ? 'green' : 
+                                      service.status === 'IN_PROGRESS' ? 'orange' : 
+                                      service.status === 'CANCELLED' ? 'red' : 'blue'
+                                    }>
+                                      {service.status}
+                                    </Badge>
+                                  </HStack>
+                                  {approvedOffer && (
+                                    <Text fontWeight="medium" color="green.500">
+                                      ${Number(approvedOffer.price).toFixed(2)}
+                                    </Text>
+                                  )}
+                                </Flex>
+                                
+                                <Text fontSize="sm">
+                                  {service.service.description || 'No description available'}
+                                </Text>
+                                
+                                {approvedOffer && approvedOffer.provider && (
+                                  <HStack>
+                                    <Icon as={FaUser} color="brand.500" />
+                                    <Text fontSize="sm">
+                                      Provider: {approvedOffer.provider.name}
+                                    </Text>
+                                    
+                                    <Button 
+                                      size="xs" 
+                                      leftIcon={<ChatIcon />}
+                                      ml={4}
+                                      onClick={() => handleOpenChat(approvedOffer.chat?.id, approvedOffer.id)}
+                                    >
+                                      Contact
+                                    </Button>
+                                  </HStack>
+                                )}
+                              </VStack>
+                            </CardBody>
+                          </Card>
+                        );
+                      })}
+                    </VStack>
+                  ) : (
+                    <Box p={4} bg="gray.50" borderRadius="md" textAlign="center">
+                      <Text>No services have been booked for this event yet.</Text>
+                    </Box>
+                  )}
+                </Box>
+                
+                <Divider />
+                
+                <Flex justify="space-between">
+                  <Button variant="outline" onClick={handleBackToBookings}>
+                    Back to All Bookings
+                  </Button>
+                  <Button 
+                    colorScheme="brand" 
+                    onClick={() => router.push(`/services`)}
+                  >
+                    Browse More Services
+                  </Button>
+                </Flex>
               </VStack>
             </CardBody>
           </Card>
+        </VStack>
+      </Container>
+    );
+  }
+  
+  return (
+    <Container maxW="container.xl" py={8}>
+      <VStack spacing={6} align="stretch">
+        <Flex justify="space-between" align="center">
+          <Heading as="h1" size="xl">My Bookings</Heading>
+          <Button 
+            colorScheme="brand" 
+            size="md" 
+            leftIcon={<FaCalendarAlt />}
+            onClick={() => router.push('/services')}
+          >
+            Browse Services
+          </Button>
+        </Flex>
+        
+        {error && (
+          <Box p={4} bg="red.50" color="red.500" borderRadius="md">
+            {error}
+          </Box>
+        )}
+        
+        {!error && approvedServices.length === 0 ? (
+          <Card p={8} textAlign="center">
+            <VStack spacing={4}>
+              <Icon as={FaCalendarAlt} w={12} h={12} color="gray.300" />
+              <Heading size="md">No Bookings Yet</Heading>
+              <Text color="gray.600">
+                You haven't made any service bookings yet. Browse our services to get started.
+              </Text>
+              <Button
+                mt={4}
+                colorScheme="brand"
+                leftIcon={<FaCalendarAlt />}
+                onClick={() => router.push('/services')}
+              >
+                Browse Services
+              </Button>
+            </VStack>
+          </Card>
         ) : (
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-            {approvedServices.map((item) => (
-              <Card key={item.id} boxShadow="md" position="relative" overflow="hidden">
-                <Box position="absolute" top={0} right={0} p={2}>
-                  <Badge colorScheme="green" fontSize="sm" px={2} py={1} borderRadius="full">
-                    <HStack spacing={1}>
-                      <CheckCircleIcon />
-                      <Text>Booked</Text>
-                    </HStack>
-                  </Badge>
-                </Box>
-                
-                {item.servicePhoto && (
-                  <Image 
-                    src={item.servicePhoto} 
-                    alt={item.serviceName}
-                    height="150px"
-                    objectFit="cover"
-                  />
-                )}
-                
+          <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
+            {approvedServices.map(service => (
+              <Card key={service.id} borderWidth="1px" boxShadow="sm">
                 <CardBody>
                   <VStack spacing={4} align="stretch">
-                    <Heading as="h3" size="md">{item.serviceName}</Heading>
-                    
-                    <HStack spacing={4}>
-                      <Avatar 
-                        size="sm" 
-                        name={item.provider.name} 
-                        src={item.provider.profile?.avatar} 
-                      />
-                      <Text fontWeight="medium">{item.provider.name}</Text>
-                    </HStack>
+                    <Flex justify="space-between" align="center">
+                      <HStack spacing={4}>
+                        {service.servicePhoto ? (
+                          <Image
+                            src={service.servicePhoto}
+                            alt={service.serviceName}
+                            boxSize="60px"
+                            objectFit="cover"
+                            borderRadius="md"
+                            fallback={
+                              <Box boxSize="60px" bg="gray.200" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
+                                <Icon as={FaCalendarAlt} color="gray.400" />
+                              </Box>
+                            }
+                          />
+                        ) : (
+                          <Box boxSize="60px" bg="gray.200" borderRadius="md" display="flex" alignItems="center" justifyContent="center">
+                            <Icon as={FaCalendarAlt} color="gray.400" />
+                          </Box>
+                        )}
+                        <VStack align="start" spacing={0}>
+                          <Heading size="sm">{service.serviceName}</Heading>
+                          <Text fontSize="xs" color="gray.500">Booking ID: {service.id.substring(0, 8)}</Text>
+                        </VStack>
+                      </HStack>
+                      <Badge colorScheme={
+                        service.status === 'COMPLETED' ? 'green' : 
+                        service.status === 'IN_PROGRESS' ? 'orange' : 
+                        service.status === 'CANCELLED' ? 'red' : 'blue'
+                      }>
+                        {service.status}
+                      </Badge>
+                    </Flex>
                     
                     <Box>
-                      <HStack spacing={2} mb={1}>
-                        <Icon as={FaMoneyBillWave} color="green.500" />
-                        <Text fontWeight="bold">${Number(item.price).toFixed(2)}</Text>
-                      </HStack>
-                      
-                      <HStack spacing={2} mb={1}>
-                        <Icon as={FaCalendarAlt} color="blue.500" />
-                        <Text>{format(new Date(item.partyDate), 'MMMM d, yyyy')}</Text>
-                      </HStack>
-                      
-                      <HStack spacing={2}>
-                        <Icon as={FaMapMarkerAlt} color="red.500" />
-                        <Text>{item.partyLocation}</Text>
-                      </HStack>
+                      <Text fontSize="sm" noOfLines={2} color="gray.600">
+                        {service.serviceDescription || "No description available"}
+                      </Text>
                     </Box>
-                    
-                    <Text fontWeight="medium" fontSize="sm" color="gray.700">
-                      For party: {item.partyName}
-                    </Text>
                     
                     <Divider />
                     
-                    <HStack spacing={3} justify="space-between">
+                    <VStack spacing={2} align="stretch">
+                      <HStack spacing={2}>
+                        <Icon as={FaCalendarAlt} color="brand.500" />
+                        <Text fontSize="sm">{formatPartyDate(service.partyDate)}</Text>
+                      </HStack>
+                      
+                      <HStack spacing={2}>
+                        <Icon as={FaMapMarkerAlt} color="brand.500" />
+                        <Text fontSize="sm">{service.partyLocation}</Text>
+                      </HStack>
+                      
+                      <HStack spacing={2}>
+                        <Icon as={FaUser} color="brand.500" />
+                        <Text fontSize="sm">{service.provider?.name || "Provider details unavailable"}</Text>
+                      </HStack>
+                      
+                      <HStack spacing={2}>
+                        <Icon as={FaMoneyBillWave} color="brand.500" />
+                        <Text fontSize="sm" fontWeight="bold">${Number(service.price).toFixed(2)}</Text>
+                      </HStack>
+                    </VStack>
+                    
+                    <Flex justify="space-between" mt={2}>
                       <Button 
                         size="sm" 
-                        leftIcon={<ChatIcon />} 
-                        onClick={() => handleOpenChat(item.chat?.id, item.id)}
+                        leftIcon={<ChatIcon />}
+                        onClick={() => handleOpenChat(service.chat?.id, service.id)}
                       >
-                        Message
+                        Contact Provider
                       </Button>
                       
                       <Button 
                         size="sm" 
                         colorScheme="brand" 
-                        onClick={() => handleViewParty(item.partyId)}
+                        onClick={() => handleViewParty(service.partyId)}
                       >
-                        View Party
+                        View Details
                       </Button>
-                    </HStack>
+                    </Flex>
                   </VStack>
                 </CardBody>
               </Card>
@@ -364,118 +589,94 @@ export default function MyBookingsPage() {
           </SimpleGrid>
         )}
         
-        {/* Party History Section */}
-        <Box mt={12}>
-          <Heading as="h2" size="lg" mb={4}>Party History</Heading>
-          <Text color="gray.600" mb={6}>
-            View your past events and completed parties
-          </Text>
+        {/* Booking History */}
+        <Box mt={8}>
+          <Heading as="h2" size="lg" mb={4}>
+            <Flex align="center">
+              <Icon as={MdHistory} mr={2} />
+              Booking History
+            </Flex>
+          </Heading>
           
           {loadingHistory ? (
             <Flex justify="center" py={8}>
-              <VStack spacing={4}>
-                <Spinner size="xl" color="brand.500" />
-                <Text>Loading your party history...</Text>
-              </VStack>
+              <Spinner size="lg" color="brand.500" />
             </Flex>
           ) : completedParties.length === 0 ? (
-            <Box p={8} textAlign="center" borderWidth="1px" borderRadius="lg">
-              <Heading size="md" mb={4}>No completed parties yet</Heading>
-              <Text mb={6}>You don't have any completed parties in your history.</Text>
-            </Box>
+            <Card p={6} bg="gray.50">
+              <Text textAlign="center" color="gray.600">No completed bookings found in your history.</Text>
+            </Card>
           ) : (
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-              {completedParties.map((party) => (
-                <Card key={party.id} borderWidth="1px">
-                  <CardBody>
-                    <VStack spacing={4} align="stretch">
-                      <Flex justify="space-between" align="center">
-                        <Heading size="md">{party.name}</Heading>
-                        <Badge colorScheme="green" px={2} py={1}>
-                          Completed
-                        </Badge>
+            <Accordion allowMultiple>
+              {completedParties.map(party => (
+                <AccordionItem key={party.id}>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      <Flex align="center">
+                        <Text fontWeight="bold">{party.name}</Text>
+                        <Text ml={4} color="gray.500">
+                          {formatPartyDate(party.date)}
+                        </Text>
                       </Flex>
-                      
-                      <HStack spacing={4}>
-                        <HStack>
-                          <Icon as={CalendarIcon} color="brand.500" />
-                          <Text>{formatPartyDate(party.date)}</Text>
-                        </HStack>
-                        <HStack>
-                          <Icon as={TimeIcon} color="brand.500" />
-                          <Text>{party.startTime} ({party.duration}h)</Text>
-                        </HStack>
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                  <AccordionPanel pb={4}>
+                    <VStack align="stretch" spacing={4}>
+                      <HStack>
+                        <Icon as={FaMapMarkerAlt} color="gray.500" />
+                        <Text>{party.city?.name || "Location not specified"}</Text>
                       </HStack>
                       
-                      <Divider />
+                      <HStack>
+                        <Icon as={TimeIcon} color="gray.500" />
+                        <Text>{party.startTime || "Time not specified"}</Text>
+                      </HStack>
                       
-                      <Accordion allowToggle>
-                        <AccordionItem border="none">
-                          <AccordionButton px={0}>
-                            <Box flex="1" textAlign="left" fontWeight="medium">
-                              Services & Providers
-                            </Box>
-                            <AccordionIcon />
-                          </AccordionButton>
-                          <AccordionPanel pb={4} px={0}>
-                            <VStack spacing={3} align="stretch">
-                              {party.partyServices && party.partyServices.map((service) => {
-                                // Find approved offer for this service
-                                const approvedOffer = service.offers && service.offers.find(
-                                  offer => offer.status === 'APPROVED'
-                                );
-                                
-                                return (
-                                  <Box 
-                                    key={service.id} 
-                                    p={3} 
-                                    borderWidth="1px" 
-                                    borderRadius="md"
-                                  >
-                                    <HStack justify="space-between" mb={2}>
-                                      <Text fontWeight="bold">
-                                        {service.service?.name || 'Service'}
-                                      </Text>
-                                      <Badge colorScheme="green">
-                                        <HStack spacing={1}>
-                                          <CheckCircleIcon />
-                                          <Text>Completed</Text>
-                                        </HStack>
-                                      </Badge>
-                                    </HStack>
-                                    
-                                    {approvedOffer && (
-                                      <HStack spacing={3} mt={2}>
-                                        <Avatar 
-                                          size="sm" 
-                                          src={approvedOffer.provider?.profile?.avatar} 
-                                          name={approvedOffer.provider?.name} 
-                                        />
-                                        <Text>{approvedOffer.provider?.name}</Text>
-                                      </HStack>
-                                    )}
-                                  </Box>
-                                );
-                              })}
-                            </VStack>
-                          </AccordionPanel>
-                        </AccordionItem>
-                      </Accordion>
+                      {party.description && (
+                        <Box>
+                          <Text fontWeight="bold">Description:</Text>
+                          <Text>{party.description}</Text>
+                        </Box>
+                      )}
                       
-                      <Divider />
+                      {party.partyServices && party.partyServices.length > 0 && (
+                        <Box>
+                          <Text fontWeight="bold" mb={2}>Services:</Text>
+                          <VStack align="stretch" spacing={2}>
+                            {party.partyServices.map(service => (
+                              <Card key={service.id} size="sm" variant="outline">
+                                <CardBody>
+                                  <Flex justify="space-between" align="center">
+                                    <Text>{service.service.name}</Text>
+                                    <Badge colorScheme={
+                                      service.status === 'COMPLETED' ? 'green' : 
+                                      service.status === 'IN_PROGRESS' ? 'orange' : 
+                                      service.status === 'CANCELLED' ? 'red' : 'blue'
+                                    }>
+                                      {service.status}
+                                    </Badge>
+                                  </Flex>
+                                </CardBody>
+                              </Card>
+                            ))}
+                          </VStack>
+                        </Box>
+                      )}
                       
                       <Button
-                        variant="outline"
+                        size="sm"
                         colorScheme="brand"
-                        onClick={() => router.push(`/client/my-party?id=${party.id}`)}
+                        variant="outline"
+                        onClick={() => handleViewParty(party.id)}
                       >
-                        View Details
+                        View Complete Details
                       </Button>
                     </VStack>
-                  </CardBody>
-                </Card>
+                  </AccordionPanel>
+                </AccordionItem>
               ))}
-            </SimpleGrid>
+            </Accordion>
           )}
         </Box>
       </VStack>

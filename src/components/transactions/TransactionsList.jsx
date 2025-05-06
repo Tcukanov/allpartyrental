@@ -30,7 +30,6 @@ const getStatusBadge = (status) => {
   const statusConfig = {
     'PENDING': { text: 'Pending', colorScheme: 'gray', icon: MdPending },
     'PROVIDER_REVIEW': { text: 'Pending Approval', colorScheme: 'yellow', icon: MdPending },
-    'ESCROW': { text: 'In Escrow', colorScheme: 'blue', icon: MdLock },
     'COMPLETED': { text: 'Completed', colorScheme: 'green', icon: MdCheckCircle },
     'REFUNDED': { text: 'Refunded', colorScheme: 'purple', icon: MdAccountBalance },
     'DECLINED': { text: 'Declined', colorScheme: 'red', icon: MdCancel },
@@ -123,9 +122,9 @@ const TransactionCard = ({ transaction, userRole }) => {
               </VStack>
             )}
             
-            {(escrowEndTime && transaction.status === 'ESCROW') && (
+            {(escrowEndTime && transaction.status === 'COMPLETED') && (
               <VStack align="start" spacing={1}>
-                <Text fontSize="sm" color="gray.500">Escrow Release</Text>
+                <Text fontSize="sm" color="gray.500">Payment Release</Text>
                 <Text>{getRelativeTimeString(escrowEndTime)}</Text>
               </VStack>
             )}
@@ -225,12 +224,12 @@ const TransactionsList = ({ userRole }) => {
   
   // Filter transactions that need attention
   const pendingTransactions = transactions.filter(
-    t => t.status === 'PROVIDER_REVIEW' || t.status === 'ESCROW'
+    t => t.status === 'PROVIDER_REVIEW' || t.status === 'PENDING'
   );
   
   // Other transactions
   const otherTransactions = transactions.filter(
-    t => t.status !== 'PROVIDER_REVIEW' && t.status !== 'ESCROW'
+    t => t.status !== 'PROVIDER_REVIEW' && t.status !== 'PENDING'
   );
   
   return (
