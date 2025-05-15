@@ -38,7 +38,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { AddIcon, EditIcon, DeleteIcon, CheckIcon, CloseIcon, ChatIcon, StarIcon } from '@chakra-ui/icons';
 import { useSession } from 'next-auth/react';
-import { FaComment, FaEye, FaBuilding, FaIdCard, FaPlus, FaTrash, FaMoneyBillWave } from 'react-icons/fa';
+import { FaComment, FaEye, FaBuilding, FaIdCard, FaPlus, FaTrash, FaMoneyBillWave, FaPaypal } from 'react-icons/fa';
 import { BsChatDots, BsFillGeoAltFill } from 'react-icons/bs';
 import NextLink from 'next/link';
 
@@ -2183,7 +2183,7 @@ export default function ProviderCabinetPage() {
             </CardBody>
           </Card>
 
-          {/* Stripe Connect Card */}
+          {/* PayPal Connect Card */}
           <Card>
             <CardHeader bg="green.50" _dark={{ bg: "green.900" }}>
               <HStack>
@@ -2192,7 +2192,7 @@ export default function ProviderCabinetPage() {
               </HStack>
             </CardHeader>
             <CardBody>
-              <Text mb={4}>Connect with Stripe to receive payments from clients</Text>
+              <Text mb={4}>Connect with PayPal to receive payments from clients</Text>
               
               <HStack spacing={2} mb={4}>
                 <Badge colorScheme={stripeConnected ? "green" : "red"}>
@@ -2204,10 +2204,10 @@ export default function ProviderCabinetPage() {
               <Button 
                 as={NextLink}
                 href="/provider/settings/payments"
-                colorScheme="green" 
-                leftIcon={<FaMoneyBillWave />}
+                colorScheme="blue" 
+                leftIcon={<FaPaypal />}
               >
-                {stripeConnected ? "Manage Stripe Account" : "Connect Stripe Account"}
+                {stripeConnected ? "Manage PayPal Account" : "Connect PayPal Account"}
               </Button>
             </CardBody>
           </Card>

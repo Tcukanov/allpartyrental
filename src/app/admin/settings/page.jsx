@@ -40,6 +40,7 @@ import {
   RadioGroup,
   Radio,
   useColorModeValue,
+  FormHelperText,
 } from '@chakra-ui/react';
 import { FiSave, FiCheckCircle, FiSettings, FiCreditCard, FiMail, FiGlobe, FiLock, FiClock, FiPercent } from 'react-icons/fi';
 
@@ -65,6 +66,13 @@ export default function AdminSettingsPage() {
       reviewPeriodHours: 0,
       clientFeePercent: 0,
       providerFeePercent: 0,
+      paypalMode: '',
+      paypalSandboxClientId: '',
+      paypalSandboxClientSecret: '',
+      paypalLiveClientId: '',
+      paypalLiveClientSecret: '',
+      paypalPartnerId: '',
+      activePaymentProvider: '',
     },
     notifications: {
       emailNotifications: false,
@@ -451,96 +459,183 @@ export default function AdminSettingsPage() {
                   </CardBody>
                 </Card>
                 
-                <Card bg={cardBg}>
-                  <CardHeader>
-                    <HStack>
-                      <Heading size="md">Stripe Configuration</Heading>
-                      <Badge colorScheme={settings.payments.stripeMode === 'live' ? 'green' : 'blue'}>
-                        {settings.payments.stripeMode === 'live' ? 'Live' : 'Test'} Mode
-                      </Badge>
-                    </HStack>
-                  </CardHeader>
-                  <CardBody>
-                    <Stack spacing={6}>
-                      <RadioGroup
-                        value={settings.payments.stripeMode}
-                        onChange={(value) => handleRadioChange('payments', 'stripeMode', value)}
-                      >
-                        <Stack direction="row" spacing={5}>
-                          <Radio value="test" colorScheme="blue">Test Mode</Radio>
-                          <Radio value="live" colorScheme="green">Live Mode</Radio>
-                        </Stack>
-                      </RadioGroup>
-                      
-                      <Accordion allowToggle>
-                        <AccordionItem>
-                          <h2>
-                            <AccordionButton>
-                              <Box flex="1" textAlign="left">
-                                Test Credentials
-                              </Box>
-                              <AccordionIcon />
-                            </AccordionButton>
-                          </h2>
-                          <AccordionPanel pb={4}>
-                            <Stack spacing={4}>
-                              <FormControl>
-                                <FormLabel>Stripe Test Public Key</FormLabel>
-                                <Input
-                                  name="stripeTestPublicKey"
-                                  value={settings.payments.stripeTestPublicKey}
-                                  onChange={handlePaymentsChange}
-                                />
-                              </FormControl>
-                              
-                              <FormControl>
-                                <FormLabel>Stripe Test Secret Key</FormLabel>
-                                <Input
-                                  name="stripeTestSecretKey"
-                                  value={settings.payments.stripeTestSecretKey}
-                                  onChange={handlePaymentsChange}
-                                  type="password"
-                                />
-                              </FormControl>
-                            </Stack>
-                          </AccordionPanel>
-                        </AccordionItem>
-                        
-                        <AccordionItem>
-                          <h2>
-                            <AccordionButton>
-                              <Box flex="1" textAlign="left">
-                                Live Credentials
-                              </Box>
-                              <AccordionIcon />
-                            </AccordionButton>
-                          </h2>
-                          <AccordionPanel pb={4}>
-                            <Stack spacing={4}>
-                              <FormControl>
-                                <FormLabel>Stripe Live Public Key</FormLabel>
-                                <Input
-                                  name="stripeLivePublicKey"
-                                  value={settings.payments.stripeLivePublicKey}
-                                  onChange={handlePaymentsChange}
-                                />
-                              </FormControl>
-                              
-                              <FormControl>
-                                <FormLabel>Stripe Live Secret Key</FormLabel>
-                                <Input
-                                  name="stripeLiveSecretKey"
-                                  value={settings.payments.stripeLiveSecretKey}
-                                  onChange={handlePaymentsChange}
-                                  type="password"
-                                />
-                              </FormControl>
-                            </Stack>
-                          </AccordionPanel>
-                        </AccordionItem>
-                      </Accordion>
+                {/* Payment Provider Selection */}
+                <Card p={4} mb={6}>
+                  <Heading size="md">Active Payment Provider</Heading>
+                  <Text mb={4} color="gray.600">
+                    Select which payment provider to use for processing payments
+                  </Text>
+                  <RadioGroup
+                    value={settings.payments.activePaymentProvider}
+                    onChange={(value) => handlePaymentsChange({ target: { name: 'activePaymentProvider', value } })}
+                  >
+                    <Stack direction="row" spacing={5}>
+                      <Radio value="stripe">Stripe Connect</Radio>
+                      <Radio value="paypal">PayPal for Marketplaces</Radio>
                     </Stack>
-                  </CardBody>
+                  </RadioGroup>
+                </Card>
+                
+                {/* Stripe Configuration Section */}
+                <Card p={4} mb={6}>
+                  <Heading size="md">Stripe Configuration</Heading>
+                  <Badge colorScheme={settings.payments.stripeMode === 'live' ? 'green' : 'blue'}>
+                    {settings.payments.stripeMode === 'live' ? 'Live' : 'Test'} Mode
+                  </Badge>
+                  
+                  <Box mt={4}>
+                    <Text mb={2}>API Mode</Text>
+                    <RadioGroup
+                      value={settings.payments.stripeMode}
+                      onChange={(value) => handleRadioChange('payments', 'stripeMode', value)}
+                    >
+                      <Stack direction="row" spacing={5}>
+                        <Radio value="test">Test Mode</Radio>
+                        <Radio value="live">Live Mode</Radio>
+                      </Stack>
+                    </RadioGroup>
+                  </Box>
+
+                  {/* Rest of Stripe configuration */}
+                  {settings.payments.stripeMode === 'test' && (
+                    <>
+                      <Box mt={4}>
+                        <Text mb={2}>Test Credentials</Text>
+                        <SimpleGrid columns={[1, 1, 2]} spacing={4}>
+                          <FormControl>
+                            <FormLabel>Stripe Test Public Key</FormLabel>
+                            <Input
+                              name="stripeTestPublicKey"
+                              value={settings.payments.stripeTestPublicKey}
+                              onChange={handlePaymentsChange}
+                            />
+                          </FormControl>
+                          <FormControl>
+                            <FormLabel>Stripe Test Secret Key</FormLabel>
+                            <Input
+                              name="stripeTestSecretKey"
+                              value={settings.payments.stripeTestSecretKey}
+                              onChange={handlePaymentsChange}
+                              type="password"
+                            />
+                          </FormControl>
+                        </SimpleGrid>
+                      </Box>
+                    </>
+                  )}
+
+                  {settings.payments.stripeMode === 'live' && (
+                    <>
+                      <Box mt={4}>
+                        <Text mb={2}>Live Credentials</Text>
+                        <SimpleGrid columns={[1, 1, 2]} spacing={4}>
+                          <FormControl>
+                            <FormLabel>Stripe Live Public Key</FormLabel>
+                            <Input
+                              name="stripeLivePublicKey"
+                              value={settings.payments.stripeLivePublicKey}
+                              onChange={handlePaymentsChange}
+                            />
+                          </FormControl>
+                          <FormControl>
+                            <FormLabel>Stripe Live Secret Key</FormLabel>
+                            <Input
+                              name="stripeLiveSecretKey"
+                              value={settings.payments.stripeLiveSecretKey}
+                              onChange={handlePaymentsChange}
+                              type="password"
+                            />
+                          </FormControl>
+                        </SimpleGrid>
+                      </Box>
+                    </>
+                  )}
+                </Card>
+                
+                {/* PayPal Configuration Section */}
+                <Card p={4} mb={6}>
+                  <Heading size="md">PayPal Configuration</Heading>
+                  <Badge colorScheme={settings.payments.paypalMode === 'live' ? 'green' : 'blue'}>
+                    {settings.payments.paypalMode === 'live' ? 'Live' : 'Sandbox'} Mode
+                  </Badge>
+                  
+                  <Box mt={4}>
+                    <Text mb={2}>API Mode</Text>
+                    <RadioGroup
+                      value={settings.payments.paypalMode}
+                      onChange={(value) => handleRadioChange('payments', 'paypalMode', value)}
+                    >
+                      <Stack direction="row" spacing={5}>
+                        <Radio value="sandbox">Sandbox Mode</Radio>
+                        <Radio value="live">Live Mode</Radio>
+                      </Stack>
+                    </RadioGroup>
+                  </Box>
+                  
+                  <Box mt={4}>
+                    <Text mb={2} fontWeight="bold">Sandbox Environment</Text>
+                    <SimpleGrid columns={[1, 1, 2]} spacing={4}>
+                      <FormControl>
+                        <FormLabel>PayPal Sandbox Client ID</FormLabel>
+                        <Input
+                          name="paypalSandboxClientId"
+                          value={settings.payments.paypalSandboxClientId}
+                          onChange={(e) => handlePaymentsChange({ target: { name: e.target.name, value: e.target.value } })}
+                          placeholder="PayPal Sandbox Client ID"
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>PayPal Sandbox Client Secret</FormLabel>
+                        <Input
+                          name="paypalSandboxClientSecret"
+                          value={settings.payments.paypalSandboxClientSecret}
+                          onChange={(e) => handlePaymentsChange({ target: { name: e.target.name, value: e.target.value } })}
+                          placeholder="PayPal Sandbox Client Secret"
+                          type="password"
+                        />
+                      </FormControl>
+                    </SimpleGrid>
+                  </Box>
+                  
+                  <Box mt={4}>
+                    <Text mb={2} fontWeight="bold">Live Environment</Text>
+                    <SimpleGrid columns={[1, 1, 2]} spacing={4}>
+                      <FormControl>
+                        <FormLabel>PayPal Live Client ID</FormLabel>
+                        <Input
+                          name="paypalLiveClientId"
+                          value={settings.payments.paypalLiveClientId}
+                          onChange={(e) => handlePaymentsChange({ target: { name: e.target.name, value: e.target.value } })}
+                          placeholder="PayPal Live Client ID"
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>PayPal Live Client Secret</FormLabel>
+                        <Input
+                          name="paypalLiveClientSecret"
+                          value={settings.payments.paypalLiveClientSecret}
+                          onChange={(e) => handlePaymentsChange({ target: { name: e.target.name, value: e.target.value } })}
+                          placeholder="PayPal Live Client Secret"
+                          type="password"
+                        />
+                      </FormControl>
+                    </SimpleGrid>
+                  </Box>
+                  
+                  <Box mt={4}>
+                    <FormControl>
+                      <FormLabel>PayPal Partner ID</FormLabel>
+                      <Input
+                        name="paypalPartnerId"
+                        value={settings.payments.paypalPartnerId}
+                        onChange={(e) => handlePaymentsChange({ target: { name: e.target.name, value: e.target.value } })}
+                        placeholder="PayPal Partner ID for marketplace payments"
+                      />
+                      <FormHelperText>
+                        Your PayPal Partner ID for marketplace integrations. This is required for payments to connected merchants.
+                      </FormHelperText>
+                    </FormControl>
+                  </Box>
                 </Card>
                 
                 <Card bg={cardBg}>

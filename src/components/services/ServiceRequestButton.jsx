@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Button,
   Modal,
@@ -19,29 +19,23 @@ import {
   Alert,
   AlertIcon,
   AlertTitle,
-  AlertDescription
+  AlertDescription,
+  Heading
 } from '@chakra-ui/react';
 import { CheckIcon } from '@chakra-ui/icons';
-import { Elements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
-import ServiceRequestPayment from '../payment/ServiceRequestPayment';
 import ServiceAvailabilityCalendar from './ServiceAvailabilityCalendar';
 import { useRouter } from 'next/navigation';
+import PayPalPaymentButton from '../payment/PayPalPaymentButton';
+import { getActivePaymentProvider } from '@/lib/payment/paypal/config';
 
-// Initialize Stripe with your publishable key if available
-const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-console.log("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY value:", stripeKey ? "Key exists" : "Key missing");
-console.log("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:", process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.substring(0, 10) + "..." : "undefined");
-const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
+// Initialize PayPal client ID
+const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+console.log("NEXT_PUBLIC_PAYPAL_CLIENT_ID value:", paypalClientId ? "Key exists" : "Key missing");
 
-if (!stripeKey) {
-  console.error("Stripe publishable key is missing or invalid. Payment processing will not work.");
+if (!paypalClientId && process.env.NODE_ENV === 'production') {
+  console.error("PayPal client ID is missing or invalid. Payment processing may not work in production.");
 } else {
-  console.log("Stripe initialization started");
-  stripePromise.then(
-    stripe => console.log("Stripe loaded successfully:", !!stripe),
-    error => console.error("Stripe failed to load:", error)
-  );
+  console.log("PayPal initialization ready");
 }
 
 // Steps for the booking process
@@ -58,6 +52,7 @@ const ServiceRequestButton = ({ service, offer }) => {
   const toast = useToast();
   const router = useRouter();
   const [activeStep, setActiveStep] = useState(0);
+  const [activePaymentProvider, setActivePaymentProvider] = useState('paypal');
 
   // Booking details
   const [selectedDate, setSelectedDate] = useState(null);
@@ -67,6 +62,16 @@ const ServiceRequestButton = ({ service, offer }) => {
   const [bookingAddress, setBookingAddress] = useState('');
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [bookingDetails, setBookingDetails] = useState(null);
+
+  // Check which payment provider is active
+  useEffect(() => {
+    const checkPaymentProvider = async () => {
+      const provider = await getActivePaymentProvider();
+      setActivePaymentProvider(provider);
+    };
+
+    checkPaymentProvider();
+  }, []);
 
   console.log("ServiceRequestButton received service:", JSON.stringify({
     id: service?.id,
@@ -198,8 +203,153 @@ const ServiceRequestButton = ({ service, offer }) => {
       duration: selectedDuration,
       address: bookingAddress,
       comments: bookingComments,
-      addons: selectedAddons
     };
+  };
+
+  // Calculate total amount
+  const servicePrice = offer?.price || service?.price || 0;
+  const baseAmount = Number(servicePrice);
+  const addonsTotal = selectedAddons.reduce((total, addon) => total + Number(addon.price), 0);
+  const subtotal = baseAmount + addonsTotal;
+  const serviceFeePercent = 5.0; // 5% platform fee
+  const serviceFee = subtotal * (serviceFeePercent / 100);
+  const totalAmount = subtotal + serviceFee;
+
+  // Function to render the current step
+  const renderStep = () => {
+    switch (activeStep) {
+      case 0:
+        return (
+          <ServiceAvailabilityCalendar
+            service={service}
+            onDateSelect={handleDateSelect}
+            onTimeSelect={handleTimeSelect}
+            onDurationSelect={handleDurationSelect}
+            onCommentChange={handleCommentChange}
+            onAddressChange={handleAddressChange}
+            onAddonsChange={handleAddonsChange}
+            selectedDate={selectedDate}
+            selectedTime={selectedTime}
+            selectedDuration={selectedDuration}
+            bookingComments={bookingComments}
+            bookingAddress={bookingAddress}
+            selectedAddons={selectedAddons}
+          />
+        );
+      case 1:
+        return (
+          <Box width="100%">
+            <VStack spacing={4} align="stretch">
+              <Box 
+                border="1px" 
+                borderColor="gray.200" 
+                borderRadius="md" 
+                p={4} 
+                bg="gray.50"
+              >
+                <VStack align="start" spacing={2}>
+                  <Text fontWeight="bold">Booking Summary</Text>
+                  <Text>Date: {bookingDetails?.formattedDate}</Text>
+                  <Text>Time: {bookingDetails?.time}</Text>
+                  <Text>Duration: {bookingDetails?.duration} hour(s)</Text>
+                  <Text>Address: {bookingDetails?.address}</Text>
+                  {bookingDetails?.comments && (
+                    <Text>Notes: {bookingDetails?.comments}</Text>
+                  )}
+                  {selectedAddons.length > 0 && (
+                    <Box>
+                      <Text fontWeight="bold">Selected Add-ons:</Text>
+                      {selectedAddons.map((addon, index) => (
+                        <Text key={index}>- {addon.title}: ${addon.price}</Text>
+                      ))}
+                    </Box>
+                  )}
+                </VStack>
+              </Box>
+              
+              <Box>
+                <Text fontWeight="bold" mb={2}>Total Amount: ${totalAmount.toFixed(2)}</Text>
+                <Text fontSize="sm" color="gray.600">
+                  Base Price: ${baseAmount.toFixed(2)}<br />
+                  {addonsTotal > 0 && `Add-ons: $${addonsTotal.toFixed(2)}\n`}
+                  Service Fee (5%): ${serviceFee.toFixed(2)}
+                </Text>
+              </Box>
+              
+              <Box w="100%">
+                <PayPalPaymentButton
+                  amount={totalAmount}
+                  serviceName={service?.name}
+                  onPaymentSuccess={handlePaymentComplete}
+                  onPaymentError={(error) => {
+                    console.error("Payment error:", error);
+                    toast({
+                      title: "Payment Error",
+                      description: error.message || "There was an error processing your payment.",
+                      status: "error",
+                      duration: 5000,
+                      isClosable: true,
+                    });
+                  }}
+                  metadata={{
+                    serviceId: service?.id,
+                    serviceName: service?.name,
+                    providerId: service?.providerId,
+                    bookingDetails: bookingDetails
+                  }}
+                  createPaymentEndpoint="/api/payment/create-intent"
+                  showCardByDefault={true}
+                  buttonText="Pay with PayPal"
+                />
+              </Box>
+            </VStack>
+          </Box>
+        );
+      case 2:
+        return (
+          <VStack spacing={6} align="center" w="100%">
+            <Box 
+              borderRadius="full" 
+              bg="green.100" 
+              p={3} 
+              display="flex" 
+              alignItems="center"
+              justifyContent="center"
+            >
+              <CheckIcon color="green.500" boxSize={8} />
+            </Box>
+            <Heading size="md">Booking Confirmed!</Heading>
+            <Text textAlign="center">
+              Your booking has been successfully processed. You'll receive a confirmation email shortly.
+            </Text>
+            <Box 
+              border="1px" 
+              borderColor="gray.200" 
+              borderRadius="md" 
+              p={4} 
+              bg="gray.50"
+              w="100%"
+            >
+              <VStack align="start" spacing={2}>
+                <Text fontWeight="bold">Booking Details</Text>
+                <Text>Date: {bookingDetails?.formattedDate}</Text>
+                <Text>Time: {bookingDetails?.time}</Text>
+                <Text>Duration: {bookingDetails?.duration} hour(s)</Text>
+                <Text>Address: {bookingDetails?.address}</Text>
+              </VStack>
+            </Box>
+            <Button 
+              colorScheme="blue" 
+              onClick={() => router.push('/client/my-bookings')}
+              mt={4}
+            >
+              View My Bookings
+            </Button>
+          </VStack>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -208,190 +358,113 @@ const ServiceRequestButton = ({ service, offer }) => {
         onClick={onOpen} 
         colorScheme="blue" 
         size="lg" 
-        width="full"
-        isLoading={isSubmitting}
+        width="100%"
+        isDisabled={!service && !offer}
       >
-        Send Request
+        Book Now
       </Button>
 
-      <Modal isOpen={isOpen} onClose={handleCancel} size="xl" scrollBehavior="inside">
+      <Modal 
+        isOpen={isOpen} 
+        onClose={handleCancel} 
+        size="lg" 
+        closeOnOverlayClick={false}
+        isCentered
+      >
         <ModalOverlay />
-        <ModalContent>
+        <ModalContent maxW={{ base: "90%", md: "800px" }}>
           <ModalHeader>
-            {steps[activeStep].title}
-            <Text fontSize="sm" color="gray.500" mt={1}>
-              {service?.name || offer?.service?.name}
-            </Text>
-          </ModalHeader>
-          <ModalCloseButton />
-          
-          {/* Custom Stepper */}
-          <Box px={6} mb={6} mt={4}>
-            <Flex justify="space-between" align="center" width="100%">
+            <Text>Book {service?.name || offer?.service?.name}</Text>
+            <Flex mt={2}>
               {steps.map((step, index) => (
                 <React.Fragment key={index}>
-                  {/* Step Item */}
-                  <VStack 
-                    spacing={1}
-                    flexBasis="30%"
-                    align="center"
-                    opacity={index < activeStep ? 1 : index === activeStep ? 1 : 0.5}
+                  <Box 
+                    textAlign="center" 
+                    color={index <= activeStep ? "blue.500" : "gray.400"}
                   >
-                    {/* Number Indicator */}
-                    <Flex
-                      w="30px"
-                      h="30px"
-                      borderRadius="full"
-                      bg={index < activeStep ? "green.500" : index === activeStep ? "blue.500" : "gray.200"}
-                      color="white"
-                      justify="center"
-                      align="center"
-                      fontWeight="bold"
+                    <Box 
+                      width="30px" 
+                      height="30px" 
+                      borderRadius="50%" 
+                      border="2px solid"
+                      borderColor={index <= activeStep ? "blue.500" : "gray.300"}
+                      display="flex" 
+                      alignItems="center" 
+                      justifyContent="center"
+                      bg={index < activeStep ? "blue.500" : "transparent"}
+                      color={index < activeStep ? "white" : "inherit"}
+                      mx="auto"
                     >
-                      {index < activeStep ? <CheckIcon fontSize="sm" /> : index + 1}
-                    </Flex>
-                    
-                    {/* Step Title and Description */}
+                      {index < activeStep ? <CheckIcon boxSize={3} /> : index + 1}
+                    </Box>
                     <Text 
-                      fontWeight="medium" 
-                      fontSize="sm" 
-                      textAlign="center"
-                      color={index === activeStep ? "blue.500" : "gray.700"}
+                      fontSize="xs" 
+                      mt={1} 
+                      fontWeight={index === activeStep ? "medium" : "normal"}
                     >
                       {step.title}
                     </Text>
-                    <Text 
-                      fontSize="xs" 
-                      color="gray.500" 
-                      textAlign="center"
-                      display={{ base: 'none', md: 'block' }}
-                    >
-                      {step.description}
-                    </Text>
-                  </VStack>
-                  
-                  {/* Separator Line */}
+                  </Box>
                   {index < steps.length - 1 && (
-                    <Box 
-                      height="1px" 
-                      bg={index < activeStep ? "green.500" : "gray.200"} 
-                      flex="1"
-                    />
+                    <Flex 
+                      flex={1} 
+                      alignItems="center" 
+                      px={1}
+                    >
+                      <Box 
+                        height="1px" 
+                        bg={index < activeStep ? "blue.500" : "gray.300"} 
+                        w="100%" 
+                      />
+                    </Flex>
                   )}
                 </React.Fragment>
               ))}
             </Flex>
-          </Box>
+          </ModalHeader>
+          <ModalCloseButton />
           
-          <ModalBody pb={6}>
-            {activeStep === 0 && (
-              <ServiceAvailabilityCalendar 
-                service={service}
-                onDateSelect={handleDateSelect}
-                onTimeSelect={handleTimeSelect}
-                onDurationSelect={handleDurationSelect}
-                onCommentChange={handleCommentChange}
-                onAddressChange={handleAddressChange}
-                onAddonsChange={handleAddonsChange}
-              />
-            )}
-            
-            {activeStep === 1 && (
-              <Box px={6} pb={6}>
-                {!stripePromise ? (
-                  <Alert status="error" mb={4}>
-                    <AlertIcon />
-              <Box>
-                      <AlertTitle>Stripe configuration error</AlertTitle>
-                      <AlertDescription>
-                        Payment processing is not available at the moment. Please try again later.
-                      </AlertDescription>
-                    </Box>
-                  </Alert>
-                ) : (
-                <Elements stripe={stripePromise}>
-                  <ServiceRequestPayment 
-                    service={service} 
-                    offer={offer}
-                      bookingDetails={bookingDetails} 
-                    onPaymentComplete={handlePaymentComplete}
-                      onCancel={handleBack}
-                  />
-                </Elements>
-                )}
-              </Box>
-            )}
-            
-            {activeStep === 2 && (
-              <VStack spacing={4} align="stretch" p={4}>
-                <Text fontSize="lg" fontWeight="bold" color="green.500">
-                  Booking Confirmed!
-                </Text>
-                <Text>
-                  Your service request has been submitted and the provider has been notified. 
-                  They will review your request within 24 hours.
-                </Text>
-                <Box borderWidth="1px" p={4} borderRadius="md" bg="blue.50">
-                  <Text fontWeight="bold" mb={2}>Booking Details</Text>
-                  <Text>Date: {bookingDetails?.formattedDate}</Text>
-                  <Text>Time: {bookingDetails?.time}</Text>
-                  <Text>Duration: {bookingDetails?.duration} hour{bookingDetails?.duration !== 1 ? 's' : ''}</Text>
-                  <Text>Address: {bookingDetails?.address}</Text>
-                  {bookingDetails?.comments && (
-                    <Text mt={2}>
-                      <Text as="span" fontWeight="bold">Comments: </Text>
-                      {bookingDetails.comments}
-                    </Text>
-                  )}
-                  {bookingDetails?.addons && bookingDetails.addons.length > 0 && (
-                    <Box mt={2}>
-                      <Text fontWeight="bold">Add-ons:</Text>
-                      {bookingDetails.addons.map((addon) => (
-                        <Text key={addon.id} fontSize="sm" ml={2}>
-                          • {addon.title} (${Number(addon.price).toFixed(2)})
-                        </Text>
-                      ))}
-                    </Box>
-                  )}
+          <ModalBody py={6}>
+            {!paypalClientId && activePaymentProvider === 'paypal' && (
+              <Alert status="error" mb={4}>
+                <AlertIcon />
+                <Box>
+                  <AlertTitle>PayPal configuration error</AlertTitle>
+                  <AlertDescription>
+                    The payment system is not properly configured. Please contact support.
+                  </AlertDescription>
                 </Box>
-                <Text>
-                  Your payment will only be processed if the provider accepts your request.
-                </Text>
-              </VStack>
-            )}
-          </ModalBody>
-          
-          <ModalFooter>
-            {activeStep === 0 && (
-              <>
-                <Button onClick={handleCancel} mr={3}>
-                  Cancel
-                </Button>
-                <Button 
-                  colorScheme="blue" 
-                  onClick={handleProceedToPayment}
-                  isDisabled={!selectedDate || !selectedTime || !bookingAddress}
-                >
-                  Proceed to Payment
-                </Button>
-              </>
+              </Alert>
             )}
             
-            {activeStep === 1 && (
-              <Button onClick={handleBack} mr={3}>
-                Back
+            {renderStep()}
+          </ModalBody>
+
+          <ModalFooter>
+            {activeStep < 2 && (
+              <Button 
+                variant="ghost" 
+                mr={3} 
+                onClick={activeStep === 0 ? handleCancel : handleBack}
+              >
+                {activeStep === 0 ? "Cancel" : "Back"}
+              </Button>
+            )}
+            
+            {activeStep === 0 && (
+              <Button 
+                colorScheme="blue" 
+                onClick={handleProceedToPayment}
+                isDisabled={!selectedDate || !selectedTime || !bookingAddress}
+              >
+                Proceed to Payment
               </Button>
             )}
             
             {activeStep === 2 && (
-              <>
-                <Button colorScheme="blue" mr={3} onClick={handleCancel}>
-                  Close
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/client/transactions')}>
-                  View Transactions
-                </Button>
-              </>
+              <Button colorScheme="blue" onClick={handleCancel}>
+                Close
+              </Button>
             )}
           </ModalFooter>
         </ModalContent>

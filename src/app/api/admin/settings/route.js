@@ -9,12 +9,25 @@ export const dynamic = 'force-dynamic';
 // Default settings when none are found in the database
 const DEFAULT_SETTINGS = {
   general: {
-    siteName: 'AllPartyRent',
+    siteName: 'All Party Rent',
+    contactEmail: 'contact@example.com',
+    platformFee: '15',
+    currencySymbol: '$',
+    dateFormat: 'MM/DD/YYYY',
+    timeFormat: '12h',
     tagline: 'Rent anything, for any party',
     adminEmail: 'admin@allpartyrent.com',
     supportEmail: 'support@allpartyrent.com',
     timezone: 'America/New_York',
     maintenanceMode: false,
+  },
+  appearance: {
+    primaryColor: '#6B46C1',
+    accentColor: '#3182CE',
+    logoUrl: '/images/logo.png',
+    favicon: '/favicon.ico',
+    headerStyle: 'default',
+    footerStyle: 'default',
   },
   payments: {
     currency: 'USD',
@@ -27,6 +40,13 @@ const DEFAULT_SETTINGS = {
     stripeTestSecretKey: 'sk_test_*****',
     stripeLivePublicKey: 'pk_live_*****',
     stripeLiveSecretKey: 'sk_live_*****',
+    paypalMode: 'sandbox',
+    paypalSandboxClientId: 'sandbox_client_id_*****',
+    paypalSandboxClientSecret: 'sandbox_client_secret_*****',
+    paypalLiveClientId: 'live_client_id_*****',
+    paypalLiveClientSecret: 'live_client_secret_*****',
+    paypalPartnerId: 'partner_id_*****',
+    activePaymentProvider: 'paypal' // 'stripe' or 'paypal'
   },
   notifications: {
     emailNotifications: true,

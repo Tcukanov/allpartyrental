@@ -54,20 +54,23 @@ model Profile {
 }
 
 model Provider {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  businessName      String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  availability      Json?
-  bio               String?
-  isVerified        Boolean  @default(false)
-  phone             String?
-  vatNumber         String?
-  verificationLevel Int      @default(0)
-  website           String?
-  stripeAccountId   String?
-  user              User     @relation(fields: [userId], references: [id])
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  businessName          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  availability          Json?
+  bio                   String?
+  isVerified            Boolean  @default(false)
+  phone                 String?
+  vatNumber             String?
+  verificationLevel     Int      @default(0)
+  website               String?
+  stripeAccountId       String?
+  paypalMerchantId      String?
+  paypalEmail           String?
+  paypalOnboardingComplete Boolean @default(false)
+  user                  User     @relation(fields: [userId], references: [id])
 }
 
 model Calendar {
