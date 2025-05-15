@@ -5,6 +5,12 @@ import { prisma } from '@/lib/prisma/client';
 
 export const dynamic = 'force-dynamic';
 
+interface RatingsData {
+  rating: number;
+  reviewCount: number;
+  success?: boolean;
+}
+
 /**
  * This API fetches Google Business ratings for a URL and optionally updates a provider's profile
  * 
@@ -12,7 +18,7 @@ export const dynamic = 'force-dynamic';
  * POST /api/google/ratings (updates the logged-in provider's profile)
  */
 
-export async function GET(request) {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     // Extract URL from query params
     const url = new URL(request.url);
@@ -30,7 +36,7 @@ export async function GET(request) {
     // This is a mock implementation for demonstration
     
     // For demo purposes, return mock data
-    const mockData = {
+    const mockData: RatingsData = {
       rating: 4.7,
       reviewCount: 14,
       success: true
@@ -40,7 +46,7 @@ export async function GET(request) {
       success: true,
       data: mockData
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching Google Business ratings:', error);
     return NextResponse.json({
       success: false,
@@ -49,7 +55,7 @@ export async function GET(request) {
   }
 }
 
-export async function POST(request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     const session = await getServerSession(authOptions);
     
@@ -75,7 +81,7 @@ export async function POST(request) {
     // 2. Update the provider's profile with the fetched data
     
     // For demo purposes, we'll use mock data
-    const mockData = {
+    const mockData: RatingsData = {
       rating: 4.7,
       reviewCount: 14
     };
@@ -100,7 +106,7 @@ export async function POST(request) {
         googleBusinessReviews: mockData.reviewCount
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating Google Business ratings:', error);
     return NextResponse.json({
       success: false,

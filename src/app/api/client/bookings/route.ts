@@ -7,7 +7,7 @@ import { authOptions } from '@/lib/auth/auth-options';
  * GET /api/client/bookings
  * Fetches all parties for the current client user for use in the calendar
  */
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
     const session = await getServerSession(authOptions);
     
@@ -68,7 +68,7 @@ export async function GET() {
     // Return the parties data directly without wrapping in a success object
     // This matches the format expected by the client
     return NextResponse.json(parties, { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get client bookings error:', error);
     console.error('Error details:', error.message);
     if (error.stack) {

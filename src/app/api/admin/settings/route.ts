@@ -6,8 +6,84 @@ import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
+// Define types for settings
+interface GeneralSettings {
+  siteName: string;
+  contactEmail: string;
+  platformFee: string;
+  currencySymbol: string;
+  dateFormat: string;
+  timeFormat: string;
+  tagline: string;
+  adminEmail: string;
+  supportEmail: string;
+  timezone: string;
+  maintenanceMode: boolean;
+}
+
+interface AppearanceSettings {
+  primaryColor: string;
+  accentColor: string;
+  logoUrl: string;
+  favicon: string;
+  headerStyle: string;
+  footerStyle: string;
+}
+
+interface PaymentSettings {
+  currency: string;
+  clientFeePercent: number;
+  providerFeePercent: number;
+  escrowPeriodHours: number;
+  reviewPeriodHours: number;
+  stripeMode: string;
+  stripeTestPublicKey: string;
+  stripeTestSecretKey: string;
+  stripeLivePublicKey: string;
+  stripeLiveSecretKey: string;
+  paypalMode: string;
+  paypalSandboxClientId: string;
+  paypalSandboxClientSecret: string;
+  paypalLiveClientId: string;
+  paypalLiveClientSecret: string;
+  paypalPartnerId: string;
+  activePaymentProvider: string;
+}
+
+interface NotificationSettings {
+  emailNotifications: boolean;
+  smsNotifications: boolean;
+  adminAlerts: boolean;
+  emailService: string;
+  sendgridApiKey: string;
+  smsService: string;
+  twilioAccountSid: string;
+  twilioAuthToken: string;
+  twilioPhoneNumber: string;
+}
+
+interface SecuritySettings {
+  registrationEnabled: boolean;
+  requireEmailVerification: boolean;
+  twoFactorEnabled: boolean;
+  loginAttempts: number;
+  sessionTimeout: number;
+  passwordMinLength: number;
+  passwordRequireUppercase: boolean;
+  passwordRequireNumbers: boolean;
+  passwordRequireSpecial: boolean;
+}
+
+interface SystemSettings {
+  general: GeneralSettings;
+  appearance: AppearanceSettings;
+  payments: PaymentSettings;
+  notifications: NotificationSettings;
+  security: SecuritySettings;
+}
+
 // Default settings when none are found in the database
-const DEFAULT_SETTINGS = {
+const DEFAULT_SETTINGS: SystemSettings = {
   general: {
     siteName: 'All Party Rent',
     contactEmail: 'contact@example.com',
@@ -73,7 +149,7 @@ const DEFAULT_SETTINGS = {
 };
 
 // Helper function to get settings from SystemSettings table
-async function getSettingsFromDatabase() {
+async function getSettingsFromDatabase(): Promise<SystemSettings> {
   // Create a settings object with default values
   const settings = { ...DEFAULT_SETTINGS };
   
@@ -85,15 +161,18 @@ async function getSettingsFromDatabase() {
     dbSettings.forEach(setting => {
       const [section, key] = setting.key.split('.');
       
-      if (section && key && settings[section]) {
+      if (section && key && settings[section as keyof SystemSettings]) {
         try {
+          const sectionObj = settings[section as keyof SystemSettings];
+          const typedKey = key as keyof typeof sectionObj;
+          
           // Parse values that should be numbers or booleans
-          if (typeof settings[section][key] === 'number') {
-            settings[section][key] = parseFloat(setting.value);
-          } else if (typeof settings[section][key] === 'boolean') {
-            settings[section][key] = setting.value === 'true';
+          if (typeof sectionObj[typedKey] === 'number') {
+            (sectionObj as any)[typedKey] = parseFloat(setting.value);
+          } else if (typeof sectionObj[typedKey] === 'boolean') {
+            (sectionObj as any)[typedKey] = setting.value === 'true';
           } else {
-            settings[section][key] = setting.value;
+            (sectionObj as any)[typedKey] = setting.value;
           }
         } catch (e) {
           console.error(`Error parsing setting ${setting.key}:`, e);
@@ -109,10 +188,10 @@ async function getSettingsFromDatabase() {
 }
 
 // Helper function to save settings to SystemSettings table
-async function saveSettingsToDatabase(newSettings) {
+async function saveSettingsToDatabase(newSettings: SystemSettings): Promise<boolean> {
   try {
     // Flatten the settings object for storage
-    const flatSettings = [];
+    const flatSettings: { key: string; value: string }[] = [];
     
     Object.entries(newSettings).forEach(([section, sectionSettings]) => {
       Object.entries(sectionSettings).forEach(([key, value]) => {
@@ -144,7 +223,7 @@ async function saveSettingsToDatabase(newSettings) {
   }
 }
 
-export async function GET(request) {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -173,7 +252,7 @@ export async function GET(request) {
     
     // Return the settings
     return NextResponse.json(settings);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error retrieving settings:', error);
     return NextResponse.json(
       { error: 'Failed to retrieve settings', message: error.message ? error.message : String(error) },
@@ -182,7 +261,7 @@ export async function GET(request) {
   }
 }
 
-export async function POST(request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -205,7 +284,7 @@ export async function POST(request) {
     }
     
     // Parse the request body
-    const newSettings = await request.json();
+    const newSettings = await request.json() as SystemSettings;
     
     // Validate settings (simplified, in a real app you'd do more validation)
     if (!newSettings || typeof newSettings !== 'object') {
@@ -225,7 +304,7 @@ export async function POST(request) {
       message: 'Settings updated successfully',
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating settings:', error);
     return NextResponse.json(
       { error: 'Failed to update settings', message: error.message ? error.message : String(error) },

@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, ReactNode } from 'react';
 import { Box, Container, Flex, Text, Spinner, useToast } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 import { getSession } from 'next-auth/react';
 import AdminNavbar from '@/components/admin/AdminNavbar';
 
-export default function AdminLayout({ children }) {
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+interface AdminLayoutProps {
+  children: ReactNode;
+}
+
+export default function AdminLayout({ children }: AdminLayoutProps) {
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
   const toast = useToast();
 

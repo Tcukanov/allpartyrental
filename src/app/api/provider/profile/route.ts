@@ -1,9 +1,40 @@
 import { getServerSession } from "next-auth";
+import { Session } from "next-auth";
 import { authOptions } from "@/lib/auth/auth-options";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
+import { User, Profile } from "@prisma/client";
 
-async function getUserBySessionOrEmail(session) {
+interface ProfileData {
+  companyName?: string;
+  avatar?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  website?: string | null;
+  googleBusinessUrl?: string | null;
+  googleBusinessRating?: string | number | null;
+  googleBusinessReviews?: string | number | null;
+  description?: string | null;
+  contactPerson?: string | null;
+  socialLinks?: Record<string, string> | null;
+  isProStatus?: boolean;
+}
+
+interface NormalizedProfileData {
+  avatar: string | null;
+  phone: string | null;
+  address: string | null;
+  website: string | null;
+  googleBusinessUrl: string | null;
+  googleBusinessRating?: number | null;
+  googleBusinessReviews?: number | null;
+  description: string | null;
+  contactPerson: string | null;
+  socialLinks: Record<string, string>;
+  isProStatus: boolean;
+}
+
+async function getUserBySessionOrEmail(session: Session | null): Promise<User | null> {
   if (!session || !session.user) return null;
   
   // Try to find user by ID first
@@ -25,7 +56,7 @@ async function getUserBySessionOrEmail(session) {
   return user;
 }
 
-export async function PUT(request) {
+export async function PUT(request: Request): Promise<NextResponse> {
   try {
     console.log('Updating provider profile...');
     const session = await getServerSession(authOptions);
@@ -55,7 +86,7 @@ export async function PUT(request) {
     console.log('Using user ID from database:', userId);
     
     console.log('Session user:', session.user);
-    const data = await request.json();
+    const data = await request.json() as ProfileData;
     console.log('Profile data received:', data);
     
     // Check if we need to update the user's name (company name)
@@ -83,7 +114,7 @@ export async function PUT(request) {
     });
     
     // Normalize all fields to prevent undefined values
-    const normalizedData = {
+    const normalizedData: NormalizedProfileData = {
       avatar: data.avatar || null,
       phone: data.phone || null,
       address: data.address || null,
@@ -98,7 +129,7 @@ export async function PUT(request) {
     // Float values need special handling
     if (data.googleBusinessRating !== undefined) {
       try {
-        normalizedData.googleBusinessRating = parseFloat(data.googleBusinessRating) || null;
+        normalizedData.googleBusinessRating = parseFloat(data.googleBusinessRating as string) || null;
       } catch (e) {
         normalizedData.googleBusinessRating = null;
       }
@@ -107,7 +138,7 @@ export async function PUT(request) {
     // Integer values need special handling
     if (data.googleBusinessReviews !== undefined) {
       try {
-        normalizedData.googleBusinessReviews = parseInt(data.googleBusinessReviews) || null;
+        normalizedData.googleBusinessReviews = parseInt(data.googleBusinessReviews as string) || null;
       } catch (e) {
         normalizedData.googleBusinessReviews = null;
       }
@@ -146,7 +177,7 @@ export async function PUT(request) {
       success: true, 
       data: updatedProfile
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating profile:", error);
     return NextResponse.json({ 
       success: false, 
@@ -158,7 +189,7 @@ export async function PUT(request) {
   }
 }
 
-export async function GET(request) {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     console.log('Fetching provider profile...');
     const session = await getServerSession(authOptions);
@@ -213,7 +244,7 @@ export async function GET(request) {
       success: true, 
       data: profile
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching profile:", error);
     return NextResponse.json({ 
       success: false, 

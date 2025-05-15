@@ -8,7 +8,7 @@ import { logger } from '@/lib/logger';
  * API endpoint to check system status
  * This is useful for monitoring and debugging
  */
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
     // Initialize API if not already initialized
     if (!getApiStatus().status === 'initialized') {
@@ -37,7 +37,7 @@ export async function GET() {
         system: systemInfo
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error retrieving system status:', error);
     
     return NextResponse.json({

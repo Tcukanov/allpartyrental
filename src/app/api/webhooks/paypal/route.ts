@@ -2,11 +2,33 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import crypto from 'crypto';
 import { logger } from '@/lib/logger';
+import { Headers } from 'next/dist/compiled/@edge-runtime/primitives/fetch';
+
+interface PayPalResource {
+  id: string;
+  supplementary_data?: {
+    related_ids?: {
+      order_id?: string;
+    };
+  };
+  links?: Array<{
+    href: string;
+    rel: string;
+  }>;
+  merchant_id?: string;
+  primary_email?: string;
+  tracking_id?: string;
+}
+
+interface PayPalWebhookPayload {
+  event_type: string;
+  resource: PayPalResource;
+}
 
 /**
  * Verify the PayPal webhook signature
  */
-const verifyWebhookSignature = (requestBody, headers) => {
+const verifyWebhookSignature = (requestBody: PayPalWebhookPayload, headers: Headers): boolean => {
   try {
     // Get the PayPal webhook ID and signature from environment variables
     const webhookId = process.env.PAYPAL_WEBHOOK_ID;
@@ -23,12 +45,12 @@ const verifyWebhookSignature = (requestBody, headers) => {
     const validationStr = transmissionId + '|' + transmissionTime + '|' + webhookId + '|' + Buffer.from(JSON.stringify(requestBody)).toString('base64');
     
     // Create the expected signature
-    const hmac = crypto.createHmac('sha256', process.env.PAYPAL_WEBHOOK_SECRET);
+    const hmac = crypto.createHmac('sha256', process.env.PAYPAL_WEBHOOK_SECRET || '');
     hmac.update(validationStr);
     const expectedSignature = hmac.digest('base64');
     
     return actualSignature === expectedSignature;
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error verifying PayPal webhook signature:', error);
     return false;
   }
@@ -37,9 +59,9 @@ const verifyWebhookSignature = (requestBody, headers) => {
 /**
  * Handle a PayPal webhook event
  */
-export async function POST(request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const payload = await request.json();
+    const payload = await request.json() as PayPalWebhookPayload;
     const headers = request.headers;
     
     // Log the event type
@@ -97,7 +119,7 @@ export async function POST(request) {
     
     // Always return a 200 response to acknowledge receipt of the webhook
     return NextResponse.json({ received: true });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error handling PayPal webhook:', error);
     return NextResponse.json(
       { error: `Failed to process webhook: ${error.message}` },
@@ -110,13 +132,18 @@ export async function POST(request) {
  * Handle payment capture completed event
  * Update transaction status to PAID
  */
-async function handlePaymentCaptureCompleted(payload) {
+async function handlePaymentCaptureCompleted(payload: PayPalWebhookPayload): Promise<void> {
   try {
     const resource = payload.resource;
     const orderId = resource.supplementary_data?.related_ids?.order_id;
     const captureId = resource.id;
     
     logger.info(`Processing PayPal payment capture completed: Order ID ${orderId}, Capture ID: ${captureId}`);
+    
+    if (!orderId) {
+      logger.warn('No order ID found in payload');
+      return;
+    }
     
     // Find any transactions with this payment intent ID
     const transaction = await prisma.transaction.findFirst({
@@ -138,7 +165,7 @@ async function handlePaymentCaptureCompleted(payload) {
     });
     
     logger.info(`Updated transaction ${transaction.id} to PAID status based on PayPal webhook`);
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error processing payment capture completed webhook:', error);
     throw error;
   }
@@ -148,12 +175,17 @@ async function handlePaymentCaptureCompleted(payload) {
  * Handle payment capture denied event
  * Update transaction status to FAILED
  */
-async function handlePaymentCaptureDenied(payload) {
+async function handlePaymentCaptureDenied(payload: PayPalWebhookPayload): Promise<void> {
   try {
     const resource = payload.resource;
     const orderId = resource.supplementary_data?.related_ids?.order_id;
     
     logger.info(`Processing PayPal payment capture denied: Order ID ${orderId}`);
+    
+    if (!orderId) {
+      logger.warn('No order ID found in payload');
+      return;
+    }
     
     // Find any transactions with this payment intent ID
     const transaction = await prisma.transaction.findFirst({
@@ -175,7 +207,7 @@ async function handlePaymentCaptureDenied(payload) {
     });
     
     logger.info(`Updated transaction ${transaction.id} to FAILED status based on PayPal webhook`);
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error processing payment capture denied webhook:', error);
     throw error;
   }
@@ -185,10 +217,10 @@ async function handlePaymentCaptureDenied(payload) {
  * Handle payment refund event
  * Update transaction status to REFUNDED
  */
-async function handlePaymentRefund(payload) {
+async function handlePaymentRefund(payload: PayPalWebhookPayload): Promise<void> {
   try {
     const resource = payload.resource;
-    const captureId = resource.links.find(link => link.href.includes('/captures/'))?.href.split('/').pop();
+    const captureId = resource.links?.find(link => link.href.includes('/captures/'))?.href.split('/').pop();
     
     logger.info(`Processing PayPal payment refund: Capture ID ${captureId}`);
     
@@ -224,7 +256,7 @@ async function handlePaymentRefund(payload) {
     }));
     
     logger.info(`Updated ${transactions.length} transactions to REFUNDED status based on PayPal webhook`);
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error processing payment refund webhook:', error);
     throw error;
   }
@@ -234,7 +266,7 @@ async function handlePaymentRefund(payload) {
  * Handle order approved event
  * This is called when the buyer approves the PayPal order
  */
-async function handleOrderApproved(payload) {
+async function handleOrderApproved(payload: PayPalWebhookPayload): Promise<void> {
   try {
     const resource = payload.resource;
     const orderId = resource.id;
@@ -243,7 +275,7 @@ async function handleOrderApproved(payload) {
     
     // This is just a notification - the actual payment capture will be handled
     // by the capture endpoint or the PAYMENT.CAPTURE.COMPLETED webhook
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error processing order approved webhook:', error);
     throw error;
   }
@@ -253,7 +285,7 @@ async function handleOrderApproved(payload) {
  * Handle order completed event
  * This is called when the entire order flow is completed
  */
-async function handleOrderCompleted(payload) {
+async function handleOrderCompleted(payload: PayPalWebhookPayload): Promise<void> {
   try {
     const resource = payload.resource;
     const orderId = resource.id;
@@ -282,7 +314,7 @@ async function handleOrderCompleted(payload) {
       
       logger.info(`Updated transaction ${transaction.id} to PAID status based on PayPal webhook`);
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error processing order completed webhook:', error);
     throw error;
   }
@@ -292,12 +324,17 @@ async function handleOrderCompleted(payload) {
  * Handle merchant onboarding completed event
  * Update provider record with PayPal merchant ID
  */
-async function handleMerchantOnboarding(payload) {
+async function handleMerchantOnboarding(payload: PayPalWebhookPayload): Promise<void> {
   try {
     const resource = payload.resource;
     const merchantId = resource.merchant_id;
     const merchantEmail = resource.primary_email;
     const trackingId = resource.tracking_id; // This should be the provider ID if you set it during onboarding
+    
+    if (!merchantId || !merchantEmail) {
+      logger.warn('Missing merchant data in payload');
+      return;
+    }
     
     logger.info(`Processing PayPal merchant onboarding: Merchant ID ${merchantId}, Email: ${merchantEmail}`);
     
@@ -345,7 +382,7 @@ async function handleMerchantOnboarding(payload) {
     });
     
     logger.info(`Updated provider ${user.provider.id} with PayPal merchant ID ${merchantId} by email match`);
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error processing merchant onboarding webhook:', error);
     throw error;
   }

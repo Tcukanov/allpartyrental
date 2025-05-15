@@ -4,12 +4,18 @@ import { CronJob } from 'cron';
 import { processAllTransactions } from './transaction-processor';
 import { logger } from '@/lib/logger';
 
+// Define the CronJobs type
+export interface CronJobs {
+  transactionProcessorJob: CronJob;
+  transactionReportJob: CronJob;
+}
+
 /**
  * Initializes cron jobs for the application
  * This includes:
  * - Transaction processor: runs every hour to check for transactions that need processing
  */
-export function initCronJobs() {
+export function initCronJobs(): CronJobs {
   // Transaction processor job - runs every hour
   const transactionProcessorJob = new CronJob(
     '0 * * * *', // Cron syntax: At minute 0 of every hour
@@ -18,7 +24,7 @@ export function initCronJobs() {
         logger.info('Running scheduled transaction processor job');
         await processAllTransactions();
         logger.info('Scheduled transaction processor job completed');
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Error in transaction processor cron job:', error);
       }
     },
@@ -36,7 +42,7 @@ export function initCronJobs() {
         // Code to generate and send daily transaction reports
         // This could email admins a summary of transactions
         logger.info('Daily transaction report job completed');
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Error in daily transaction report cron job:', error);
       }
     },
@@ -61,7 +67,7 @@ export function initCronJobs() {
 /**
  * Stop all cron jobs (useful for graceful shutdown)
  */
-export function stopCronJobs(jobs) {
+export function stopCronJobs(jobs: CronJobs): void {
   if (jobs.transactionProcessorJob) {
     jobs.transactionProcessorJob.stop();
   }

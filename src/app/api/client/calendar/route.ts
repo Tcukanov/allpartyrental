@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma/client';
 /**
  * Get calendar events for the authenticated client
  */
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
     // Verify authentication
     const session = await getServerSession(authOptions);
@@ -31,7 +31,7 @@ export async function GET() {
     });
 
     return NextResponse.json(events);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching calendar events:', error);
     return NextResponse.json(
       { message: 'Internal server error' },

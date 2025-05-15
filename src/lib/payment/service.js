@@ -186,7 +186,7 @@ export const paymentService = {
       const transfer = await stripe.transfers.create({
         amount: transferAmount,
         currency: paymentIntent.currency,
-        destination: providerAccount.accountId,
+        destination: providerAccount.stripeAccountId,
         source_transaction: paymentIntent.charges.data[0].id,
         metadata: {
           paymentIntentId,
@@ -208,19 +208,32 @@ export const paymentService = {
 
 /**
  * Helper function to get a provider's connected Stripe account
- * In a real implementation, this would fetch from your database
  */
 async function getProviderStripeAccount(providerId) {
-  // This is a stub - in a real application, you would fetch the provider's
-  // Stripe account ID from your database
-  
-  // TODO: Implement actual database lookup for provider's Stripe account
-  
   logger.debug(`Getting Stripe account for provider: ${providerId}`);
   
-  // For development/testing purposes
-  return {
-    accountId: process.env.STRIPE_TEST_ACCOUNT_ID || 'acct_test',
-    isActive: true
-  };
+  try {
+    // Import prisma - we need it inside this function
+    const { prisma } = await import('@/lib/prisma/client');
+    
+    // Look up the provider in the database
+    const provider = await prisma.provider.findFirst({
+      where: { userId: providerId }
+    });
+    
+    if (!provider || !provider.stripeAccountId) {
+      logger.warn(`No Stripe account found for provider: ${providerId}`);
+      return null;
+    }
+    
+    logger.debug(`Found Stripe account ${provider.stripeAccountId} for provider ${providerId}`);
+    
+    return {
+      stripeAccountId: provider.stripeAccountId,
+      isActive: true
+    };
+  } catch (error) {
+    logger.error(`Error fetching provider Stripe account: ${error.message}`);
+    return null;
+  }
 } 

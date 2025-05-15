@@ -64,7 +64,14 @@ export async function GET(request: NextRequest) {
     
     // Instead of filtering on the database, we'll send all transactions
     // and let the frontend deduplicate them appropriately
-    return NextResponse.json(transactions);
+    const response = NextResponse.json(transactions);
+    
+    // Add cache control headers to prevent caching
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Error fetching client transactions:', error);
     return NextResponse.json(

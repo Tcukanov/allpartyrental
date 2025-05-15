@@ -9,7 +9,7 @@ import {
 /**
  * Get current fee settings
  */
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -29,7 +29,7 @@ export async function GET() {
       success: true,
       data: settings
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error retrieving fee settings:', error);
     return NextResponse.json({
       success: false,
@@ -41,7 +41,7 @@ export async function GET() {
 /**
  * Update fee settings
  */
-export async function POST(request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -86,7 +86,7 @@ export async function POST(request) {
       message: 'Fee settings updated successfully',
       data: updatedSettings
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating fee settings:', error);
     return NextResponse.json({
       success: false,

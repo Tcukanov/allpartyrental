@@ -3,6 +3,7 @@ import { SessionProvider } from '@/components/providers/SessionProvider';
 import MainLayout from '@/components/layout/MainLayout';
 import '@/styles/globals.css';
 import { Inter, Nunito } from 'next/font/google';
+import { ReactNode } from 'react';
 
 const inter = Inter({ subsets: ['latin'] });
 const nunito = Nunito({ 
@@ -45,7 +46,11 @@ export const metadata = {
   }
 };
 
-export default function RootLayout({ children }) {
+interface RootLayoutProps {
+  children: ReactNode;
+}
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" className={`${inter.className} ${nunito.variable}`}>
       <body className={`${inter.className} ${nunito.variable}`}>
@@ -59,4 +64,4 @@ export default function RootLayout({ children }) {
       </body>
     </html>
   );
-}
+} 

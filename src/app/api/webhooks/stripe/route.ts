@@ -3,11 +3,38 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma/client';
 import { headers } from 'next/headers';
 
+// Define Stripe event data types
+interface StripeMetadata {
+  transactionId?: string;
+  [key: string]: any;
+}
+
+interface StripeTransfer {
+  id: string;
+  amount: number;
+  currency: string;
+  metadata?: StripeMetadata;
+}
+
+interface StripeCharge {
+  id: string;
+  amount: number;
+  currency: string;
+  payment_intent: string;
+}
+
+interface StripePaymentIntent {
+  id: string;
+  amount: number;
+  currency: string;
+  metadata?: StripeMetadata;
+}
+
 /**
  * Stripe webhook handler
  * Processes incoming events from Stripe
  */
-export async function POST(request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body = await request.text();
     const signature = headers().get('stripe-signature');
@@ -18,7 +45,9 @@ export async function POST(request) {
     }
 
     // Initialize Stripe
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      apiVersion: '2023-10-16', // Use the latest API version or specify your version
+    });
     
     // Verify webhook signature
     let event;
@@ -26,9 +55,9 @@ export async function POST(request) {
       event = stripe.webhooks.constructEvent(
         body,
         signature,
-        process.env.STRIPE_WEBHOOK_SECRET
+        process.env.STRIPE_WEBHOOK_SECRET || ''
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error(`Webhook signature verification failed: ${err.message}`);
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
@@ -38,27 +67,27 @@ export async function POST(request) {
     // Handle different event types
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(event.data.object);
+        await handlePaymentIntentSucceeded(event.data.object as StripePaymentIntent);
         break;
         
       case 'payment_intent.payment_failed':
-        await handlePaymentIntentFailed(event.data.object);
+        await handlePaymentIntentFailed(event.data.object as StripePaymentIntent);
         break;
         
       case 'payment_intent.canceled':
-        await handlePaymentIntentCanceled(event.data.object);
+        await handlePaymentIntentCanceled(event.data.object as StripePaymentIntent);
         break;
         
       case 'transfer.created':
-        await handleTransferCreated(event.data.object);
+        await handleTransferCreated(event.data.object as StripeTransfer);
         break;
         
       case 'transfer.failed':
-        await handleTransferFailed(event.data.object);
+        await handleTransferFailed(event.data.object as StripeTransfer);
         break;
         
       case 'charge.refunded':
-        await handleChargeRefunded(event.data.object);
+        await handleChargeRefunded(event.data.object as StripeCharge);
         break;
         
       default:
@@ -66,7 +95,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Webhook error:', error);
     return NextResponse.json(
       { error: 'Webhook handler failed' },
@@ -77,9 +106,9 @@ export async function POST(request) {
 
 /**
  * Handle payment_intent.succeeded event
- * @param {Object} paymentIntent - Stripe payment intent object
+ * @param {StripePaymentIntent} paymentIntent - Stripe payment intent object
  */
-async function handlePaymentIntentSucceeded(paymentIntent) {
+async function handlePaymentIntentSucceeded(paymentIntent: StripePaymentIntent): Promise<void> {
   try {
     console.log(`Payment succeeded: ${paymentIntent.id}`);
     
@@ -120,16 +149,16 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
         isRead: false
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling payment_intent.succeeded:', error);
   }
 }
 
 /**
  * Handle payment_intent.payment_failed event
- * @param {Object} paymentIntent - Stripe payment intent object
+ * @param {StripePaymentIntent} paymentIntent - Stripe payment intent object
  */
-async function handlePaymentIntentFailed(paymentIntent) {
+async function handlePaymentIntentFailed(paymentIntent: StripePaymentIntent): Promise<void> {
   try {
     console.log(`Payment failed: ${paymentIntent.id}`);
     
@@ -166,16 +195,16 @@ async function handlePaymentIntentFailed(paymentIntent) {
         isRead: false
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling payment_intent.payment_failed:', error);
   }
 }
 
 /**
  * Handle payment_intent.canceled event
- * @param {Object} paymentIntent - Stripe payment intent object
+ * @param {StripePaymentIntent} paymentIntent - Stripe payment intent object
  */
-async function handlePaymentIntentCanceled(paymentIntent) {
+async function handlePaymentIntentCanceled(paymentIntent: StripePaymentIntent): Promise<void> {
   try {
     console.log(`Payment canceled: ${paymentIntent.id}`);
     
@@ -193,16 +222,16 @@ async function handlePaymentIntentCanceled(paymentIntent) {
       where: { id: transaction.id },
       data: { status: 'CANCELED' }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling payment_intent.canceled:', error);
   }
 }
 
 /**
  * Handle transfer.created event
- * @param {Object} transfer - Stripe transfer object
+ * @param {StripeTransfer} transfer - Stripe transfer object
  */
-async function handleTransferCreated(transfer) {
+async function handleTransferCreated(transfer: StripeTransfer): Promise<void> {
   try {
     console.log(`Transfer created: ${transfer.id}`);
     
@@ -249,16 +278,16 @@ async function handleTransferCreated(transfer) {
         isRead: false
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling transfer.created:', error);
   }
 }
 
 /**
  * Handle transfer.failed event
- * @param {Object} transfer - Stripe transfer object
+ * @param {StripeTransfer} transfer - Stripe transfer object
  */
-async function handleTransferFailed(transfer) {
+async function handleTransferFailed(transfer: StripeTransfer): Promise<void> {
   try {
     console.log(`Transfer failed: ${transfer.id}`);
     
@@ -295,19 +324,24 @@ async function handleTransferFailed(transfer) {
     
     // Notify admin (you could have an admin notification system)
     console.log(`ADMIN ALERT: Transfer ${transfer.id} for transaction ${transaction.id} has failed`);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling transfer.failed:', error);
   }
 }
 
 /**
  * Handle charge.refunded event
- * @param {Object} charge - Stripe charge object
+ * @param {StripeCharge} charge - Stripe charge object
  */
-async function handleChargeRefunded(charge) {
+async function handleChargeRefunded(charge: StripeCharge): Promise<void> {
   try {
     console.log(`Charge refunded: ${charge.id}`);
     
+    // Initialize Stripe
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      apiVersion: '2023-10-16', // Use the latest API version or specify your version
+    });
+
     // Find payment intent by charge ID
     const paymentIntent = await stripe.paymentIntents.retrieve(charge.payment_intent);
     
@@ -360,7 +394,7 @@ async function handleChargeRefunded(charge) {
         isRead: false
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling charge.refunded:', error);
   }
 } 

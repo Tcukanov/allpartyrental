@@ -4,6 +4,11 @@ import { NextResponse } from 'next/server';
 import { initializeApi, getApiStatus } from './init';
 import { logger } from '@/lib/logger';
 
+// Global type declaration for API initialization flag
+declare global {
+  var _apiInitialized: boolean;
+}
+
 // Initialize the API when this module is first loaded
 // This ensures cron jobs and other services start when Next.js initializes
 (async () => {
@@ -20,7 +25,7 @@ import { logger } from '@/lib/logger';
     if (typeof global !== 'undefined') {
       global._apiInitialized = true;
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to initialize API on startup:', error);
   }
 })();
@@ -29,7 +34,7 @@ import { logger } from '@/lib/logger';
  * API root endpoint
  * Returns basic API information
  */
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
     const status = getApiStatus();
     
@@ -41,7 +46,7 @@ export async function GET() {
       docs: '/api/docs', // If you have API docs
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error handling API root request:', error);
     
     return NextResponse.json({

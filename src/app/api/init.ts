@@ -1,16 +1,32 @@
 'use strict';
 
-import { initCronJobs, stopCronJobs } from '@/lib/jobs/cron';
+import { initCronJobs, stopCronJobs, CronJobs } from '@/lib/jobs/cron';
 import { logger } from '@/lib/logger';
 
+// Define type for resources
+interface ApiResources {
+  cronJobs: CronJobs;
+  initialized: boolean;
+  initTime: string;
+}
+
+// Add type declaration for process
+declare global {
+  namespace NodeJS {
+    interface Process {
+      _apiShutdownHandlersSet?: boolean;
+    }
+  }
+}
+
 // Store references to initialized resources
-let resources = null;
+let resources: ApiResources | null = null;
 
 /**
  * Initialize server-side components for Next.js API routes
  * This should be called once when the server starts
  */
-export async function initializeApi() {
+export async function initializeApi(): Promise<ApiResources> {
   // Only initialize once
   if (resources) {
     logger.debug('API already initialized, using existing resources');
@@ -36,7 +52,7 @@ export async function initializeApi() {
     setupShutdownHandlers();
     
     return resources;
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error during API initialization:', error);
     throw error;
   }
@@ -45,12 +61,12 @@ export async function initializeApi() {
 /**
  * Set up graceful shutdown handlers
  */
-function setupShutdownHandlers() {
+function setupShutdownHandlers(): void {
   // Only set up handlers once and only in a Node.js environment
   if (typeof process !== 'undefined' && process.on && !process._apiShutdownHandlersSet) {
     process._apiShutdownHandlersSet = true;
     
-    const handleShutdown = async () => {
+    const handleShutdown = async (): Promise<void> => {
       logger.info('API shutdown initiated...');
       
       try {
@@ -62,7 +78,7 @@ function setupShutdownHandlers() {
         
         logger.info('API shutdown completed successfully');
         process.exit(0);
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Error during API shutdown:', error);
         process.exit(1);
       }
@@ -79,7 +95,11 @@ function setupShutdownHandlers() {
 /**
  * Get API status and initialization information
  */
-export function getApiStatus() {
+export function getApiStatus(): {
+  status: 'initialized' | 'uninitialized';
+  initTime: string | null;
+  cronJobsActive: boolean;
+} {
   return {
     status: resources ? 'initialized' : 'uninitialized',
     initTime: resources ? resources.initTime : null,

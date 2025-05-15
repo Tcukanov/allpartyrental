@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/prisma/client';
+import { Prisma } from '@prisma/client';
 
 /**
  * Get parties for the authenticated client with optional status filtering
  */
-export async function GET(request) {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     console.log('API request: /api/client/parties');
     
@@ -30,7 +31,7 @@ export async function GET(request) {
     console.log(`Status filter: ${statusParam || 'none'}`);
     
     // Determine statuses to include based on the status parameter
-    let statusFilter = {};
+    let statusFilter: Prisma.PartyWhereInput = {};
     
     if (statusParam) {
       if (statusParam === 'active') {
@@ -91,7 +92,7 @@ export async function GET(request) {
         success: true,
         data: processedParties
       });
-    } catch (prismaError) {
+    } catch (prismaError: any) {
       console.error('Prisma error in parties endpoint:', prismaError);
       return NextResponse.json(
         { 
@@ -103,7 +104,7 @@ export async function GET(request) {
         { status: 500 }
       );
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching parties:', error);
     
     // Return a more detailed error response

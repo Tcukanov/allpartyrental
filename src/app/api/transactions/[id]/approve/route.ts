@@ -96,65 +96,157 @@ export async function POST(
           where: { userId: transaction.offer.provider.id }
         });
         
-        if (provider?.stripeAccountId) {
-          try {
-            // Get fee settings
-            const { providerFeePercent } = await getFeeSettings();
-            
-            // Calculate platform fee (provider's portion)
-            const paymentIntent = await stripe.paymentIntents.retrieve(transaction.paymentIntentId);
-            const totalAmount = paymentIntent.amount;
-            const platformFee = Math.round(totalAmount * (providerFeePercent / 100));
-            const transferAmount = totalAmount - platformFee;
-            
-            console.log(`Automatically transferring ${transferAmount} to provider (fee: ${platformFee})`);
-            
-            // Create transfer to provider's connected account
-            const transfer = await stripe.transfers.create({
-              amount: transferAmount,
-              currency: paymentIntent.currency,
-              destination: provider.stripeAccountId,
-              source_transaction: typeof paymentIntent.latest_charge === 'string' 
-                ? paymentIntent.latest_charge 
-                : paymentIntent.latest_charge.id,
-              metadata: {
-                transactionId: transaction.id,
-                paymentIntentId: transaction.paymentIntentId,
-                providerId: transaction.offer.provider.id,
-                platformFee,
-                providerFeePercent,
-                auto: 'true'
-              }
-            });
-            
-            console.log('Transfer created successfully:', transfer.id);
-            
-            // Update transaction with transfer details
-            await prisma.transaction.update({
-              where: { id: transactionId },
-              data: {
-                // Add only fields that exist in your Transaction model
-                transferId: transfer.id,
-                status: "COMPLETED" as any,
-                escrowStartTime: new Date(),
-                escrowEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
-              } as any
-            });
-            
-            // Send notification to provider about the payment
-            await prisma.notification.create({
-              data: {
-                userId: transaction.offer.provider.id,
-                type: 'PAYMENT',
-                title: 'Payment Received',
-                content: `A payment of ${(transferAmount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()} for "${transaction.offer.service.name}" has been transferred to your account.`,
-                isRead: false
-              }
-            });
-          } catch (transferError) {
-            console.error('Error transferring funds to provider:', transferError);
-            // We'll continue even if transfer fails - admin can do it manually later
-          }
+        if (!provider?.stripeAccountId) {
+          console.error(`Provider ${transaction.offer.provider.id} has no connected Stripe account`);
+          
+          // Move transaction to ESCROW instead of completing it
+          // The admin will need to manually release funds later
+          await prisma.transaction.update({
+            where: { id: transactionId },
+            data: {
+              status: "ESCROW" as any,
+              escrowStartTime: new Date(),
+              escrowEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            } as any
+          });
+          
+          // Notify admin about missing Stripe account
+          await prisma.notification.create({
+            data: {
+              userId: transaction.offer.provider.id,
+              type: 'PAYMENT',
+              title: 'Stripe Account Required',
+              content: `A payment for "${transaction.offer.service.name}" is in escrow, but you need to connect your Stripe account to receive funds.`,
+              isRead: false
+            }
+          });
+          
+          return NextResponse.json({
+            success: true,
+            data: {
+              transaction: {
+                ...transaction,
+                status: "ESCROW"
+              },
+              message: "Payment is in escrow, but provider needs to connect Stripe account to receive funds."
+            }
+          }, { status: 200 });
+        }
+        
+        try {
+          // Get fee settings
+          const { providerFeePercent } = await getFeeSettings();
+          
+          // Calculate platform fee (provider's portion)
+          const paymentIntent = await stripe.paymentIntents.retrieve(transaction.paymentIntentId);
+          const totalAmount = paymentIntent.amount;
+          const platformFee = Math.round(totalAmount * (providerFeePercent / 100));
+          const transferAmount = totalAmount - platformFee;
+          
+          console.log(`Transferring ${transferAmount} to provider (platform fee: ${platformFee})`);
+          
+          // Create transfer to provider's connected account
+          const transfer = await stripe.transfers.create({
+            amount: transferAmount,
+            currency: paymentIntent.currency,
+            destination: provider.stripeAccountId,
+            source_transaction: typeof paymentIntent.latest_charge === 'string' 
+              ? paymentIntent.latest_charge 
+              : paymentIntent.latest_charge.id,
+            metadata: {
+              transactionId: transaction.id,
+              paymentIntentId: transaction.paymentIntentId,
+              providerId: transaction.offer.provider.id,
+              platformFee,
+              providerFeePercent,
+              auto: 'true'
+            }
+          });
+          
+          console.log('Transfer created successfully:', transfer.id);
+          
+          // Update transaction with transfer details and mark as COMPLETED
+          await prisma.transaction.update({
+            where: { id: transactionId },
+            data: {
+              transferId: transfer.id,
+              status: "COMPLETED" as any,
+              escrowStartTime: new Date(),
+              escrowEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            } as any
+          });
+          
+          // Send notification to provider about the payment
+          await prisma.notification.create({
+            data: {
+              userId: transaction.offer.provider.id,
+              type: 'PAYMENT',
+              title: 'Payment Received',
+              content: `A payment of ${(transferAmount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()} for "${transaction.offer.service.name}" has been transferred to your account.`,
+              isRead: false
+            }
+          });
+          
+          // Send notification to the client
+          await prisma.notification.create({
+            data: {
+              userId: transaction.offer.client.id,
+              type: 'PAYMENT',
+              title: 'Booking Confirmed',
+              content: `Your booking for ${transaction.offer.service.name} has been confirmed and completed. The provider has received payment.`,
+              isRead: false
+            }
+          });
+          
+          return NextResponse.json({
+            success: true,
+            data: {
+              transaction: {
+                ...transaction,
+                status: "COMPLETED",
+                transferId: transfer.id
+              },
+              escrowEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            }
+          }, { status: 200 });
+        } catch (transferError) {
+          console.error('Error transferring funds to provider:', transferError);
+          
+          // If transfer fails, set to ESCROW instead of COMPLETED
+          // Admin can manually release funds later
+          const escrowEndTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          
+          await prisma.transaction.update({
+            where: { id: transactionId },
+            data: {
+              status: "ESCROW" as any,
+              escrowStartTime: new Date(),
+              escrowEndTime
+            } as any
+          });
+          
+          // Notify admin about transfer failure
+          await prisma.notification.create({
+            data: {
+              userId: "admin", // Replace with actual admin user ID if available
+              type: 'SYSTEM',
+              title: 'Transfer Failed',
+              content: `Transfer to provider ${transaction.offer.provider.id} failed for transaction ${transactionId}. Reason: ${transferError.message}`,
+              isRead: false
+            }
+          });
+          
+          return NextResponse.json({
+            success: true,
+            data: {
+              transaction: {
+                ...transaction,
+                status: "ESCROW"
+              },
+              escrowEndTime,
+              message: "Payment is in escrow, but transfer to provider failed. Admin attention required."
+            }
+          }, { status: 200 });
         }
       } catch (error) {
         console.error('Error capturing payment:', error);
@@ -165,36 +257,29 @@ export async function POST(
       }
     }
     
-    // Calculate escrow end time (24 hours from now)
+    // If we get here, it means there's no payment intent
+    // This should not happen in normal flow, but handle it gracefully
+    console.warn(`Transaction ${transactionId} has no payment intent, but is being approved`);
+    
+    // Update the transaction status to ESCROW as a fallback
     const escrowEndTime = new Date();
     escrowEndTime.setHours(escrowEndTime.getHours() + 24);
     
-    // Update the transaction status directly to COMPLETED and set escrow end time
     const updatedTransaction = await prisma.transaction.update({
       where: { id: transactionId },
       data: {
-        status: "COMPLETED" as any, // Unsafe cast due to Prisma typing issue
+        status: "ESCROW" as any,
         escrowStartTime: new Date(),
         escrowEndTime
-      } as any // Unsafe cast for the entire data object due to property issues
-    });
-    
-    // Send notification to the client
-    await prisma.notification.create({
-      data: {
-        userId: transaction.offer.client.id,
-        type: 'PAYMENT',
-        title: 'Booking Confirmed',
-        content: `Your booking for ${transaction.offer.service.name} has been confirmed and completed. The payment will be released to the provider in 24 hours.`,
-        isRead: false
-      }
+      } as any
     });
     
     return NextResponse.json({
       success: true,
       data: {
         transaction: updatedTransaction,
-        escrowEndTime
+        escrowEndTime,
+        message: "Transaction approved, but no payment intent was found."
       }
     }, { status: 200 });
   } catch (error) {

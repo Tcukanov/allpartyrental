@@ -1,17 +1,24 @@
 'use strict';
 
-import { Prisma } from '@prisma/client';
+import { Prisma, Transaction } from '@prisma/client';
 import { prisma } from '@/lib/prisma/client';
 import { paymentService } from '@/lib/payment/service';
 import { logger } from '@/lib/logger';
 import { getFeeSettings } from '@/lib/payment/fee-settings';
+
+interface ProcessingResult {
+  processed: number;
+  successful: number;
+  failed: number;
+  results: PromiseSettledResult<Transaction>[];
+}
 
 /**
  * Processes all transactions with expired review deadlines
  * If a provider hasn't responded to a service request within 24 hours,
  * the transaction is automatically refunded.
  */
-export async function processReviewDeadlines() {
+export async function processReviewDeadlines(): Promise<ProcessingResult> {
   try {
     logger.info('Processing expired review deadlines');
     
@@ -46,7 +53,7 @@ export async function processReviewDeadlines() {
             try {
               await paymentService.cancelPaymentIntent(transaction.paymentIntentId);
               logger.info(`Refunded payment for expired transaction: ${transaction.id}`);
-            } catch (error) {
+            } catch (error: any) {
               logger.error(`Failed to refund payment for transaction ${transaction.id}:`, error);
               throw error;
             }
@@ -85,7 +92,7 @@ export async function processReviewDeadlines() {
           
           logger.info(`Successfully processed expired review for transaction: ${transaction.id}`);
           return updatedTransaction;
-        } catch (error) {
+        } catch (error: any) {
           logger.error(`Error processing expired review for transaction ${transaction.id}:`, error);
           throw error;
         }
@@ -104,7 +111,7 @@ export async function processReviewDeadlines() {
       failed,
       results
     };
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error processing review deadlines:', error);
     throw error;
   }
@@ -114,7 +121,7 @@ export async function processReviewDeadlines() {
  * Processes all transactions with expired escrow periods
  * When the escrow period ends, funds are automatically released to the provider.
  */
-export async function processEscrowReleases() {
+export async function processEscrowReleases(): Promise<ProcessingResult> {
   try {
     logger.info('Processing expired escrow periods');
     
@@ -162,7 +169,7 @@ export async function processEscrowReleases() {
                 providerFeePercent  // Use the configured fee percentage
               );
               logger.info(`Released funds to provider for transaction: ${transaction.id}`);
-            } catch (error) {
+            } catch (error: any) {
               logger.error(`Failed to release funds for transaction ${transaction.id}:`, error);
               throw error;
             }
@@ -201,7 +208,7 @@ export async function processEscrowReleases() {
           
           logger.info(`Successfully processed escrow release for transaction: ${transaction.id}`);
           return updatedTransaction;
-        } catch (error) {
+        } catch (error: any) {
           logger.error(`Error processing escrow release for transaction ${transaction.id}:`, error);
           throw error;
         }
@@ -220,7 +227,7 @@ export async function processEscrowReleases() {
       failed,
       results
     };
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error processing escrow releases:', error);
     throw error;
   }
@@ -230,7 +237,11 @@ export async function processEscrowReleases() {
  * Process all transaction deadlines
  * This is the main function called by the cron job
  */
-export async function processAllTransactions() {
+export async function processAllTransactions(): Promise<{
+  reviewDeadlines: ProcessingResult;
+  escrowReleases: ProcessingResult;
+  timestamp: string;
+}> {
   logger.info('Starting transaction processor');
   
   try {
@@ -248,7 +259,7 @@ export async function processAllTransactions() {
       escrowReleases: escrowResults,
       timestamp: new Date().toISOString()
     };
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error in transaction processor:', error);
     throw error;
   }

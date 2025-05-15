@@ -9,7 +9,7 @@ import Stripe from 'stripe';
  * 
  * @returns {Promise<NextResponse>} The response containing the account link URL
  */
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
     // Check if user is authenticated
     const session = await getServerSession(authOptions);
@@ -54,7 +54,7 @@ export async function GET() {
         });
         
         return NextResponse.json({ url: accountLink.url });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error creating account link:', error);
         
         // If the error is because the account link expired, we can create a new account link
@@ -104,7 +104,7 @@ export async function GET() {
         });
         
         return NextResponse.json({ url: accountLink.url });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error creating Stripe account or link:', error);
         
         // Check for platform setup errors
@@ -128,7 +128,7 @@ export async function GET() {
         );
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating Stripe Connect link:', error);
     return NextResponse.json(
       { error: `Failed to create Stripe Connect link: ${error.message}` },
