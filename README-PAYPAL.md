@@ -165,14 +165,45 @@ For production use, set up PayPal webhooks:
 
 ## Development Mocks
 
-In development environment, if PayPal credentials are not configured, the application will use mock responses:
+> **IMPORTANT NOTICE**: We are phasing out all mock implementations in favor of using real PayPal sandbox accounts.
 
-- Mock orders are created with IDs prefixed with `MOCK-`
-- Mock payments are always successful
-- Provider connections will simulate successful onboarding
-- Both PayPal wallet and credit card payments will use simplified mock flows
+### New Approach - Use Real Sandbox Accounts
 
-This allows development and testing without real PayPal credentials.
+For all development and testing:
+
+1. **Create real PayPal sandbox accounts** through the [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/)
+2. Configure your environment with sandbox credentials:
+   ```
+   PAYPAL_MODE=sandbox
+   PAYPAL_SANDBOX_CLIENT_ID=your_sandbox_client_id
+   PAYPAL_SANDBOX_CLIENT_SECRET=your_sandbox_client_secret
+   NEXT_PUBLIC_PAYPAL_CLIENT_ID=your_sandbox_client_id
+   ```
+3. Use real PayPal Sandbox API calls instead of mock implementations
+4. Document your sandbox testing credentials in a secure location
+
+### Temporary Fallback Only
+
+The application contains a fallback mechanism for development scenarios where sandbox credentials are not yet available:
+
+- This fallback is provided for initial setup only
+- It uses a standardized approach controlled by environment variables
+- **No hardcoded mock data** should ever be added to the codebase
+- All developers should transition to real sandbox accounts as soon as possible
+
+### Rules for Development:
+
+1. **NEVER add hardcoded mock data or responses** in the codebase
+2. **ALWAYS use PayPal sandbox accounts** for testing all payment flows
+3. **AVOID creating custom mock implementations** of the PayPal API
+4. If you need test data, create it through the normal application flows using sandbox accounts
+
+### When running without PayPal credentials (Temporary):
+
+- Mock orders are created with IDs prefixed with `SANDBOX_`
+- A warning is displayed in the console about missing credentials
+- Limited functionality is available until proper credentials are configured
+- This mode is intended for initial setup only and should not be used for feature development or testing
 
 ## Going to Production
 

@@ -8,7 +8,7 @@ export default function MyPartyRedirectPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const partyId = searchParams.get('id');
-
+  
   useEffect(() => {
     // On component mount, redirect to transactions page
     const redirectTimeout = setTimeout(() => {
@@ -17,7 +17,7 @@ export default function MyPartyRedirectPage() {
 
     return () => clearTimeout(redirectTimeout);
   }, [router]);
-
+  
   return (
     <Container maxW="container.md" py={12}>
       <Center flexDirection="column">
@@ -25,7 +25,7 @@ export default function MyPartyRedirectPage() {
         <Text fontSize="lg" textAlign="center">
           Party details are now integrated into the transactions page.
           Redirecting you to transactions...
-        </Text>
+          </Text>
       </Center>
     </Container>
   );

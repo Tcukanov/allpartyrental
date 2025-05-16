@@ -10,6 +10,19 @@ export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Add connection handling options for better stability
+    // This helps prevent "Connection already open" errors
+    // and ensures transactions complete properly
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL
+      }
+    },
+    // Set transaction timeout to ensure operations complete
+    transactionOptions: {
+      maxWait: 5000, // 5s max waiting for a transaction
+      timeout: 10000  // 10s max transaction time
+    }
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

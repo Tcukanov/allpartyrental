@@ -20,29 +20,13 @@ const PayPalConnectButton = ({ onSuccess, isReconnect = false }) => {
       const data = await response.json();
 
       if (!response.ok) {
+        console.error('PayPal connect error response:', data);
         throw new Error(data.error || 'Failed to initiate PayPal Connect');
       }
 
-      // Check if we're using mock mode (direct success without redirect)
-      if (data.success && data.message && data.merchantId) {
-        toast({
-          title: 'Connection Successful',
-          description: data.message,
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
-        
-        // Notify the parent component if needed
-        if (onSuccess) {
-          onSuccess(data);
-        }
-        
-        return;
-      }
-      
-      // If API returns a URL for PayPal onboarding
+      // If successful, the API returns a URL to redirect the user to PayPal
       if (data.success && data.links && data.links.partnerReferralUrl) {
+        console.log('Redirecting to PayPal onboarding URL:', data.links.partnerReferralUrl);
         // Redirect to PayPal onboarding
         window.location.href = data.links.partnerReferralUrl;
         
@@ -51,15 +35,27 @@ const PayPalConnectButton = ({ onSuccess, isReconnect = false }) => {
           onSuccess(data);
         }
       } else {
+        console.error('Invalid PayPal connect response:', data);
         throw new Error(data.error || 'Invalid response from PayPal connect endpoint');
       }
     } catch (error) {
       console.error('PayPal Connect error:', error);
+      
+      // Show more detailed error information
       toast({
         title: 'Connection Failed',
         description: error.message || 'Failed to connect to PayPal. Please try again.',
         status: 'error',
-        duration: 5000,
+        duration: 7000,
+        isClosable: true,
+      });
+      
+      // Show additional help toast
+      toast({
+        title: 'Try Manual Connection',
+        description: 'If automatic connection fails, please try entering your PayPal sandbox credentials manually.',
+        status: 'info',
+        duration: 10000,
         isClosable: true,
       });
     } finally {

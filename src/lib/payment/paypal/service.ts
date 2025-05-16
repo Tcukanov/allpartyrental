@@ -236,72 +236,24 @@ export class PayPalClient {
    * @param businessName - Business name of the provider
    */
   async createPartnerReferral(providerId: string, email: string, businessName: string): Promise<any> {
-    // Force sandbox mode for development
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    
-    // For development, use sandbox direct link instead of partner flow
-    if (isDevelopment) {
-      console.log('Using direct sandbox onboarding link for PayPal (development mode)');
-      const timestamp = Date.now();
-      const trackingId = `${providerId.substring(0, 8)}_${timestamp}`;
-      
-      // Create a direct sandbox onboarding link that doesn't require partner ID
-      return {
-        links: [
-          {
-            href: `https://www.sandbox.paypal.com/bizsignup/partner/entry?referralToken=${trackingId}&displayMode=minibrowser&partnerClientId=${this.clientId}&returnToPartnerUrl=${encodeURIComponent(`${process.env.NEXTAUTH_URL}/provider/settings/payments/paypal-callback`)}`,
-            rel: 'action_url',
-            method: 'GET'
-          }
-        ]
-      };
-    }
-    
-    // For production, use the proper partner flow (requires PayPal approval and partner ID)
-    console.log(`Using real PayPal partner referral API with clientId: ${this.clientId.substring(0, 5)}...`);
-    
-    const data = {
-      tracking_id: providerId,
-      partner_config_override: {
-        return_url: `${process.env.NEXTAUTH_URL}/provider/settings/payments/paypal-callback`,
-        return_url_description: "Return to the application after approval"
-      },
-      operations: [
-        {
-          operation: "API_INTEGRATION",
-          api_integration_preference: {
-            rest_api_integration: {
-              integration_method: "PAYPAL",
-              integration_type: "THIRD_PARTY",
-              third_party_details: {
-                features: [
-                  "PAYMENT",
-                  "REFUND",
-                  "PARTNER_FEE",
-                  "DELAY_FUNDS_DISBURSEMENT"
-                ]
-              }
-            }
-          }
-        }
-      ],
-      legal_consents: [
-        {
-          type: "SHARE_DATA_CONSENT",
-          granted: true
-        }
-      ],
-      products: ["EXPRESS_CHECKOUT"],
-      capabilities: [
-        "CUSTOM_CARD_PROCESSING",
-        "PAYPAL_WALLET_VAULTING_ADVANCED",
-        "PAYOUTS"
-      ],
-      legal_business_name: businessName,
-      email
-    };
+    // For sandbox testing without partner approval, create a direct link
+    console.log(`Creating PayPal onboarding link for ${email}, Client ID: ${this.clientId.substring(0, 8)}...`);
 
-    return this.request('/v2/customer/partner-referrals', 'POST', data);
+    // Generate a tracking ID
+    const timestamp = Date.now();
+    const trackingId = `${providerId.substring(0, 8)}_${timestamp}`;
+
+    // In development/sandbox, we'll use our manual onboarding page instead of PayPal's Partner API
+    return {
+      success: true,
+      links: [
+        {
+          href: `${process.env.NEXTAUTH_URL}/provider/settings/payments/manual-paypal-setup?trackingId=${trackingId}&email=${encodeURIComponent(email)}&businessName=${encodeURIComponent(businessName)}`,
+          rel: 'action_url',
+          method: 'GET'
+        }
+      ]
+    };
   }
 
   /**

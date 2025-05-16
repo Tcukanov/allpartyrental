@@ -327,4 +327,38 @@ try {
 - Paginate large data sets when appropriate
 - Cache API responses when feasible
 
+## Mock Data and Testing
+
+### IMPORTANT: Rules for Development and Testing
+
+1. **No Hardcoded Mock Data**: Never use hardcoded mock data directly in the codebase. All test data should be configurable through environment variables or specific test configurations.
+
+2. **Sandbox over Mocks**: Always prefer using real sandbox environments (PayPal Sandbox, etc.) instead of creating mock implementations. This ensures testing is done in conditions that match production as closely as possible.
+
+3. **Environment Variables**: Use environment variables to control all external service configurations. For example:
+   ```
+   PAYPAL_MODE=sandbox
+   PAYPAL_SANDBOX_CLIENT_ID=your_sandbox_client_id
+   PAYPAL_SANDBOX_CLIENT_SECRET=your_sandbox_client_secret
+   ```
+
+4. **Conditional Logic**: If sandbox environments aren't available, use environment-based flags to determine behavior:
+   ```typescript
+   // CORRECT approach
+   if (process.env.NODE_ENV === 'development' && !process.env.PAYPAL_SANDBOX_CLIENT_ID) {
+     console.warn('Using fallback sandbox configuration. Add real sandbox credentials for complete testing.');
+     // Use sandbox fallback logic
+   }
+   
+   // INCORRECT approach - Do NOT do this
+   if (isDevelopment) {
+     return mockPaypalResponse(); // Hardcoded mock - NOT ALLOWED
+   }
+   ```
+
+5. **Testing in Development**:
+   - Always create proper sandbox accounts for testing integrations
+   - Never use production credentials in development environments
+   - Document all sandbox testing procedures in appropriate README files
+
 By following these patterns and conventions, you'll generate code that integrates seamlessly with the existing AllPartyRent platform. 

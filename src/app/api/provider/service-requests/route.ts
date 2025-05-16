@@ -77,7 +77,29 @@ export async function POST(req: NextRequest) {
     // We need the partyServiceId for the offer
     const partyServiceId = party.partyServices[0].id;
     
-    // Create an offer first, since Chat requires an offer
+    // First check if the provider has a Provider record
+    const serviceProvider = await prisma.user.findUnique({
+      where: { id: service.providerId },
+      include: { provider: true }
+    });
+
+    if (!serviceProvider) {
+      throw new Error(`Provider user with ID ${service.providerId} not found`);
+    }
+
+    // If there's no Provider record, create one
+    if (!serviceProvider.provider) {
+      console.log(`Creating missing Provider record for user ${service.providerId}`);
+      await prisma.provider.create({
+        data: {
+          userId: service.providerId,
+          businessName: serviceProvider.name || 'Service Provider',
+          isVerified: false,
+          verificationLevel: 0
+        }
+      });
+    }
+    
     const offer = await prisma.offer.create({
       data: {
         providerId: service.providerId,

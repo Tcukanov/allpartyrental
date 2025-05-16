@@ -300,6 +300,25 @@ export async function POST(request: NextRequest) {
             throw new Error(`Provider with ID ${service.providerId} not found`);
           }
           
+          // Check if the provider has a Provider record in the database
+          const providerRecord = await prisma.provider.findUnique({
+            where: { userId: service.providerId }
+          });
+          
+          // If provider record doesn't exist, create it
+          if (!providerRecord) {
+            console.log(`Creating missing Provider record for user ${service.providerId}`);
+            await prisma.provider.create({
+              data: {
+                userId: service.providerId,
+                businessName: providerCheck.name || 'Service Provider',
+                isVerified: false,
+                verificationLevel: 0
+              }
+            });
+            console.log(`Created new Provider record for user ${service.providerId}`);
+          }
+          
           const serviceCheck = await prisma.service.findUnique({
             where: { id: service.id }
           });

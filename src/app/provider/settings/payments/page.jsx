@@ -24,13 +24,16 @@ import {
   AccordionItem,
   AccordionButton,
   AccordionPanel,
-  AccordionIcon
+  AccordionIcon,
+  VStack,
+  HStack,
+  Link
 } from '@chakra-ui/react';
 import { useSearchParams } from 'next/navigation';
 import SettingsLayout from '@/components/provider/SettingsLayout';
 import StripeConnectButton from '@/components/provider/StripeConnectButton';
 import PayPalConnectButton from '@/components/provider/PayPalConnectButton';
-import { FaPaypal } from 'react-icons/fa';
+import { FaPaypal, FaCog, FaExclamationCircle, FaWrench } from 'react-icons/fa';
 
 export default function PaymentsSettingsPage() {
   const searchParams = useSearchParams();
@@ -52,6 +55,7 @@ export default function PaymentsSettingsPage() {
   const [paymentAlert, setPaymentAlert] = useState(null);
   const [accountIdInput, setAccountIdInput] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState(null);
 
   // Check for success or error in the URL query params
   useEffect(() => {
@@ -374,6 +378,13 @@ export default function PaymentsSettingsPage() {
     }
   };
 
+  // Determine badge color based on connection status
+  const getBadgeColor = (status) => {
+    if (!status || !status.connected) return 'red';
+    if (status.accountType === 'SANDBOX') return 'orange';
+    return 'green';
+  };
+
   return (
     <SettingsLayout>
       <Box p={5} shadow="md" borderWidth="1px" borderRadius="md">
@@ -431,13 +442,21 @@ export default function PaymentsSettingsPage() {
                   {paypalStatus.connected ? (
                     <>
                       <Box mb={4} display="flex" alignItems="center">
-                        <Badge colorScheme="green" mr={2}>Connected</Badge>
-                        <Text>Your PayPal account is connected and ready to receive payments.</Text>
+                        <Badge colorScheme={getBadgeColor(paypalStatus)}>
+                          {paypalStatus.accountType === 'SANDBOX' ? 'SANDBOX MODE' : 'CONNECTED'}
+                        </Badge>
+                        {paypalStatus.accountType === 'SANDBOX' && (
+                          <Badge colorScheme="blue">TESTING</Badge>
+                        )}
                       </Box>
                       {paypalStatus.details && (
                         <Box mt={2}>
-                          <Text><strong>Merchant ID:</strong> {paypalStatus.details.merchantId}</Text>
-                          <Text><strong>Email:</strong> {paypalStatus.details.primaryEmail}</Text>
+                          <Text fontWeight="bold" mb={1}>Merchant ID:</Text>
+                          <Text mb={3} fontSize="sm" fontFamily="mono">
+                            {paypalStatus.details.merchantId}
+                          </Text>
+                          <Text fontWeight="bold" mb={1}>PayPal Email:</Text>
+                          <Text mb={4}>{paypalStatus.details.primaryEmail}</Text>
                           {paypalStatus.details.payments?.canReceivePayments ? (
                             <Badge colorScheme="green" mt={2}>Payments Enabled</Badge>
                           ) : (
