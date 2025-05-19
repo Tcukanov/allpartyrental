@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma/client';
 import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 import { Headers } from 'next/dist/compiled/@edge-runtime/primitives/fetch';
+import { TransactionStatus } from '@prisma/client';
 
 interface PayPalResource {
   id: string;
@@ -130,7 +131,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
 /**
  * Handle payment capture completed event
- * Update transaction status to PAID
+ * Update transaction status to ESCROW
  */
 async function handlePaymentCaptureCompleted(payload: PayPalWebhookPayload): Promise<void> {
   try {
@@ -155,16 +156,16 @@ async function handlePaymentCaptureCompleted(payload: PayPalWebhookPayload): Pro
       return;
     }
     
-    // Update the transaction status to PAID
+    // Update the transaction status to ESCROW
     await prisma.transaction.update({
       where: { id: transaction.id },
       data: {
-        status: 'PAID',
+        status: TransactionStatus.ESCROW,
         updatedAt: new Date(),
       },
     });
     
-    logger.info(`Updated transaction ${transaction.id} to PAID status based on PayPal webhook`);
+    logger.info(`Updated transaction ${transaction.id} to ESCROW status based on PayPal webhook`);
   } catch (error: any) {
     logger.error('Error processing payment capture completed webhook:', error);
     throw error;
@@ -173,7 +174,7 @@ async function handlePaymentCaptureCompleted(payload: PayPalWebhookPayload): Pro
 
 /**
  * Handle payment capture denied event
- * Update transaction status to FAILED
+ * Update transaction status to DECLINED
  */
 async function handlePaymentCaptureDenied(payload: PayPalWebhookPayload): Promise<void> {
   try {
@@ -197,16 +198,16 @@ async function handlePaymentCaptureDenied(payload: PayPalWebhookPayload): Promis
       return;
     }
     
-    // Update the transaction status to FAILED
+    // Update the transaction status to DECLINED
     await prisma.transaction.update({
       where: { id: transaction.id },
       data: {
-        status: 'FAILED',
+        status: TransactionStatus.DECLINED,
         updatedAt: new Date(),
       },
     });
     
-    logger.info(`Updated transaction ${transaction.id} to FAILED status based on PayPal webhook`);
+    logger.info(`Updated transaction ${transaction.id} to DECLINED status based on PayPal webhook`);
   } catch (error: any) {
     logger.error('Error processing payment capture denied webhook:', error);
     throw error;
@@ -249,7 +250,7 @@ async function handlePaymentRefund(payload: PayPalWebhookPayload): Promise<void>
       return prisma.transaction.update({
         where: { id: transaction.id },
         data: {
-          status: 'REFUNDED',
+          status: TransactionStatus.REFUNDED,
           updatedAt: new Date(),
         },
       });
@@ -302,17 +303,17 @@ async function handleOrderCompleted(payload: PayPalWebhookPayload): Promise<void
       return;
     }
     
-    // If the transaction isn't already PAID, update it
-    if (transaction.status !== 'PAID') {
+    // If the transaction isn't already in ESCROW, update it
+    if (transaction.status !== TransactionStatus.ESCROW) {
       await prisma.transaction.update({
         where: { id: transaction.id },
         data: {
-          status: 'PAID',
+          status: TransactionStatus.ESCROW,
           updatedAt: new Date(),
         },
       });
       
-      logger.info(`Updated transaction ${transaction.id} to PAID status based on PayPal webhook`);
+      logger.info(`Updated transaction ${transaction.id} to ESCROW status based on PayPal webhook`);
     }
   } catch (error: any) {
     logger.error('Error processing order completed webhook:', error);

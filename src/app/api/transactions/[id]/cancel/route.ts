@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 import { paymentService } from '@/lib/payment/service';
+import { TransactionStatus } from '@prisma/client';
 
 /**
  * Cancel a transaction
@@ -100,16 +101,16 @@ export async function POST(
         console.log('No payment intent to cancel');
       }
 
-      // Update the transaction's status to CANCELLED
-      console.log(`Updating transaction ${transactionId} status to CANCELLED`);
+      // Update the transaction's status to DECLINED (since there's no CANCELLED in the enum)
+      console.log(`Updating transaction ${transactionId} status to DECLINED`);
       const updatedTransaction = await prisma.transaction.update({
         where: { id: transaction.id },
         data: {
-          status: 'CANCELLED'
+          status: TransactionStatus.DECLINED
         }
       });
 
-      console.log(`Transaction ${transactionId} status updated to CANCELLED`);
+      console.log(`Transaction ${transactionId} status updated to DECLINED`);
 
       // Send notification to the provider
       if (transaction.offer.provider?.id) {

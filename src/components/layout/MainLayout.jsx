@@ -433,6 +433,7 @@ export default function MainLayout({ children }) {
                   <Link href="/contact">Contact</Link>
                   <Link href="/terms">Terms of Service</Link>
                   <Link href="/privacy">Privacy Policy</Link>
+                  <Link href="/authorized-use">Authorized Use Policy</Link>
                 </VStack>
               </Box>
             </Stack>

@@ -2,7 +2,7 @@
 
 import { Prisma, Transaction } from '@prisma/client';
 import { prisma } from '@/lib/prisma/client';
-import { paymentService } from '@/lib/payment/service';
+import { paymentService } from '@/lib/payment/stripe';
 import { logger } from '@/lib/logger';
 import { getFeeSettings } from '@/lib/payment/fee-settings';
 
@@ -34,9 +34,13 @@ export async function processReviewDeadlines(): Promise<ProcessingResult> {
         }
       },
       include: {
-        client: true,
-        provider: true,
-        service: true
+        offer: {
+          include: {
+            client: true,
+            provider: true,
+            service: true
+          }
+        }
       }
     });
     
@@ -71,10 +75,10 @@ export async function processReviewDeadlines(): Promise<ProcessingResult> {
           // Send notification to the client
           await prisma.notification.create({
             data: {
-              userId: transaction.clientId,
+              userId: transaction.offer.client.id,
               type: 'PAYMENT',
               title: 'Service Request Expired',
-              content: `Your service request for ${transaction.service.name} has expired as the provider did not respond within 24 hours. Your payment has been refunded.`,
+              content: `Your service request for ${transaction.offer.service.name} has expired as the provider did not respond within 24 hours. Your payment has been refunded.`,
               isRead: false
             }
           });
@@ -82,10 +86,10 @@ export async function processReviewDeadlines(): Promise<ProcessingResult> {
           // Send notification to the provider
           await prisma.notification.create({
             data: {
-              userId: transaction.providerId,
+              userId: transaction.offer.provider.id,
               type: 'PAYMENT',
               title: 'Service Request Expired',
-              content: `A service request for ${transaction.service.name} has expired as you did not respond within 24 hours. The client has been refunded.`,
+              content: `A service request for ${transaction.offer.service.name} has expired as you did not respond within 24 hours. The client has been refunded.`,
               isRead: false
             }
           });
@@ -137,9 +141,13 @@ export async function processEscrowReleases(): Promise<ProcessingResult> {
         }
       },
       include: {
-        client: true,
-        provider: true,
-        service: true
+        offer: {
+          include: {
+            client: true,
+            provider: true,
+            service: true
+          }
+        }
       }
     });
     
@@ -160,14 +168,14 @@ export async function processEscrowReleases(): Promise<ProcessingResult> {
                   providerFeePercent: transaction.providerFeePercent 
                 }));
               
-              // Release funds with the provider fee percentage
-              await paymentService.releaseFundsToProvider(
-                transaction.paymentIntentId,
-                transaction.providerId,
-                null,  // Let the service retrieve the transferGroup
-                null,  // Let the service calculate the amount
-                providerFeePercent  // Use the configured fee percentage
-              );
+              // Release funds with the provider fee percentage - uses the params object format
+              await paymentService.releaseFundsToProvider({
+                paymentIntentId: transaction.paymentIntentId,
+                providerId: transaction.offer.provider.id,
+                transferGroup: null,
+                amount: Number(transaction.amount),
+                providerFeePercent
+              });
               logger.info(`Released funds to provider for transaction: ${transaction.id}`);
             } catch (error: any) {
               logger.error(`Failed to release funds for transaction ${transaction.id}:`, error);
@@ -187,10 +195,10 @@ export async function processEscrowReleases(): Promise<ProcessingResult> {
           // Send notification to the client
           await prisma.notification.create({
             data: {
-              userId: transaction.clientId,
+              userId: transaction.offer.client.id,
               type: 'PAYMENT',
               title: 'Payment Released',
-              content: `Your payment for ${transaction.service.name} has been released to the provider as the escrow period has ended.`,
+              content: `Your payment for ${transaction.offer.service.name} has been released to the provider as the escrow period has ended.`,
               isRead: false
             }
           });
@@ -198,10 +206,10 @@ export async function processEscrowReleases(): Promise<ProcessingResult> {
           // Send notification to the provider
           await prisma.notification.create({
             data: {
-              userId: transaction.providerId,
+              userId: transaction.offer.provider.id,
               type: 'PAYMENT',
               title: 'Payment Received',
-              content: `Payment for ${transaction.service.name} has been released to you as the escrow period has ended.`,
+              content: `Payment for ${transaction.offer.service.name} has been released to you as the escrow period has ended.`,
               isRead: false
             }
           });

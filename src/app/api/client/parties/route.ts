@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/prisma/client';
-import { Prisma } from '@prisma/client';
+import { Prisma, PartyStatus } from '@prisma/client';
 
 /**
  * Get parties for the authenticated client with optional status filtering
@@ -52,10 +52,16 @@ export async function GET(request: Request): Promise<NextResponse> {
           status: 'CANCELLED'
         };
       } else {
-        // Specific status
-        statusFilter = {
-          status: statusParam
-        };
+        // Check if statusParam is a valid PartyStatus enum value
+        const validStatuses = ['DRAFT', 'PUBLISHED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+        if (validStatuses.includes(statusParam)) {
+          statusFilter = {
+            status: statusParam as PartyStatus
+          };
+        } else {
+          console.warn(`Invalid status parameter provided: ${statusParam}`);
+          // If invalid status, don't apply any filter
+        }
       }
     }
 

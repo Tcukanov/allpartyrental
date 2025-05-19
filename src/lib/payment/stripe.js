@@ -1,361 +1,105 @@
-// src/lib/payment/stripe.js
-
-import Stripe from 'stripe';
-import { getFeeSettings } from '@/lib/payment/fee-settings';
-
-// Initialize Stripe client
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// src/lib/payment/stripe.js - STRIPE INTEGRATION REMOVED
 
 /**
- * Payment service with Stripe integration
- * Handles payment processing with escrow functionality
+ * Placeholder payment service - Stripe integration has been removed
+ * All methods return error responses indicating that Stripe is no longer supported
  */
 export const paymentService = {
   /**
-   * Create a payment intent for an offer
-   * @param {Object} params - Payment parameters
-   * @param {string} params.offerId - Offer ID
-   * @param {string} params.clientId - Client ID
-   * @param {string} params.providerId - Provider ID
-   * @param {number} params.amount - Payment amount in cents
-   * @param {string} params.description - Payment description
-   * @param {number} params.clientFeePercent - Fee percentage charged to client
-   * @param {number} params.providerFeePercent - Fee percentage charged to provider
-   * @returns {Promise<Object>} - Stripe payment intent data
+   * Create a payment intent (REMOVED)
    */
-  createPaymentIntent: async ({ 
-    offerId, 
-    clientId, 
-    providerId, 
-    amount, 
-    description,
-    clientFeePercent = null,
-    providerFeePercent = null
-  }) => {
-    try {
-      // If fee percentages aren't provided, get them from settings
-      if (clientFeePercent === null || providerFeePercent === null) {
-        try {
-          const feeSettings = await getFeeSettings();
-          if (clientFeePercent === null) {
-            clientFeePercent = feeSettings.clientFeePercent;
-          }
-          if (providerFeePercent === null) {
-            providerFeePercent = feeSettings.providerFeePercent;
-          }
-        } catch (error) {
-          console.error('Error retrieving fee settings, using defaults:', error);
-          clientFeePercent = clientFeePercent === null ? 5.0 : clientFeePercent;
-          providerFeePercent = providerFeePercent === null ? 12.0 : providerFeePercent;
-        }
+  createPaymentIntent: async (params) => {
+    console.warn('Stripe integration has been removed - createPaymentIntent called with:', params);
+    return {
+      success: false,
+      error: {
+        code: 'STRIPE_REMOVED',
+        message: 'Stripe integration has been removed from this application'
       }
-
-      // Create transfer group ID
-      const transferGroup = `offer_${offerId}`;
-
-      // Calculate the client fee amount
-      const clientFeeAmount = Math.round(amount * (clientFeePercent / 100));
-      
-      // Total amount to charge (service amount + client fee)
-      const totalAmount = amount + clientFeeAmount;
-
-      // Create payment intent with application fee
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: totalAmount,
-        currency: 'usd',
-        description,
-        metadata: {
-          offerId,
-          clientId,
-          providerId,
-          baseAmount: amount,
-          clientFee: clientFeeAmount,
-          clientFeePercent,
-          providerFeePercent,
-          type: 'escrow'
-        },
-        transfer_group: transferGroup,
-        capture_method: 'manual', // This allows us to authorize now and capture later
-      });
-
-      return {
-        success: true,
-        data: {
-          clientSecret: paymentIntent.client_secret,
-          paymentIntentId: paymentIntent.id,
-          transferGroup,
-          totalAmount,
-          clientFeeAmount
-        }
-      };
-    } catch (error) {
-      console.error('Error creating payment intent:', error);
-      return {
-        success: false,
-        error: {
-          code: 'PAYMENT_INTENT_ERROR',
-          message: error.message
-        }
-      };
-    }
+    };
   },
 
   /**
-   * Capture payment intent (funds move to platform/escrow)
-   * @param {string} paymentIntentId - Payment intent ID
-   * @returns {Promise<Object>} - Updated payment intent
+   * Capture payment intent (REMOVED)
    */
   capturePayment: async (paymentIntentId) => {
-    try {
-      const paymentIntent = await stripe.paymentIntents.capture(paymentIntentId);
-      
-      return {
-        success: true,
-        data: paymentIntent
-      };
-    } catch (error) {
-      console.error('Error capturing payment:', error);
-      return {
-        success: false,
-        error: {
-          code: 'PAYMENT_CAPTURE_ERROR',
-          message: error.message
-        }
-      };
-    }
+    console.warn('Stripe integration has been removed - capturePayment called with ID:', paymentIntentId);
+    return {
+      success: false,
+      error: {
+        code: 'STRIPE_REMOVED',
+        message: 'Stripe integration has been removed from this application'
+      }
+    };
   },
 
   /**
-   * Release funds from escrow to provider
-   * @param {Object} params - Release parameters
-   * @param {string} params.paymentIntentId - Payment intent ID
-   * @param {string} params.providerId - Provider ID
-   * @param {string} params.transferGroup - Transfer group
-   * @param {number} params.amount - Original amount to transfer
-   * @param {number} params.providerFeePercent - Fee percentage charged to provider
-   * @returns {Promise<Object>} - Transfer data
+   * Release funds from escrow to provider (REMOVED)
    */
-  releaseFundsToProvider: async ({ 
-    paymentIntentId, 
-    providerId, 
-    transferGroup, 
-    amount,
-    providerFeePercent = null
-  }) => {
-    try {
-      // If providerFeePercent isn't provided, get it from settings
-      if (providerFeePercent === null) {
-        try {
-          const { providerFeePercent: settingsFee } = await getFeeSettings();
-          providerFeePercent = settingsFee;
-        } catch (error) {
-          console.error('Error retrieving provider fee percentage, using default:', error);
-          providerFeePercent = 12.0;
-        }
+  releaseFundsToProvider: async (params) => {
+    console.warn('Stripe integration has been removed - releaseFundsToProvider called with:', params);
+    return {
+      success: false,
+      error: {
+        code: 'STRIPE_REMOVED',
+        message: 'Stripe integration has been removed from this application'
       }
-
-      // Get provider's Stripe account ID
-      const provider = await getProviderStripeAccount(providerId);
-      
-      if (!provider || !provider.stripeAccountId) {
-        return {
-          success: false,
-          error: {
-            code: 'INVALID_PROVIDER',
-            message: 'Provider is not connected to Stripe'
-          }
-        };
-      }
-
-      // Calculate provider fee
-      const providerFeeAmount = Math.round(amount * (providerFeePercent / 100));
-      
-      // Amount to transfer to provider (original amount minus provider fee)
-      const transferAmount = amount - providerFeeAmount;
-
-      // Create a transfer to the provider's account
-      const transfer = await stripe.transfers.create({
-        amount: transferAmount,
-        currency: 'usd',
-        destination: provider.stripeAccountId,
-        transfer_group: transferGroup,
-        metadata: {
-          paymentIntentId,
-          providerId,
-          originalAmount: amount,
-          providerFee: providerFeeAmount,
-          providerFeePercent,
-          type: 'escrow_release'
-        }
-      });
-
-      return {
-        success: true,
-        data: {
-          transfer,
-          transferAmount,
-          providerFeeAmount
-        }
-      };
-    } catch (error) {
-      console.error('Error releasing funds to provider:', error);
-      return {
-        success: false,
-        error: {
-          code: 'FUND_RELEASE_ERROR',
-          message: error.message
-        }
-      };
-    }
+    };
   },
 
   /**
-   * Issue refund to client
-   * @param {string} paymentIntentId - Payment intent ID
-   * @param {number} amount - Refund amount (optional, defaults to full payment)
-   * @returns {Promise<Object>} - Refund data
+   * Issue refund to client (REMOVED)
    */
   issueRefund: async (paymentIntentId, amount = null) => {
-    try {
-      const refundParams = {
-        payment_intent: paymentIntentId,
-        metadata: {
-          type: 'transaction_refund'
-        }
-      };
-
-      // If amount is specified, do a partial refund
-      if (amount) {
-        refundParams.amount = amount;
+    console.warn('Stripe integration has been removed - issueRefund called with ID:', paymentIntentId, 'amount:', amount);
+    return {
+      success: false,
+      error: {
+        code: 'STRIPE_REMOVED',
+        message: 'Stripe integration has been removed from this application'
       }
-
-      const refund = await stripe.refunds.create(refundParams);
-      
-      return {
-        success: true,
-        data: refund
-      };
-    } catch (error) {
-      console.error('Error issuing refund:', error);
-      return {
-        success: false,
-        error: {
-          code: 'REFUND_ERROR',
-          message: error.message
-        }
-      };
-    }
+    };
   },
 
   /**
-   * Get payment intent details
-   * @param {string} paymentIntentId - Payment intent ID
-   * @returns {Promise<Object>} - Payment intent data
+   * Cancel a payment intent (REMOVED)
+   */
+  cancelPaymentIntent: async (paymentIntentId) => {
+    console.warn('Stripe integration has been removed - cancelPaymentIntent called with ID:', paymentIntentId);
+    return {
+      success: false,
+      error: {
+        code: 'STRIPE_REMOVED',
+        message: 'Stripe integration has been removed from this application'
+      }
+    };
+  },
+
+  /**
+   * Get a payment intent (REMOVED)
    */
   getPaymentIntent: async (paymentIntentId) => {
-    try {
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      
-      return {
-        success: true,
-        data: paymentIntent
-      };
-    } catch (error) {
-      console.error('Error retrieving payment intent:', error);
-      return {
-        success: false,
-        error: {
-          code: 'PAYMENT_INTENT_RETRIEVAL_ERROR',
-          message: error.message
-        }
-      };
-    }
+    console.warn('Stripe integration has been removed - getPaymentIntent called with ID:', paymentIntentId);
+    return {
+      success: false,
+      error: {
+        code: 'STRIPE_REMOVED',
+        message: 'Stripe integration has been removed from this application'
+      }
+    };
   },
 
   /**
-   * Handle Stripe webhook events
-   * @param {string} requestBody - Raw request body
-   * @param {string} signature - Stripe signature header
-   * @returns {Promise<Object>} - Processed event or error
+   * Create a Stripe Connect account link (REMOVED)
    */
-  handleWebhookEvent: async (requestBody, signature) => {
-    try {
-      const event = stripe.webhooks.constructEvent(
-        requestBody,
-        signature,
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
-
-      // Handle different event types
-      switch (event.type) {
-        case 'payment_intent.succeeded':
-          // Payment captured, update transaction status
-          await updateTransactionStatus(event.data.object);
-          break;
-        case 'transfer.created':
-          // Funds released to provider
-          await handleProviderTransfer(event.data.object);
-          break;
-        case 'charge.refunded':
-          // Refund issued to client
-          await handleClientRefund(event.data.object);
-          break;
+  createAccountLink: async (params) => {
+    console.warn('Stripe integration has been removed - createAccountLink called with:', params);
+    return {
+      success: false,
+      error: {
+        code: 'STRIPE_REMOVED',
+        message: 'Stripe integration has been removed from this application'
       }
-
-      return {
-        success: true,
-        data: { received: true, event: event.type }
-      };
-    } catch (error) {
-      console.error('Error handling webhook event:', error);
-      return {
-        success: false,
-        error: {
-          code: 'WEBHOOK_ERROR',
-          message: error.message
-        }
-      };
-    }
+    };
   }
 };
-
-/**
- * Get provider's Stripe account ID
- * @param {string} providerId - Provider's user ID
- * @returns {Promise<Object>} - Provider with Stripe account ID
- */
-async function getProviderStripeAccount(providerId) {
-  // In a real app, retrieve the provider's Stripe account from your database
-  // For now, we'll return a mock account
-  return {
-    id: providerId,
-    stripeAccountId: process.env.STRIPE_TEST_ACCOUNT || 'acct_test',
-  };
-}
-
-/**
- * Update transaction status based on Stripe event
- * @param {Object} paymentIntent - Stripe payment intent object
- */
-async function updateTransactionStatus(paymentIntent) {
-  // In a real app, update the transaction status in your database
-  console.log('Payment captured:', paymentIntent.id);
-}
-
-/**
- * Handle provider transfer events
- * @param {Object} transfer - Stripe transfer object
- */
-async function handleProviderTransfer(transfer) {
-  // In a real app, update the transaction in your database
-  console.log('Transfer to provider:', transfer.id);
-}
-
-/**
- * Handle client refund events
- * @param {Object} charge - Stripe charge object
- */
-async function handleClientRefund(charge) {
-  // In a real app, update the transaction in your database
-  console.log('Refund to client:', charge.id);
-}

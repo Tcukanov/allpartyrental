@@ -11,7 +11,7 @@ import { logger } from '@/lib/logger';
 export async function GET(): Promise<NextResponse> {
   try {
     // Initialize API if not already initialized
-    if (!getApiStatus().status === 'initialized') {
+    if (getApiStatus().status !== 'initialized') {
       await initializeApi();
     }
     
