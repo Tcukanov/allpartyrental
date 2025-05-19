@@ -1,21 +1,18 @@
 'use strict';
 
-import Stripe from 'stripe';
+import paypalClient from './paypal';
 import { logger } from '@/lib/logger';
-import { getFeeSettings } from '@/lib/payment/fee-settings';
-
-// Initialize Stripe with the secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+import { getFeeSettings } from './fee-settings';
 
 /**
- * Payment Service
- * Handles interactions with the Stripe API for payment processing
+ * Payment Service 
+ * This is a compatibility layer for legacy code that used the Stripe API
+ * All operations are now redirected to PayPal
  */
 export const paymentService = {
   /**
    * Create a payment intent
-   * For our escrow system, we use manual capture to authorize the payment
-   * without immediately charging the customer
+   * Now redirects to PayPal order creation
    */
   createPaymentIntent: async ({
     amount,
@@ -44,9 +41,6 @@ export const paymentService = {
           providerFeePercent = providerFeePercent === null ? 12.0 : providerFeePercent;
         }
       }
-
-      // Convert amount to cents for Stripe
-      const amountInCents = Math.round(amount * 100);
       
       // Create metadata with fee information for later use
       const metadataWithFees = {
@@ -56,19 +50,18 @@ export const paymentService = {
         originalAmount: amount.toString()
       };
       
-      // Create the payment intent
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountInCents,
+      // Create a new PayPal order
+      const order = await paypalClient.createOrder(
+        amount, 
         currency,
-        capture_method,
-        metadata: metadataWithFees,
-      });
+        metadataWithFees
+      );
       
-      logger.info(`Payment intent created: ${paymentIntent.id}`);
+      logger.info(`PayPal order created: ${order.id}`);
       
       return {
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id
+        clientSecret: order.id, // Using order ID as the "client secret"
+        paymentIntentId: order.id
       };
     } catch (error) {
       logger.error('Error creating payment intent:', error);
@@ -78,27 +71,18 @@ export const paymentService = {
   
   /**
    * Capture a payment intent
-   * Used when a provider approves a service request
-   * This moves the funds from authorization to actual charge (escrow)
+   * Now redirects to PayPal order capture
    */
   capturePaymentIntent: async (paymentIntentId) => {
     try {
       logger.info(`Capturing payment intent: ${paymentIntentId}`);
       
-      // Get the current payment intent to check its status
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      // Capture the order in PayPal
+      const capture = await paypalClient.captureOrder(paymentIntentId);
       
-      if (paymentIntent.status !== 'requires_capture') {
-        logger.warn(`Payment intent ${paymentIntentId} is not in 'requires_capture' state (current: ${paymentIntent.status})`);
-        return null;
-      }
+      logger.info(`Payment captured successfully: ${paymentIntentId}`);
       
-      // Capture the full amount
-      const capturedPayment = await stripe.paymentIntents.capture(paymentIntentId);
-      
-      logger.info(`Payment intent captured: ${paymentIntentId}`);
-      
-      return capturedPayment;
+      return capture;
     } catch (error) {
       logger.error(`Error capturing payment intent ${paymentIntentId}:`, error);
       throw new Error(`Failed to capture payment: ${error.message}`);
@@ -107,28 +91,29 @@ export const paymentService = {
   
   /**
    * Cancel a payment intent
-   * Used when a provider declines a service request
-   * This releases the authorization without charging the customer
+   * For PayPal, we simply get the order status
    */
   cancelPaymentIntent: async (paymentIntentId) => {
     try {
       logger.info(`Canceling payment intent: ${paymentIntentId}`);
       
-      // Check current status
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      
-      // Already canceled or captured
-      if (['canceled', 'succeeded'].includes(paymentIntent.status)) {
-        logger.warn(`Payment intent ${paymentIntentId} is already in '${paymentIntent.status}' state`);
-        return paymentIntent;
+      // PayPal orders expire automatically if not captured
+      // Just check and return the status
+      try {
+        const order = await paypalClient.getOrder(paymentIntentId);
+        
+        return {
+          id: order.id,
+          status: order.status
+        };
+      } catch (getOrderError) {
+        // If the order doesn't exist or can't be found, consider it canceled
+        logger.warn(`Error retrieving order ${paymentIntentId}, considering it canceled:`, getOrderError);
+        return {
+          id: paymentIntentId,
+          status: 'CANCELED'
+        };
       }
-      
-      // Cancel the payment intent
-      const canceledPayment = await stripe.paymentIntents.cancel(paymentIntentId);
-      
-      logger.info(`Payment intent canceled: ${paymentIntentId}`);
-      
-      return canceledPayment;
     } catch (error) {
       logger.error(`Error canceling payment intent ${paymentIntentId}:`, error);
       throw new Error(`Failed to cancel payment: ${error.message}`);
@@ -137,68 +122,49 @@ export const paymentService = {
   
   /**
    * Release funds to the provider
-   * Used when a service is completed and funds are released from escrow
-   * This creates a transfer to the provider's connected account
+   * Now redirects to PayPal payout
    */
-  releaseFundsToProvider: async (paymentIntentId, providerId, transferGroup = null, amount = null, providerFeePercent = null) => {
+  releaseFundsToProvider: async ({ paymentIntentId, providerId, amount }) => {
     try {
       logger.info(`Releasing funds for payment: ${paymentIntentId} to provider: ${providerId}`);
       
-      // Get the payment intent to determine amount
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      // Get provider details for the payout
+      const provider = await getProviderPayPalAccount(providerId);
       
-      if (paymentIntent.status !== 'succeeded') {
-        throw new Error(`Payment intent ${paymentIntentId} is not in 'succeeded' state (current: ${paymentIntent.status})`);
+      if (!provider || !provider.paypalEmail) {
+        throw new Error(`Provider ${providerId} does not have a PayPal email configured`);
       }
       
-      // Get the provider's connected account
-      const providerAccount = await getProviderStripeAccount(providerId);
-      
-      if (!providerAccount) {
-        throw new Error(`Provider ${providerId} does not have a connected Stripe account`);
+      // Get fee settings
+      let providerFeePercent;
+      try {
+        const feeSettings = await getFeeSettings();
+        providerFeePercent = feeSettings.providerFeePercent;
+      } catch (error) {
+        logger.warn('Error retrieving provider fee percentage, using default:', error);
+        providerFeePercent = 12.0;
       }
       
-      // If providerFeePercent isn't provided, get it from settings or metadata
-      if (providerFeePercent === null) {
-        try {
-          // First try to use the fee from the payment intent metadata
-          providerFeePercent = parseFloat(paymentIntent.metadata.providerFeePercent || '0');
-          
-          // If not found in metadata, get from settings
-          if (isNaN(providerFeePercent) || providerFeePercent <= 0) {
-            const { providerFeePercent: settingsFee } = await getFeeSettings();
-            providerFeePercent = settingsFee;
-          }
-        } catch (error) {
-          logger.warn('Error retrieving provider fee percentage, using default:', error);
-          providerFeePercent = 12.0;
-        }
-      }
+      // Calculate platform fee and transfer amount
+      const platformFeeAmount = amount * (providerFeePercent / 100);
+      const transferAmount = amount - platformFeeAmount;
       
-      // Calculate platform fee (provider fee percentage)
-      const originalAmount = amount || parseFloat(paymentIntent.metadata.originalAmount || '0');
-      const platformFeeAmount = Math.round((originalAmount * providerFeePercent / 100) * 100);
+      // Create a PayPal payout to the provider
+      const payout = await paypalClient.createPayout(
+        provider.paypalEmail,
+        transferAmount,
+        'USD',
+        `Payment for order ${paymentIntentId}`
+      );
       
-      // Calculate amount to transfer to provider (amount - platform fee)
-      const transferAmount = paymentIntent.amount - platformFeeAmount;
+      logger.info(`Funds released to provider: ${providerId}, payout: ${payout.batch_header.payout_batch_id}`);
       
-      // Create a transfer to the provider's connected account
-      const transfer = await stripe.transfers.create({
+      return {
+        id: payout.batch_header.payout_batch_id,
+        status: payout.batch_header.batch_status,
         amount: transferAmount,
-        currency: paymentIntent.currency,
-        destination: providerAccount.stripeAccountId,
-        source_transaction: paymentIntent.charges.data[0].id,
-        metadata: {
-          paymentIntentId,
-          providerId,
-          platformFee: platformFeeAmount.toString(),
-          providerFeePercent: providerFeePercent.toString()
-        }
-      });
-      
-      logger.info(`Funds released to provider: ${providerId}, transfer: ${transfer.id}`);
-      
-      return transfer;
+        currency: 'USD'
+      };
     } catch (error) {
       logger.error(`Error releasing funds for payment ${paymentIntentId}:`, error);
       throw new Error(`Failed to release funds: ${error.message}`);
@@ -207,33 +173,30 @@ export const paymentService = {
 };
 
 /**
- * Helper function to get a provider's connected Stripe account
+ * Helper function to get a provider's connected PayPal account
  */
-async function getProviderStripeAccount(providerId) {
-  logger.debug(`Getting Stripe account for provider: ${providerId}`);
+async function getProviderPayPalAccount(providerId) {
+  logger.debug(`Getting PayPal account for provider: ${providerId}`);
   
   try {
-    // Import prisma - we need it inside this function
-    const { prisma } = await import('@/lib/prisma/client');
-    
     // Look up the provider in the database
     const provider = await prisma.provider.findFirst({
       where: { userId: providerId }
     });
     
-    if (!provider || !provider.stripeAccountId) {
-      logger.warn(`No Stripe account found for provider: ${providerId}`);
+    if (!provider || !provider.paypalEmail) {
+      logger.warn(`No PayPal account found for provider: ${providerId}`);
       return null;
     }
     
-    logger.debug(`Found Stripe account ${provider.stripeAccountId} for provider ${providerId}`);
+    logger.debug(`Found PayPal email ${provider.paypalEmail} for provider ${providerId}`);
     
     return {
-      stripeAccountId: provider.stripeAccountId,
+      paypalEmail: provider.paypalEmail,
       isActive: true
     };
   } catch (error) {
-    logger.error(`Error fetching provider Stripe account: ${error.message}`);
+    logger.error(`Error fetching provider PayPal account: ${error.message}`);
     return null;
   }
 } 

@@ -36,11 +36,6 @@ interface PaymentSettings {
   providerFeePercent: number;
   escrowPeriodHours: number;
   reviewPeriodHours: number;
-  stripeMode: string;
-  stripeTestPublicKey: string;
-  stripeTestSecretKey: string;
-  stripeLivePublicKey: string;
-  stripeLiveSecretKey: string;
   paypalMode: string;
   paypalSandboxClientId: string;
   paypalSandboxClientSecret: string;
@@ -111,18 +106,13 @@ const DEFAULT_SETTINGS: SystemSettings = {
     providerFeePercent: 12.0,
     escrowPeriodHours: 24,
     reviewPeriodHours: 24,
-    stripeMode: 'test',
-    stripeTestPublicKey: 'pk_test_*****',
-    stripeTestSecretKey: 'sk_test_*****',
-    stripeLivePublicKey: 'pk_live_*****',
-    stripeLiveSecretKey: 'sk_live_*****',
     paypalMode: 'sandbox',
     paypalSandboxClientId: 'sandbox_client_id_*****',
     paypalSandboxClientSecret: 'sandbox_client_secret_*****',
     paypalLiveClientId: 'live_client_id_*****',
     paypalLiveClientSecret: 'live_client_secret_*****',
     paypalPartnerId: 'partner_id_*****',
-    activePaymentProvider: 'paypal' // 'stripe' or 'paypal'
+    activePaymentProvider: 'paypal'
   },
   notifications: {
     emailNotifications: true,

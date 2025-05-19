@@ -19,7 +19,7 @@ export async function POST(request) {
     }
     
     // Log debug information
-    logger.info('Debug direct payment endpoint called - now using PayPal instead of Stripe');
+    logger.info('Debug direct payment endpoint called - using PayPal for payment processing');
     
     // Get data from request
     const data = await request.json();
@@ -35,8 +35,8 @@ export async function POST(request) {
     // Return a message about PayPal integration
     return NextResponse.json({
       success: false,
-      message: 'Stripe integration has been removed. The application now uses PayPal for payment processing.',
-      info: 'This debug endpoint is no longer supported. Please use the regular payment flow with PayPal.',
+      message: 'This endpoint now uses PayPal for payment processing.',
+      info: 'This debug endpoint is for testing only. Please use the regular payment flow with PayPal for actual payments.',
       debugData: {
         amount: amount,
         title: title,

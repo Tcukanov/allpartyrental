@@ -50,7 +50,6 @@ export async function GET() {
           insurancePolicyNum: user.provider.insurancePolicyNum,
           taxIdVerified: user.provider.taxIdVerified,
           bankAccountVerified: user.provider.bankAccountVerified,
-          stripeAccountId: user.provider.stripeAccountId,
           isApproved: user.provider.isApproved
         }
       });
@@ -102,7 +101,6 @@ export async function PUT(request) {
     delete data.taxIdVerified;
     delete data.bankAccountVerified;
     delete data.isApproved;
-    delete data.stripeAccountId;
     
     // Update or create provider business data
     const updatedProvider = await prisma.provider.upsert({

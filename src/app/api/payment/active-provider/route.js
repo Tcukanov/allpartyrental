@@ -3,7 +3,7 @@ import { getActivePaymentProvider } from '@/lib/payment/paypal/config';
 
 /**
  * API endpoint to get the currently active payment provider
- * @returns {Promise<NextResponse>} JSON response with the active provider (paypal or stripe)
+ * @returns {Promise<NextResponse>} JSON response with the active provider (always paypal)
  */
 export async function GET() {
   try {

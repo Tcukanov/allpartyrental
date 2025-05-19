@@ -280,7 +280,6 @@ export default function ProviderCabinetPage() {
   const [isAddingCity, setIsAddingCity] = useState(false);
   const [selectedCityId, setSelectedCityId] = useState('');
   const [isLoadingCities, setIsLoadingCities] = useState(false);
-  const [stripeConnected, setStripeConnected] = useState(false);
 
   // Clear any outdated localStorage values but preserve important data
   useEffect(() => {
@@ -532,22 +531,6 @@ export default function ProviderCabinetPage() {
           avatar: profileData.avatar || '',
           socialLinks: profileData.socialLinks || {}
         });
-      }
-      
-      // Fetch Stripe connection status
-      try {
-        const stripeStatusResponse = await fetch('/api/provider/stripe/status');
-        const stripeStatusData = await stripeStatusResponse.json();
-        
-        console.log('Stripe status response:', stripeStatusData);
-        
-        // The API returns isConnected property, not success/connected
-        setStripeConnected(!!stripeStatusData.isConnected);
-        console.log('Stripe connected status set to:', !!stripeStatusData.isConnected);
-      } catch (stripeError) {
-        console.error('Error fetching Stripe status:', stripeError);
-        // Default to false if there's an error
-        setStripeConnected(false);
       }
       
       // Fetch requests data with chats
@@ -2194,20 +2177,13 @@ export default function ProviderCabinetPage() {
             <CardBody>
               <Text mb={4}>Connect with PayPal to receive payments from clients</Text>
               
-              <HStack spacing={2} mb={4}>
-                <Badge colorScheme={stripeConnected ? "green" : "red"}>
-                  {stripeConnected ? "Connected" : "Not Connected"}
-                </Badge>
-                {stripeConnected && <Badge colorScheme="green">Ready to Receive Payments</Badge>}
-              </HStack>
-              
               <Button 
                 as={NextLink}
                 href="/provider/settings/payments"
                 colorScheme="blue" 
                 leftIcon={<FaPaypal />}
               >
-                {stripeConnected ? "Manage PayPal Account" : "Connect PayPal Account"}
+                Connect PayPal Account
               </Button>
             </CardBody>
           </Card>

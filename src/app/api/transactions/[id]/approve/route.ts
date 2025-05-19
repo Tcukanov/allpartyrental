@@ -4,8 +4,8 @@ import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 import { paymentService } from '@/lib/payment/service';
 import { Prisma } from '@prisma/client';
-import Stripe from 'stripe';
 import { getFeeSettings } from '@/lib/payment/fee-settings';
+import { logger } from '@/lib/logger';
 
 /**
  * Process approval for a transaction
@@ -21,19 +21,19 @@ export async function POST(
     const { id } = unwrappedParams;
     const transactionId = id;
     
-    console.log(`Processing transaction approval request for ID: ${transactionId}`);
+    logger.info(`Processing transaction approval request for ID: ${transactionId}`);
     
     // Verify authentication
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
-      console.log('User not authenticated');
+      logger.info('User not authenticated');
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } },
         { status: 401 }
       );
     }
 
-    console.log(`Transaction ID: ${transactionId}`);
+    logger.info(`Transaction ID: ${transactionId}`);
 
     // Get the transaction
     const transaction = await prisma.transaction.findUnique({
@@ -50,21 +50,21 @@ export async function POST(
     });
 
     if (!transaction) {
-      console.error(`Transaction not found: ${transactionId}`);
+      logger.error(`Transaction not found: ${transactionId}`);
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Transaction not found' } },
         { status: 404 }
       );
     }
 
-    console.log('Transaction data:', JSON.stringify(transaction, null, 2));
+    logger.info('Transaction data:', transaction);
 
     // Check user authorization - either the provider or admin
     const isAdmin = session.user.role === 'ADMIN';
     const isProvider = transaction.offer.provider.id === session.user.id;
     
     if (!isAdmin && !isProvider) {
-      console.error(`Unauthorized access to transaction ${transactionId} by user ${session.user.id}`);
+      logger.error(`Unauthorized access to transaction ${transactionId} by user ${session.user.id}`);
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'You do not have permission to approve this transaction' } },
         { status: 403 }
@@ -79,25 +79,20 @@ export async function POST(
       );
     }
     
-    // Initialize Stripe with the secret key
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-      apiVersion: '2023-08-16',
-    });
-    
     // Capture the payment to move funds into escrow
     if (transaction.paymentIntentId) {
       try {
-        // Capture the payment
+        // Capture the payment with PayPal
         const capturedPayment = await paymentService.capturePaymentIntent(transaction.paymentIntentId);
-        console.log('Payment captured successfully:', capturedPayment.id);
+        logger.info('Payment captured successfully:', capturedPayment.id);
         
-        // Get provider's Stripe account ID
+        // Get provider's PayPal account
         const provider = await prisma.provider.findFirst({
           where: { userId: transaction.offer.provider.id }
         });
         
-        if (!provider?.stripeAccountId) {
-          console.error(`Provider ${transaction.offer.provider.id} has no connected Stripe account`);
+        if (!provider?.paypalEmail) {
+          logger.error(`Provider ${transaction.offer.provider.id} has no connected PayPal account`);
           
           // Move transaction to ESCROW instead of completing it
           // The admin will need to manually release funds later
@@ -110,13 +105,13 @@ export async function POST(
             } as any
           });
           
-          // Notify admin about missing Stripe account
+          // Notify admin about missing PayPal account
           await prisma.notification.create({
             data: {
               userId: transaction.offer.provider.id,
               type: 'PAYMENT',
-              title: 'Stripe Account Required',
-              content: `A payment for "${transaction.offer.service.name}" is in escrow, but you need to connect your Stripe account to receive funds.`,
+              title: 'PayPal Account Required',
+              content: `A payment for "${transaction.offer.service.name}" is in escrow, but you need to connect your PayPal account to receive funds.`,
               isRead: false
             }
           });
@@ -128,7 +123,7 @@ export async function POST(
                 ...transaction,
                 status: "ESCROW"
               },
-              message: "Payment is in escrow, but provider needs to connect Stripe account to receive funds."
+              message: "Payment is in escrow, but provider needs to connect PayPal account to receive funds."
             }
           }, { status: 200 });
         }
@@ -137,42 +132,16 @@ export async function POST(
           // Get fee settings
           const { providerFeePercent } = await getFeeSettings();
           
-          // Calculate platform fee (provider's portion)
-          const paymentIntent = await stripe.paymentIntents.retrieve(transaction.paymentIntentId);
-          const totalAmount = paymentIntent.amount;
-          const platformFee = Math.round(totalAmount * (providerFeePercent / 100));
-          const transferAmount = totalAmount - platformFee;
+          // Set up transaction for escrow
+          const escrowEndTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
           
-          console.log(`Transferring ${transferAmount} to provider (platform fee: ${platformFee})`);
-          
-          // Create transfer to provider's connected account
-          const transfer = await stripe.transfers.create({
-            amount: transferAmount,
-            currency: paymentIntent.currency,
-            destination: provider.stripeAccountId,
-            source_transaction: typeof paymentIntent.latest_charge === 'string' 
-              ? paymentIntent.latest_charge 
-              : paymentIntent.latest_charge.id,
-            metadata: {
-              transactionId: transaction.id,
-              paymentIntentId: transaction.paymentIntentId,
-              providerId: transaction.offer.provider.id,
-              platformFee,
-              providerFeePercent,
-              auto: 'true'
-            }
-          });
-          
-          console.log('Transfer created successfully:', transfer.id);
-          
-          // Update transaction with transfer details and mark as COMPLETED
+          // Update transaction to ESCROW status
           await prisma.transaction.update({
             where: { id: transactionId },
             data: {
-              transferId: transfer.id,
-              status: "COMPLETED" as any,
+              status: "ESCROW" as any,
               escrowStartTime: new Date(),
-              escrowEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
+              escrowEndTime: escrowEndTime
             } as any
           });
           
@@ -181,8 +150,8 @@ export async function POST(
             data: {
               userId: transaction.offer.provider.id,
               type: 'PAYMENT',
-              title: 'Payment Received',
-              content: `A payment of ${(transferAmount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()} for "${transaction.offer.service.name}" has been transferred to your account.`,
+              title: 'Payment In Escrow',
+              content: `A payment for "${transaction.offer.service.name}" has been placed in escrow. It will be automatically released to your PayPal account in 24 hours.`,
               isRead: false
             }
           });
@@ -193,7 +162,7 @@ export async function POST(
               userId: transaction.offer.client.id,
               type: 'PAYMENT',
               title: 'Booking Confirmed',
-              content: `Your booking for ${transaction.offer.service.name} has been confirmed and completed. The provider has received payment.`,
+              content: `Your booking for ${transaction.offer.service.name} has been confirmed. The payment is in escrow and will be released to the provider in 24 hours.`,
               isRead: false
             }
           });
@@ -203,17 +172,17 @@ export async function POST(
             data: {
               transaction: {
                 ...transaction,
-                status: "COMPLETED",
-                transferId: transfer.id
+                status: "ESCROW"
               },
-              escrowEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
+              escrowEndTime
             }
           }, { status: 200 });
-        } catch (transferError) {
-          console.error('Error transferring funds to provider:', transferError);
           
-          // If transfer fails, set to ESCROW instead of COMPLETED
-          // Admin can manually release funds later
+        } catch (escrowError: any) {
+          logger.error('Error setting up escrow:', escrowError);
+          
+          // If setting escrow fails, still attempt to complete transaction
+          // Admin can manually handle any issues
           const escrowEndTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
           
           await prisma.transaction.update({
@@ -225,13 +194,13 @@ export async function POST(
             } as any
           });
           
-          // Notify admin about transfer failure
+          // Notify admin about escrow setup failure
           await prisma.notification.create({
             data: {
               userId: "admin", // Replace with actual admin user ID if available
               type: 'SYSTEM',
-              title: 'Transfer Failed',
-              content: `Transfer to provider ${transaction.offer.provider.id} failed for transaction ${transactionId}. Reason: ${transferError.message}`,
+              title: 'Escrow Setup Issue',
+              content: `Issue setting up escrow for transaction ${transactionId}. Reason: ${escrowError.message}`,
               isRead: false
             }
           });
@@ -244,49 +213,38 @@ export async function POST(
                 status: "ESCROW"
               },
               escrowEndTime,
-              message: "Payment is in escrow, but transfer to provider failed. Admin attention required."
+              message: "Payment is in escrow, but there was an issue with setup. Admin attention may be required."
             }
           }, { status: 200 });
         }
-      } catch (error) {
-        console.error('Error capturing payment:', error);
-        return NextResponse.json(
-          { success: false, error: { code: 'PAYMENT_ERROR', message: 'Failed to capture payment' } },
-          { status: 500 }
-        );
+      } catch (captureError: any) {
+        logger.error('Error capturing payment:', captureError);
+        
+        return NextResponse.json({
+          success: false,
+          error: {
+            code: 'CAPTURE_FAILED',
+            message: 'Failed to capture payment',
+            details: captureError.message
+          }
+        }, { status: 500 });
       }
+    } else {
+      // No payment intent to capture
+      logger.error('No payment intent ID found for transaction:', transactionId);
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: 'MISSING_PAYMENT',
+          message: 'No payment information found for this transaction'
+        }
+      }, { status: 400 });
     }
-    
-    // If we get here, it means there's no payment intent
-    // This should not happen in normal flow, but handle it gracefully
-    console.warn(`Transaction ${transactionId} has no payment intent, but is being approved`);
-    
-    // Update the transaction status to ESCROW as a fallback
-    const escrowEndTime = new Date();
-    escrowEndTime.setHours(escrowEndTime.getHours() + 24);
-    
-    const updatedTransaction = await prisma.transaction.update({
-      where: { id: transactionId },
-      data: {
-        status: "ESCROW" as any,
-        escrowStartTime: new Date(),
-        escrowEndTime
-      } as any
-    });
-    
+  } catch (error: any) {
+    logger.error('Unexpected error approving transaction:', error);
     return NextResponse.json({
-      success: true,
-      data: {
-        transaction: updatedTransaction,
-        escrowEndTime,
-        message: "Transaction approved, but no payment intent was found."
-      }
-    }, { status: 200 });
-  } catch (error) {
-    console.error('Error approving transaction:', error);
-    return NextResponse.json(
-      { success: false, error: { code: 'SERVER_ERROR', message: error.message || 'Server error' } },
-      { status: 500 }
-    );
+      success: false,
+      error: { code: 'SERVER_ERROR', message: error.message || 'An unexpected error occurred' }
+    }, { status: 500 });
   }
 } 

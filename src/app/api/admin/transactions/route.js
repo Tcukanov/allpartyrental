@@ -31,7 +31,7 @@ export async function GET() {
     
     logger.info('Admin fetching all transactions');
     
-    // Fetch transactions directly from the database instead of from Stripe
+    // Fetch transactions directly from the database
     const dbTransactions = await prisma.transaction.findMany({
       orderBy: {
         createdAt: 'desc'

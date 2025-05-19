@@ -19,7 +19,7 @@ BOUNCE HOUSES, PHOTO BOOTH, ETC
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: NextAuth.js
 - **Deployment**: Vercel
-- **Payment Processing**: Stripe (with escrow functionality)
+- **Payment Processing**: PayPal (with escrow functionality)
 
 ## Core Features
 

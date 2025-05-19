@@ -230,7 +230,7 @@ export class PayPalClient {
   }
 
   /**
-   * Create a PayPal partner referral - equivalent to Stripe Connect onboarding
+   * Create a PayPal partner referral for merchant onboarding
    * @param providerId - Provider ID to associate with the PayPal account
    * @param email - Email to associate with the account
    * @param businessName - Business name of the provider
@@ -265,7 +265,7 @@ export class PayPalClient {
   }
 
   /**
-   * Create an order (similar to payment intent in Stripe)
+   * Create an order for the PayPal checkout process
    * @param amount - Amount to charge
    * @param currency - Currency code (e.g., USD)
    * @param applicationContext - Additional context for the order
@@ -476,7 +476,7 @@ export default paypalClient;
  */
 export const paymentService = {
   /**
-   * Create a payment intent equivalent to Stripe's
+   * Create a payment intent for PayPal processing
    */
   async createPaymentIntent({
     amount,

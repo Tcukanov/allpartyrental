@@ -81,20 +81,10 @@ export const getPayPalConfig = async () => {
 
 /**
  * Gets the currently active payment provider
- * Returns 'paypal' or 'stripe'
+ * Always returns 'paypal' as Stripe is no longer supported
  */
 export const getActivePaymentProvider = async () => {
-  try {
-    // Try to get settings from the database
-    const settings = await prisma.systemSettings.findFirst();
-    
-    // Return the active provider from settings, with paypal as default
-    return settings?.payments?.activePaymentProvider || process.env.ACTIVE_PAYMENT_PROVIDER || 'paypal';
-  } catch (error) {
-    logger.error('Error getting active payment provider:', error);
-    // Default to PayPal if we can't determine
-    return process.env.ACTIVE_PAYMENT_PROVIDER || 'paypal';
-  }
+  return 'paypal';
 };
 
 /**

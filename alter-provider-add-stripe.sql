@@ -1,1 +1,0 @@
-ALTER TABLE "Provider" ADD COLUMN "stripeAccountId" TEXT; 
