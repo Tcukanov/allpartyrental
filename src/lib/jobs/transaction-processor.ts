@@ -2,7 +2,7 @@
 
 import { Prisma, Transaction } from '@prisma/client';
 import { prisma } from '@/lib/prisma/client';
-import { paymentService } from '@/lib/payment/stripe';
+import { paymentService } from '@/lib/payment/service';
 import { logger } from '@/lib/logger';
 import { getFeeSettings } from '@/lib/payment/fee-settings';
 

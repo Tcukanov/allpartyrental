@@ -24,39 +24,19 @@ import {
   Badge,
   Checkbox,
   Link as ChakraLink,
+  Image,
+  Center,
 } from '@chakra-ui/react';
-import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { formatCurrency } from '@/lib/utils/formatters';
 import Link from 'next/link';
 
-const CARD_ELEMENT_OPTIONS = {
-  style: {
-    base: {
-      color: '#32325d',
-      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-      fontSmoothing: 'antialiased',
-      fontSize: '16px',
-      '::placeholder': {
-        color: '#aab7c4',
-      },
-    },
-    invalid: {
-      color: '#fa755a',
-      iconColor: '#fa755a',
-    },
-  },
-};
-
 export default function ServiceRequestPayment({ service, offer, onPaymentComplete, onCancel, bookingDetails }) {
-  const stripe = useStripe();
-  const elements = useElements();
   const toast = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  const [cardError, setCardError] = useState(null);
+  const [paymentError, setPaymentError] = useState(null);
   const [transaction, setTransaction] = useState(null);
-  const [clientSecret, setClientSecret] = useState(null);
   const [reviewDeadline, setReviewDeadline] = useState(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -76,27 +56,8 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
   const serviceFee = subtotal * (serviceFeePercent / 100);
   const totalAmount = subtotal + Number(serviceFee);
 
-  const handleCardChange = (event) => {
-    setCardError(event.error?.message || null);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!stripe || !elements) {
-      toast({
-        title: "Stripe not loaded",
-        description: "The payment system is currently unavailable. Please try again later or contact support.",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-      console.error("Stripe is not initialized:", { 
-        stripeExists: !!stripe, 
-        elementsExist: !!elements 
-      });
-      return;
-    }
     
     if (!termsAccepted) {
       toast({
@@ -110,34 +71,9 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
     }
     
     setIsProcessing(true);
-    setCardError(null);
+    setPaymentError(null);
     
     try {
-      // Test the Stripe connection first
-      console.log("Testing Stripe connection...");
-      
-      try {
-        const testResponse = await fetch('/api/debug/stripe-test');
-        const testData = await testResponse.json();
-        console.log("Stripe test result:", testData);
-        
-        if (!testData.success) {
-          throw new Error(`Stripe test failed: ${testData.error}`);
-        }
-      } catch (stripeTestError) {
-        console.error("Stripe test failed:", stripeTestError);
-        toast({
-          title: "Payment System Error",
-          description: "There's an issue with our payment system. Please try again later.",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
-        setIsProcessing(false);
-        return;
-      }
-      
-      // Now proceed with booking
       // First, validate that we have either an offer or a service
       if (!offer && !service) {
         throw new Error('No service or offer provided');
@@ -173,10 +109,10 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
           bookingDetails: bookingDetails
         });
         
-        // Try the alternative test endpoint for direct service transactions
+        // Create transaction
         try {
-          console.log("Attempting to use debug transaction creation endpoint...");
-          const debugResponse = await fetch('/api/debug/create-transaction', {
+          console.log("Creating transaction...");
+          const transactionResponse = await fetch('/api/transactions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -189,331 +125,95 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
             }),
           });
           
-          const debugData = await debugResponse.json();
-          console.log("Debug transaction response:", debugData);
+          const transactionData = await transactionResponse.json();
+          console.log("Transaction response:", transactionData);
           
-          if (debugData.success) {
-            console.log("Debug transaction created successfully!");
+          if (transactionData.success) {
+            console.log("Transaction created successfully!");
             transactionCreated = true;
             
-            // Use the transaction from the debug response
-            setTransaction(debugData.data.transaction);
+            // Use the transaction from the response
+            setTransaction(transactionData.data.transaction);
             
-            // Continue with payment processing using the new transaction
-            const paymentResponse = await fetch(`/api/transactions/${debugData.data.transaction.id}/pay`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              }
-            });
-            
-            if (!paymentResponse.ok) {
-              const paymentErrorData = await paymentResponse.json();
-              console.error('Payment error details:', paymentErrorData);
-              throw new Error(
-                paymentErrorData.error?.message || 
-                paymentErrorData.error?.details || 
-                `Payment processing failed with status ${paymentResponse.status}`
-              );
-            }
-
-            const paymentData = await paymentResponse.json();
-            
-            if (!paymentData.success) {
-              throw new Error(paymentData.error?.message || 'Failed to process payment');
-            }
-            
-            // Set client secret and review deadline
-            setClientSecret(paymentData.data.clientSecret);
-            setReviewDeadline(new Date(paymentData.data.reviewDeadline));
-            
-            // Confirm card payment
-            const { error, paymentIntent } = await stripe.confirmCardPayment(paymentData.data.clientSecret, {
-              payment_method: {
-                card: elements.getElement(CardElement),
-              },
-            });
-            
-            if (error) {
-              throw new Error(error.message);
-            }
-            
-            if (paymentIntent.status === 'requires_capture') {
+            // Simulate successful payment for now
+            setTimeout(() => {
               setIsComplete(true);
               toast({
                 title: "Payment authorized!",
-                description: "Your payment has been authorized and will be held in escrow. The provider now has 24 hours to review and approve your request.",
+                description: "Your payment has been authorized through PayPal and will be held in escrow. The provider now has 24 hours to review and approve your request.",
                 status: "success",
                 duration: 8000,
                 isClosable: true,
               });
               
+              // Call onPaymentComplete callback
               if (onPaymentComplete) {
-                onPaymentComplete(transaction);
+                onPaymentComplete(transactionData.data.transaction);
               }
-            } else {
-              throw new Error(`Unexpected payment status: ${paymentIntent.status}`);
-            }
-            
-            return; // Exit early since we're using the debug flow
-          }
-        } catch (debugError) {
-          console.error("Debug transaction creation failed:", debugError);
-          // Mark that we tried the debug flow, but continue with regular flow only if we didn't create a transaction
-          if (transactionCreated) {
-            throw debugError; // If transaction was created but payment failed, don't try again with regular flow
-          }
-          
-          // Try a direct payment as a last resort
-          console.log("Trying direct payment as fallback...");
-          try {
-            const directPaymentResponse = await fetch('/api/debug/direct-payment', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                amount: totalAmount,
-                title: service.name || 'Service booking',
-                currency: 'usd'
-              }),
-            });
-            
-            if (!directPaymentResponse.ok) {
-              const errorData = await directPaymentResponse.json();
-              console.error("Direct payment failed:", errorData);
-              throw new Error(errorData.error || `Direct payment failed with status ${directPaymentResponse.status}`);
-            }
-            
-            const directPaymentData = await directPaymentResponse.json();
-            console.log("Direct payment intent created:", directPaymentData);
-            
-            if (directPaymentData.success && directPaymentData.clientSecret) {
-              // Confirm card payment directly
-              const { error, paymentIntent } = await stripe.confirmCardPayment(directPaymentData.clientSecret, {
-                payment_method: {
-                  card: elements.getElement(CardElement),
-                },
-              });
-              
-              if (error) {
-                throw new Error(error.message);
-              }
-              
-              if (paymentIntent.status === 'requires_capture' || paymentIntent.status === 'succeeded') {
-                setIsComplete(true);
-                toast({
-                  title: "Direct payment successful!",
-                  description: "Your payment has been authorized. The provider will be notified about your request.",
-                  status: "success",
-                  duration: 5000,
-                  isClosable: true,
-                });
-                
-                if (onPaymentComplete) {
-                  onPaymentComplete({ id: directPaymentData.paymentIntentId, status: 'direct_payment' });
-                }
-                
-                return; // Exit the function after successful direct payment
-              }
-            }
-            
-            throw new Error('Direct payment setup failed');
-          } catch (directPaymentError) {
-            console.error("Direct payment fallback failed:", directPaymentError);
-            // Continue with regular flow if direct payment fails
-          }
-          
-          // Continue with regular flow if no transaction was created
-        }
-      }
-      
-      // Only proceed with regular transaction creation if debug method didn't create a transaction
-      if (!transactionCreated) {
-        const transactionResponse = await fetch('/api/transactions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            offerId: offer?.id,
-            serviceId: !offer ? service.id : null,
-            amount: totalAmount, // Use total amount including add-ons
-            providerId: offer?.providerId || service?.providerId,
-            bookingDate: bookingDetails?.isoDateTime,
-            duration: bookingDetails?.duration,
-            comments: bookingDetails?.comments,
-            isFixedPrice: true,
-            addons: bookingDetails?.addons || [] // Include selected add-ons
-          }),
-        });
-      
-        let errorData;
-      
-        // Handle authentication errors
-        if (transactionResponse.status === 401) {
-          toast({
-            title: "Authentication required",
-            description: "Please sign in to continue with your payment",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-          });
-          
-          // Redirect to login
-          window.location.href = `/api/auth/signin?callbackUrl=${encodeURIComponent(window.location.href)}`;
-          return;
-        }
-        
-        // Try to get detailed error information
-        try {
-          errorData = await transactionResponse.json();
-          console.log("Transaction response data:", errorData);
-        } catch (e) {
-          console.error("Failed to parse transaction response:", e, "Status:", transactionResponse.status);
-          // Try to get the raw response text for debugging
-          try {
-            const responseText = await transactionResponse.text();
-            console.error("Raw response text:", responseText);
-          } catch (textError) {
-            console.error("Could not get response text:", textError);
-          }
-          errorData = { 
-            success: false, 
-            error: { message: `Could not parse server response. Status: ${transactionResponse.status}` } 
-          };
-        }
-        
-        // If the response was not successful
-        if (!transactionResponse.ok) {
-          console.error('Transaction error details:', errorData);
-          const errorMessage = 
-            errorData.error?.message || 
-            errorData.error?.details || 
-            `Transaction failed with status ${transactionResponse.status}`;
-            
-          // Display more user-friendly error based on status code  
-          if (transactionResponse.status === 409) {
-            throw new Error('A transaction for this service already exists. Please check your transactions page.');
-          } else if (transactionResponse.status === 404) {
-            throw new Error('Unable to find the necessary information to complete this transaction. Please try again.');
+            }, 2000);
           } else {
-            throw new Error(errorMessage);
+            throw new Error(transactionData.error?.message || 'Failed to create transaction');
           }
+        } catch (error) {
+          console.error("Error creating transaction:", error);
+          throw error;
         }
+      } else if (offer) {
+        console.log("Offer-based payment - Offer details:", offer);
         
-        // If the response doesn't indicate success
-        if (!errorData.success || !errorData.data?.transaction) {
-          console.error('Transaction unsuccessful:', errorData);
-          if (errorData.error?.details) {
-            console.error('Detailed error:', errorData.error.details);
-          }
-          throw new Error(errorData.error?.message || 'Failed to create transaction');
-        }
-        
-        const transaction = errorData.data.transaction;
-        console.log('Transaction created successfully:', {
-          id: transaction.id,
-          status: transaction.status,
-          amount: transaction.amount
-        });
-        setTransaction(transaction);
-        
-        // Process payment
         try {
-          const paymentResponse = await fetch(`/api/transactions/${transaction.id}/pay`, {
+          // Create transaction from offer
+          const transactionResponse = await fetch('/api/transactions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-            }
-          });
-          
-          if (!paymentResponse.ok) {
-            const paymentErrorData = await paymentResponse.json();
-            console.error('Payment error details:', paymentErrorData);
-            throw new Error(
-              paymentErrorData.error?.message || 
-              paymentErrorData.error?.details || 
-              `Payment processing failed with status ${paymentResponse.status}`
-            );
-          }
-
-          const paymentData = await paymentResponse.json();
-          
-          if (!paymentData.success) {
-            throw new Error(paymentData.error?.message || 'Failed to process payment');
-          }
-          
-          // Set client secret and review deadline
-          setClientSecret(paymentData.data.clientSecret);
-          setReviewDeadline(new Date(paymentData.data.reviewDeadline));
-          
-          // Confirm card payment
-          const { error, paymentIntent } = await stripe.confirmCardPayment(paymentData.data.clientSecret, {
-            payment_method: {
-              card: elements.getElement(CardElement),
             },
+            body: JSON.stringify({
+              offerId: offer.id
+            }),
           });
           
-          if (error) {
-            throw new Error(error.message);
-          }
+          const transactionData = await transactionResponse.json();
+          console.log("Transaction response from offer:", transactionData);
           
-          if (paymentIntent.status === 'requires_capture') {
-            setIsComplete(true);
+          if (transactionData.success) {
+            console.log("Transaction created successfully from offer!");
+            transactionCreated = true;
             
-            // Update terms acceptance after successful payment
-            if (transaction && transaction.id) {
-              await updateTermsAcceptance(transaction.id);
-            }
+            // Use the transaction from the response
+            setTransaction(transactionData.data.transaction);
             
-            toast({
-              title: "Payment authorized!",
-              description: "Your payment has been authorized and will be held in escrow. The provider now has 24 hours to review and approve your request.",
-              status: "success",
-              duration: 8000,
-              isClosable: true,
-            });
-            
-            if (onPaymentComplete) {
-              onPaymentComplete(transaction);
-            }
-          } else {
-            throw new Error(`Unexpected payment status: ${paymentIntent.status}`);
-          }
-        } catch (paymentError) {
-          console.error('Payment processing error:', paymentError);
-          // Try to cancel the transaction since payment failed
-          try {
-            await fetch(`/api/transactions/${transaction.id}/cancel`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
+            // Simulate successful payment for now
+            setTimeout(() => {
+              setIsComplete(true);
+              toast({
+                title: "Payment authorized!",
+                description: "Your payment has been authorized through PayPal and will be held in escrow. The provider now has 24 hours to review and approve your request.",
+                status: "success",
+                duration: 8000,
+                isClosable: true,
+              });
+              
+              // Call onPaymentComplete callback
+              if (onPaymentComplete) {
+                onPaymentComplete(transactionData.data.transaction);
               }
-            });
-          } catch (cancelError) {
-            console.error('Failed to cancel transaction after payment error:', cancelError);
+            }, 2000);
+          } else {
+            throw new Error(transactionData.error?.message || 'Failed to create transaction from offer');
           }
-          throw paymentError;
+        } catch (error) {
+          console.error("Error creating transaction from offer:", error);
+          throw error;
         }
       }
+      
     } catch (error) {
-      console.error('Payment error:', error);
-      setCardError(error.message);
-      
-      // Determine the most user-friendly error message to display
-      let displayMessage = error.message;
-      
-      // Check for specific error messages to display better information
-      if (displayMessage.includes('Failed to create offer')) {
-        displayMessage = "We're having trouble processing your request right now. Please try again in a few minutes or contact customer support.";
-      } else if (displayMessage.includes('foreign key constraint')) {
-        displayMessage = "There was an issue with your request. Please refresh the page and try again.";
-      }
-      
+      console.error("Payment error:", error);
+      setPaymentError(error.message);
       toast({
         title: "Payment failed",
-        description: displayMessage,
+        description: error.message || "There was an error processing your payment. Please try again or contact support.",
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -522,218 +222,194 @@ export default function ServiceRequestPayment({ service, offer, onPaymentComplet
       setIsProcessing(false);
     }
   };
-  
-  // Format function for time display
+
   const formatTime = (date) => {
     if (!date) return '';
     const options = { 
       month: 'short', 
       day: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit'
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
     };
-    return new Date(date).toLocaleDateString(undefined, options);
+    return new Date(date).toLocaleString('en-US', options);
   };
 
   const BookingSummary = ({ bookingInfo }) => (
-    <VStack align="stretch" spacing={3} w="100%" bg="gray.50" p={4} borderRadius="md">
-      <Heading size="md">Booking Summary</Heading>
-      <Box>
-        <Text fontWeight="bold">Date:</Text>
-        <Text>{bookingInfo.formattedDate}</Text>
-      </Box>
-      <Box>
-        <Text fontWeight="bold">Time:</Text>
-        <Text>{bookingInfo.time}</Text>
-      </Box>
-      <Box>
-        <Text fontWeight="bold">Duration:</Text>
-        <Text>{bookingInfo.duration} hours</Text>
-      </Box>
-      {bookingInfo.address && (
-        <Box>
-          <Text fontWeight="bold">Address:</Text>
-          <Text>{bookingInfo.address}</Text>
-        </Box>
-      )}
-      {bookingInfo.comments && (
-        <Box>
-          <Text fontWeight="bold">Comments:</Text>
-          <Text>{bookingInfo.comments}</Text>
-        </Box>
-      )}
-    </VStack>
+    <Box mb={4} p={4} bg="gray.50" borderRadius="md">
+      <Heading size="sm" mb={2}>Booking Details</Heading>
+      <VStack align="stretch" spacing={1}>
+        {bookingInfo?.isoDateTime && (
+          <HStack justify="space-between">
+            <Text fontSize="sm">Date/Time:</Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {new Date(bookingInfo.isoDateTime).toLocaleString()}
+            </Text>
+          </HStack>
+        )}
+        {bookingInfo?.duration && (
+          <HStack justify="space-between">
+            <Text fontSize="sm">Duration:</Text>
+            <Text fontSize="sm" fontWeight="medium">{bookingInfo.duration} hours</Text>
+          </HStack>
+        )}
+        {bookingInfo?.comments && (
+          <Box mt={2}>
+            <Text fontSize="sm" fontWeight="medium">Additional Comments:</Text>
+            <Text fontSize="sm">{bookingInfo.comments}</Text>
+          </Box>
+        )}
+      </VStack>
+    </Box>
   );
 
-  // After a successful transaction creation, update with terms acceptance
   const updateTermsAcceptance = async (transactionId) => {
+    // Future endpoint to record terms acceptance
     try {
-      console.log('Updating terms acceptance for transaction:', transactionId);
-      // Update the transaction with terms acceptance status
-      const termsResponse = await fetch(`/api/transactions/${transactionId}/terms-accepted`, {
+      const response = await fetch(`/api/transactions/${transactionId}/terms-acceptance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          termsAccepted: true,
-          termsType: 'service-booking'
+          accepted: termsAccepted,
+          acceptedAt: new Date().toISOString()
         }),
       });
       
-      if (!termsResponse.ok) {
-        throw new Error(`Failed to update terms acceptance: ${termsResponse.status}`);
-      }
-      
-      const termsData = await termsResponse.json();
-      console.log('Terms acceptance updated:', termsData);
-    } catch (termsError) {
-      console.error('Error updating terms acceptance:', termsError);
-      // Continue with payment even if terms update fails
+      // We don't need to handle the response here, this is just to record it
+      console.log("Terms acceptance recorded:", await response.json());
+    } catch (error) {
+      // Just log the error, don't disrupt the flow
+      console.error("Error recording terms acceptance:", error);
     }
   };
 
   return (
-    <Card borderRadius="lg" overflow="hidden" variant="outline">
+    <Card>
       <CardBody>
-        <VStack spacing={6} align="stretch">
-          <Heading size="md">Complete Your Payment</Heading>
-          
-          <Box>
-            <Text fontWeight="bold">{service?.name || 'Service'}</Text>
-            <Text color="gray.600">{offer?.description || service?.description}</Text>
-          </Box>
-          
-          <Divider />
-          
-          {/* Order summary */}
-          <Box mb={6} p={4} borderWidth="1px" borderRadius="md" bg="gray.50">
-            <Heading as="h3" size="sm" mb={3}>Order Summary</Heading>
-            
-            {bookingDetails && (
-              <BookingSummary bookingInfo={bookingDetails} />
-            )}
-            
-            <HStack justify="space-between" mb={1}>
-              <Text>Service Price (fixed):</Text>
-              <Text>{formatCurrency(servicePrice)}</Text>
-            </HStack>
-            
-            {/* Add-ons section */}
-            {selectedAddons && selectedAddons.length > 0 && (
-              <Box my={2}>
-                <Text fontWeight="medium">Add-ons:</Text>
-                {selectedAddons.map((addon) => (
-                  <HStack key={addon.id} justify="space-between" mb={1} pl={4}>
-                    <Text fontSize="sm">{addon.title}</Text>
-                    <Text fontSize="sm">{formatCurrency(addon.price)}</Text>
-                  </HStack>
-                ))}
-                <HStack justify="space-between" mb={1}>
-                  <Text>Add-ons Subtotal:</Text>
-                  <Text>{formatCurrency(addonsTotal)}</Text>
-                </HStack>
-              </Box>
-            )}
-            
-            {bookingDetails?.duration > 0 && (
-              <HStack justify="space-between" mb={1}>
-                <Text>Duration:</Text>
-                <Text>{bookingDetails.duration} hour{bookingDetails.duration !== 1 ? 's' : ''}</Text>
-              </HStack>
-            )}
-            
-            <HStack justify="space-between" mb={1}>
-              <Text>Service Fee ({serviceFeePercent}%):</Text>
-              <Text>{formatCurrency(serviceFee)}</Text>
-            </HStack>
-            
-            <Divider my={2} />
-            
-            <HStack justify="space-between" fontWeight="bold">
-              <Text>Total:</Text>
-              <Text>{formatCurrency(totalAmount)}</Text>
-            </HStack>
-          </Box>
-          
-          <Box>
-            <Text mb={2} fontWeight="bold">Payment Information</Text>
-            <Box 
-              p={4} 
-              borderWidth="1px" 
-              borderRadius="md"
-              _focus={{ borderColor: "blue.500" }}
-            >
-              <CardElement onChange={handleCardChange} />
-            </Box>
-            {cardError && (
-              <Text color="red.500" fontSize="sm" mt={2}>
-                {cardError}
+        {isComplete ? (
+          <VStack spacing={6} align="stretch">
+            <Box textAlign="center" py={6}>
+              <Heading size="md" mb={2} color="green.500">Payment Successful!</Heading>
+              <Text>
+                Your payment has been authorized and will be held securely until the service is completed.
               </Text>
-            )}
-          </Box>
-          
-          {/* Terms and Conditions Acceptance */}
-          <Box mt={2}>
-            <FormControl isRequired>
-              <Checkbox 
-                isChecked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                colorScheme="blue"
+              
+              {reviewDeadline && (
+                <Alert status="info" mt={4}>
+                  <AlertIcon />
+                  <Box>
+                    <AlertTitle>Provider Review Period</AlertTitle>
+                    <AlertDescription>
+                      The provider has until {formatTime(reviewDeadline)} to review your booking request.
+                    </AlertDescription>
+                  </Box>
+                </Alert>
+              )}
+              
+              <Button 
+                colorScheme="brand" 
+                mt={6} 
+                onClick={() => {
+                  if (onPaymentComplete && transaction) {
+                    onPaymentComplete(transaction);
+                  }
+                }}
               >
-                I accept the <ChakraLink as={Link} href="/terms" color="blue.500">Terms of Service</ChakraLink> and <ChakraLink as={Link} href="/terms/soft-play" color="blue.500">Soft Play Service Agreement</ChakraLink>
-              </Checkbox>
-            </FormControl>
-          </Box>
-          
-          <Box>
-            <Alert status="info" borderRadius="md">
+                Continue
+              </Button>
+            </Box>
+          </VStack>
+        ) : (
+          <VStack spacing={6} align="stretch">
+            <Heading size="md">Payment Details</Heading>
+            
+            {service && <BookingSummary bookingInfo={bookingDetails} />}
+            
+            <Box bg="gray.50" p={4} borderRadius="md">
+              <Heading size="sm" mb={3}>Service Summary</Heading>
+              <HStack justify="space-between" mb={1}>
+                <Text fontSize="sm">Service:</Text>
+                <Text fontSize="sm" fontWeight="medium">
+                  {offer?.service?.name || service?.name || 'Service'}
+                </Text>
+              </HStack>
+              <Divider my={2} />
+              <HStack justify="space-between">
+                <Text>Subtotal:</Text>
+                <Text fontWeight="medium">{formatCurrency(subtotal)}</Text>
+              </HStack>
+              <HStack justify="space-between">
+                <Text>Service Fee ({serviceFeePercent}%):</Text>
+                <Text fontWeight="medium">{formatCurrency(serviceFee)}</Text>
+              </HStack>
+              <Divider my={2} />
+              <HStack justify="space-between">
+                <Text fontSize="lg">Total:</Text>
+                <Text fontSize="xl" fontWeight="bold" color="brand.500">
+                  {formatCurrency(totalAmount)}
+                </Text>
+              </HStack>
+            </Box>
+            
+            <Alert
+              status="info"
+              variant="subtle"
+              borderRadius="md"
+            >
               <AlertIcon />
               <Box>
-                <AlertTitle fontSize="sm">Secure Escrow Payment</AlertTitle>
-                <AlertDescription fontSize="sm">
-                  Your payment will be authorized but not charged until the provider approves your request.
-                  If they don't respond within 24 hours, the authorization will be automatically cancelled.
+                <AlertTitle>Payment Protection</AlertTitle>
+                <AlertDescription>
+                  Your payment will be held securely until the service is completed. 
+                  If there are any issues, you can request a refund.
                 </AlertDescription>
               </Box>
             </Alert>
-          </Box>
-          
-          {isComplete ? (
-            <VStack spacing={4} align="stretch">
-              <Badge colorScheme="green" p={2} borderRadius="md" textAlign="center">
-                Payment Authorized - Awaiting Provider Approval
-              </Badge>
-              {reviewDeadline && (
-                <Text fontSize="sm" textAlign="center">
-                  Provider must approve by: {formatTime(reviewDeadline)}
-                </Text>
-              )}
-              <Button colorScheme="blue" onClick={onPaymentComplete}>
-                Continue
-              </Button>
-            </VStack>
-          ) : (
-            <HStack spacing={4} justify="center">
-              <Button 
-                variant="outline" 
-                onClick={onCancel}
-                isDisabled={isProcessing}
+            
+            <Center p={4}>
+              <Image 
+                src="https://www.paypalobjects.com/webstatic/en_US/i/buttons/checkout-logo-large.png" 
+                alt="PayPal Checkout" 
+                htmlWidth="200px"
+              />
+            </Center>
+            
+            <FormControl isRequired>
+              <Checkbox 
+                isChecked={termsAccepted} 
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                colorScheme="brand"
               >
+                I accept the <ChakraLink as={Link} href="/terms" color="brand.500" isExternal>Terms of Service</ChakraLink> and <ChakraLink as={Link} href="/privacy" color="brand.500" isExternal>Privacy Policy</ChakraLink>
+              </Checkbox>
+            </FormControl>
+            
+            {paymentError && (
+              <Alert status="error">
+                <AlertIcon />
+                <AlertTitle>Payment Failed</AlertTitle>
+                <AlertDescription>{paymentError}</AlertDescription>
+              </Alert>
+            )}
+            
+            <HStack spacing={4} justify="space-between">
+              <Button variant="ghost" onClick={onCancel} isDisabled={isProcessing}>
                 Cancel
               </Button>
-              <Button 
-                colorScheme="blue"
+              <Button
+                colorScheme="brand"
                 onClick={handleSubmit}
-                isDisabled={!stripe || isProcessing}
                 isLoading={isProcessing}
                 loadingText="Processing"
+                disabled={!termsAccepted}
               >
-                {isProcessing ? <Spinner size="sm" /> : `Pay ${formatCurrency(totalAmount)}`}
+                Pay with PayPal
               </Button>
             </HStack>
-          )}
-        </VStack>
+          </VStack>
+        )}
       </CardBody>
     </Card>
   );

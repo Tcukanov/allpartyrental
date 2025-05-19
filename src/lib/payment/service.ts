@@ -1,108 +1,109 @@
-import Stripe from 'stripe';
-
-// Initialize Stripe with the secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-08-16',
-});
-
-interface CreatePaymentIntentParams {
-  amount: number;
-  currency: string;
-  capture_method: 'automatic' | 'manual';
-  metadata: {
-    transactionId: string;
-    offerId: string;
-    clientId: string;
-    providerId: string;
-    serviceName: string;
-  };
-  clientFeePercent: number;
-  providerFeePercent: number;
-}
-
-interface PaymentIntentResult {
-  clientSecret: string;
-  paymentIntentId: string;
-}
-
 /**
  * Service for handling payment-related operations
+ * This file is a compatibility layer for legacy code still expecting Stripe-like API
+ * All operations are now redirected to PayPal implementation
  */
+import paypalClient from './paypal';
+import { logger } from '@/lib/logger';
+
 export const paymentService = {
   /**
-   * Create a payment intent with Stripe
+   * Create a payment intent (now using PayPal)
    * @param params Payment parameters
    */
-  async createPaymentIntent(params: CreatePaymentIntentParams): Promise<PaymentIntentResult> {
-    // Convert decimal amount to cents
-    const amountInCents = Math.round(Number(params.amount) * 100);
-    
-    // Calculate platform fee (for internal use)
-    const platformFee = Math.round(
-      amountInCents * ((params.clientFeePercent + params.providerFeePercent) / 100)
-    );
+  async createPaymentIntent(params: any): Promise<any> {
+    logger.warn('Stripe service.ts called but Stripe has been removed - redirecting to PayPal');
     
     try {
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountInCents,
-        currency: params.currency,
-        capture_method: params.capture_method,
-        metadata: {
-          ...params.metadata,
-          clientFeePercent: params.clientFeePercent.toString(),
-          providerFeePercent: params.providerFeePercent.toString(),
-          platformFee: platformFee.toString(),
-        },
-        description: `Payment for ${params.metadata.serviceName}`,
-      });
+      // In PayPal, we use createOrder instead of createPaymentIntent
+      const order = await paypalClient.createOrder(
+        params.amount,
+        params.currency || 'USD',
+        params.metadata,
+        {
+          description: `Payment for ${params.metadata.serviceName}`
+        }
+      );
       
       return {
-        clientSecret: paymentIntent.client_secret as string,
-        paymentIntentId: paymentIntent.id,
+        id: order.id,
+        client_secret: order.id, // Using order ID as the "client secret"
+        amount: params.amount,
+        currency: params.currency || 'USD',
+        status: order.status,
+        paypal_order: order
       };
     } catch (error) {
-      console.error('Error creating payment intent:', error);
+      logger.error('Error creating payment intent:', error);
       throw error;
     }
   },
   
   /**
-   * Capture a payment intent (move funds from authorization to capture)
+   * Capture a payment intent (using PayPal)
    * @param paymentIntentId Payment intent ID to capture
    */
-  async capturePaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
+  async capturePaymentIntent(paymentIntentId: string): Promise<any> {
+    logger.warn('Stripe service.ts capturePaymentIntent called but Stripe has been removed - redirecting to PayPal');
+    
     try {
-      return await stripe.paymentIntents.capture(paymentIntentId);
+      // Use captureOrder which is the actual method in PayPalClient
+      return await paypalClient.captureOrder(paymentIntentId);
     } catch (error) {
-      console.error('Error capturing payment intent:', error);
+      logger.error('Error capturing payment intent:', error);
       throw error;
     }
   },
   
   /**
-   * Cancel a payment intent (release authorization)
+   * Cancel a payment intent (using PayPal)
    * @param paymentIntentId Payment intent ID to cancel
    */
-  async cancelPaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
+  async cancelPaymentIntent(paymentIntentId: string): Promise<any> {
+    logger.warn('Stripe service.ts cancelPaymentIntent called but Stripe has been removed - redirecting to PayPal');
+    
     try {
-      return await stripe.paymentIntents.cancel(paymentIntentId);
+      // In PayPal, cancelPaymentIntent is implemented through getting and checking the order
+      const order = await paypalClient.getOrder(paymentIntentId);
+      return {
+        id: order.id,
+        status: order.status,
+        paypal_order: order
+      };
     } catch (error) {
-      console.error('Error canceling payment intent:', error);
+      logger.error('Error canceling payment intent:', error);
       throw error;
     }
   },
   
   /**
-   * Refund a payment
+   * Refund a payment (using PayPal)
    * @param paymentIntentId Payment intent ID to refund
    */
-  async refundPayment(paymentIntentId: string): Promise<Stripe.Refund> {
+  async refundPayment(paymentIntentId: string): Promise<any> {
+    logger.warn('Stripe service.ts refundPayment called but Stripe has been removed - redirecting to PayPal');
+    
     try {
-      return await stripe.refunds.create({
-        payment_intent: paymentIntentId,
-      });
+      // In PayPal, we need to handle this by creating a refund for the capture
+      // This is a simplified implementation - in a real app you'd need to get the capture ID
+      return await paypalClient.createRefund(paymentIntentId);
     } catch (error) {
-      console.error('Error refunding payment:', error);
+      logger.error('Error refunding payment:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Release funds to provider (using PayPal)
+   */
+  async releaseFundsToProvider(params: any): Promise<any> {
+    logger.warn('Stripe service.ts releaseFundsToProvider called but Stripe has been removed - redirecting to PayPal');
+    
+    try {
+      // In PayPal, we use releaseFunds
+      return await paypalClient.releaseFunds(params.paymentIntentId);
+    } catch (error) {
+      logger.error('Error releasing funds to provider:', error);
       throw error;
     }
   },

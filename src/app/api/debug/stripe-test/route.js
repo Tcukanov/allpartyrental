@@ -1,31 +1,25 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { logger } from '@/lib/logger';
 
+/**
+ * Legacy Stripe test endpoint - keeping as a stub that returns info about migration to PayPal
+ */
 export async function GET() {
   try {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    
-    console.log('Testing Stripe connection with key:', process.env.STRIPE_SECRET_KEY ? 'Key exists' : 'Key missing');
-    
-    // Create a simple payment intent for testing
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: 1000, // $10.00
-      currency: 'usd',
-      capture_method: 'manual',
-      metadata: {
-        test: 'true',
-      },
-      description: 'Test payment intent',
-    });
+    logger.info('Legacy Stripe test endpoint accessed');
     
     return NextResponse.json({
-      success: true,
-      message: 'Stripe connection successful',
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
+      success: false,
+      message: 'Stripe integration has been removed',
+      details: 'The application has migrated from Stripe to PayPal for payment processing',
+      migrationInfo: {
+        previousProvider: 'Stripe',
+        currentProvider: 'PayPal',
+        timestamp: new Date().toISOString()
+      }
     });
   } catch (error) {
-    console.error('Stripe test error:', error);
+    logger.error('Error in legacy Stripe test endpoint:', error);
     return NextResponse.json({
       success: false,
       error: error.message,

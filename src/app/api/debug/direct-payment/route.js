@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
+import { logger } from '@/lib/logger';
 
 /**
- * Debug endpoint for testing direct payments
- * This endpoint creates a payment intent without requiring a transaction
- * to be created in the database first
+ * Debug endpoint for testing direct payments with PayPal
+ * This is a placeholder after migrating from Stripe to PayPal
  */
 export async function POST(request) {
   try {
@@ -19,17 +18,8 @@ export async function POST(request) {
       );
     }
     
-    // Initialize Stripe
-    console.log('STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY);
-    
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json(
-        { success: false, error: 'Stripe secret key is not configured' },
-        { status: 500 }
-      );
-    }
-    
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    // Log debug information
+    logger.info('Debug direct payment endpoint called - now using PayPal instead of Stripe');
     
     // Get data from request
     const data = await request.json();
@@ -42,38 +32,20 @@ export async function POST(request) {
       );
     }
     
-    // Convert amount to cents (Stripe uses the smallest currency unit)
-    const amountInCents = Math.round(parseFloat(amount) * 100);
-    
-    if (isNaN(amountInCents) || amountInCents <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid amount' },
-        { status: 400 }
-      );
-    }
-    
-    console.log(`Creating payment intent for ${amountInCents} cents (${amount} ${data.currency || 'USD'})`);
-    
-    // Create a payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountInCents,
-      currency: data.currency || 'usd',
-      capture_method: 'manual', // Authorize only, capture later
-      metadata: {
-        debug: 'true',
-        userId: session.user.id,
-        title: title
-      },
-      description: `Debug payment for ${title}`
-    });
-    
+    // Return a message about PayPal integration
     return NextResponse.json({
-      success: true,
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id
+      success: false,
+      message: 'Stripe integration has been removed. The application now uses PayPal for payment processing.',
+      info: 'This debug endpoint is no longer supported. Please use the regular payment flow with PayPal.',
+      debugData: {
+        amount: amount,
+        title: title,
+        timestamp: new Date().toISOString(),
+        userId: session.user.id
+      }
     });
   } catch (error) {
-    console.error('Error creating direct payment:', error);
+    logger.error('Error in debug direct payment endpoint:', error);
     return NextResponse.json(
       { 
         success: false, 

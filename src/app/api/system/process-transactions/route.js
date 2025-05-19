@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
-import Stripe from 'stripe';
+import { logger } from '@/lib/logger';
 
 /**
  * Process all pending transactions
@@ -29,24 +29,16 @@ export async function POST() {
       );
     }
     
-    // Initialize Stripe
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json(
-        { success: false, error: 'Stripe secret key not configured' },
-        { status: 500 }
-      );
-    }
-    
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    
-    // Mock processing logic - in a real app, this would handle things like:
-    // 1. Check for overdue review deadlines
-    // 2. Release funds from escrow based on deadlines
-    // 3. Handle any pending refunds or disputes
-    
-    // Fetch recent payment intents
-    const paymentIntents = await stripe.paymentIntents.list({
-      limit: 25
+    // Fetch recent transactions from the database
+    const recentTransactions = await prisma.transaction.findMany({
+      where: {
+        status: 'COMPLETED',
+        transferStatus: null, // Not yet processed for payout
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 25
     });
     
     // Process statistics
@@ -64,7 +56,7 @@ export async function POST() {
     };
     
     // Log the transaction processing
-    console.log(`Processing ${paymentIntents.data.length} transactions...`);
+    logger.info(`Processing ${recentTransactions.length} transactions...`);
     
     // Note: This is a placeholder for actual processing logic
     // In a real application, you would implement business logic to:
@@ -80,8 +72,8 @@ export async function POST() {
       data: {
         timestamp: new Date().toISOString(),
         reviewDeadlines: {
-          processed: paymentIntents.data.length,
-          successful: paymentIntents.data.length,
+          processed: recentTransactions.length,
+          successful: recentTransactions.length,
           failed: 0
         },
         escrowReleases: {
@@ -92,7 +84,7 @@ export async function POST() {
       }
     });
   } catch (error) {
-    console.error('Error processing transactions:', error);
+    logger.error('Error processing transactions:', error);
     return NextResponse.json(
       { 
         success: false, 

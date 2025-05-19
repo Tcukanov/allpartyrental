@@ -3,7 +3,6 @@
 import { useCallback, useState, useEffect } from 'react';
 import SettingsLayout from '@/components/provider/SettingsLayout';
 import { Box, Heading, Text, Divider, Stack } from '@chakra-ui/react';
-import StripeConnectButton from '@/components/provider/StripeConnectButton';
 import PayPalConnectButton from '@/components/provider/PayPalConnectButton';
 
 export default function ProviderSettingsPage() {
@@ -29,8 +28,8 @@ export default function ProviderSettingsPage() {
   }, []);
 
   const handlePaymentSuccess = useCallback(() => {
-    console.log(`${activePaymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} onboarding initiated`);
-  }, [activePaymentProvider]);
+    console.log('PayPal onboarding initiated');
+  }, []);
 
   return (
     <SettingsLayout>
@@ -42,16 +41,10 @@ export default function ProviderSettingsPage() {
           <Box>
             <Heading size="md" mb={2}>Payment Settings</Heading>
             <Text mb={4}>
-              {activePaymentProvider === 'paypal' 
-                ? 'Connect your PayPal account to receive payments for your services.'
-                : 'Connect your Stripe account to receive payments for your services.'}
+              Connect your PayPal account to receive payments for your services.
             </Text>
             
-            {activePaymentProvider === 'paypal' ? (
-              <PayPalConnectButton onSuccess={handlePaymentSuccess} />
-            ) : (
-              <StripeConnectButton onSuccess={handlePaymentSuccess} />
-            )}
+            <PayPalConnectButton onSuccess={handlePaymentSuccess} />
           </Box>
         </Stack>
       </Box>

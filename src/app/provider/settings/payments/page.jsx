@@ -31,25 +31,17 @@ import {
 } from '@chakra-ui/react';
 import { useSearchParams } from 'next/navigation';
 import SettingsLayout from '@/components/provider/SettingsLayout';
-import StripeConnectButton from '@/components/provider/StripeConnectButton';
 import PayPalConnectButton from '@/components/provider/PayPalConnectButton';
 import { FaPaypal, FaCog, FaExclamationCircle, FaWrench } from 'react-icons/fa';
 
 export default function PaymentsSettingsPage() {
   const searchParams = useSearchParams();
-  const [stripeStatus, setStripeStatus] = useState({
-    loading: true,
-    isConnected: false,
-    details: null,
-    error: null
-  });
   const [paypalStatus, setPaypalStatus] = useState({
     loading: true,
     connected: false,
     details: null,
     error: null
   });
-  const [activePaymentProvider, setActivePaymentProvider] = useState('paypal');
   const toast = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [paymentAlert, setPaymentAlert] = useState(null);
@@ -68,25 +60,17 @@ export default function PaymentsSettingsPage() {
     if (success) {
       toast({
         title: 'Success',
-        description: activePaymentProvider === 'paypal' 
-          ? 'Your PayPal account has been connected successfully!' 
-          : 'Your Stripe account has been connected successfully!',
+        description: 'Your PayPal account has been connected successfully!',
         status: 'success',
         duration: 5000,
         isClosable: true,
       });
       // Check and save the account ID
-      if (activePaymentProvider === 'paypal') {
-        checkPayPalAccount();
-      } else {
-        checkStripeAccount();
-      }
+      checkPayPalAccount();
     } else if (error) {
       toast({
         title: 'Error',
-        description: activePaymentProvider === 'paypal'
-          ? `Error connecting to PayPal: ${error}`
-          : `Error connecting to Stripe: ${error}`,
+        description: `Error connecting to PayPal: ${error}`,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -95,12 +79,8 @@ export default function PaymentsSettingsPage() {
       setPaymentAlert({
         status: 'error',
         title: 'Platform Setup Required',
-        message: activePaymentProvider === 'paypal'
-          ? 'The PayPal platform requires additional setup.'
-          : 'The Stripe Connect platform requires additional setup.',
-        details: activePaymentProvider === 'paypal'
-          ? 'Admin instructions: Complete the PayPal developer account setup for marketplace integrations.'
-          : 'Admin instructions: Log in to the Stripe dashboard, go to Settings > Connect Settings > Platform Profile, and complete the required information.'
+        message: 'The PayPal platform requires additional setup.',
+        details: 'Admin instructions: Complete the PayPal developer account setup for marketplace integrations.'
       });
     }
 
@@ -110,35 +90,12 @@ export default function PaymentsSettingsPage() {
       url.search = '';
       window.history.replaceState({}, '', url);
     }
-  }, [toast, activePaymentProvider]);
+  }, [toast]);
 
-  // Fetch the active payment provider
+  // Check PayPal connection status on load
   useEffect(() => {
-    const fetchActivePaymentProvider = async () => {
-      try {
-        const response = await fetch('/api/payment/active-provider');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.provider) {
-            setActivePaymentProvider(data.provider);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching active payment provider:', error);
-      }
-    };
-    
-    fetchActivePaymentProvider();
+    checkPayPalStatus();
   }, []);
-
-  // Check provider connection status
-  useEffect(() => {
-    if (activePaymentProvider === 'paypal') {
-      checkPayPalStatus();
-    } else {
-      checkStripeStatus();
-    }
-  }, [activePaymentProvider]);
 
   const checkPayPalStatus = async () => {
     setIsLoading(true);
@@ -193,54 +150,6 @@ export default function PaymentsSettingsPage() {
     }
   };
 
-  const checkStripeStatus = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/provider/stripe/status', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to check Stripe status');
-      }
-      
-      const data = await response.json();
-      setStripeStatus(data);
-      
-      if (data.isConnected && data.details?.requiresAction) {
-        setPaymentAlert({
-          status: 'warning',
-          title: 'Stripe account needs attention',
-          message: 'Your Stripe account setup is not complete. Please complete the onboarding process to start accepting payments.',
-        });
-      } else if (data.isConnected) {
-        setPaymentAlert({
-          status: 'success',
-          title: 'Stripe Connected',
-          message: 'Your Stripe account is fully set up and ready to receive payments.',
-        });
-      } else {
-        setPaymentAlert({
-          status: 'info',
-          title: 'Stripe Not Connected',
-          message: 'Connect your Stripe account to receive payments for your services.',
-        });
-      }
-    } catch (error) {
-      console.error('Error checking Stripe status:', error);
-      setPaymentAlert({
-        status: 'error',
-        title: 'Connection Error',
-        message: `Failed to check Stripe status: ${error.message}`,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const checkPayPalAccount = async () => {
     try {
       const response = await fetch('/api/provider/paypal/account-check', {
@@ -250,125 +159,95 @@ export default function PaymentsSettingsPage() {
         },
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
-        console.log('PayPal merchant ID saved:', data.merchantId);
-      } else {
-        console.error('Failed to save PayPal account:', data.message);
+      if (!response.ok) {
+        throw new Error('Failed to check account');
       }
-    } catch (error) {
-      console.error('Error checking PayPal account:', error);
-    }
-  };
 
-  const checkStripeAccount = async () => {
-    try {
-      const response = await fetch('/api/provider/stripe/account-check', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      await checkPayPalStatus();
+    } catch (error) {
+      console.error('Error checking account:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to verify account: ${error.message}`,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
       });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        console.log('Stripe account ID saved:', data.accountId);
-      } else {
-        console.error('Failed to save Stripe account:', data.message);
-      }
-    } catch (error) {
-      console.error('Error checking Stripe account:', error);
     }
   };
 
-  // Handle refresh of connection status
   const handleRefreshStatus = () => {
-    if (activePaymentProvider === 'paypal') {
-      checkPayPalStatus();
-    } else {
-      checkStripeStatus();
-    }
+    checkPayPalStatus();
+    toast({
+      title: 'Refreshing',
+      description: 'Checking your PayPal connection status...',
+      status: 'info',
+      duration: 3000,
+      isClosable: true,
+    });
   };
 
-  // Update the dashboard link function
   const handleViewDashboard = () => {
-    if (activePaymentProvider === 'paypal') {
-      if (!paypalStatus.connected) return;
-      window.open('https://www.paypal.com/merchantapps/home', '_blank');
-    } else {
-      if (!stripeStatus?.isConnected) return;
-      window.open(
-        `https://dashboard.stripe.com/express/${stripeStatus.details.accountId}`,
-        '_blank'
-      );
-    }
+    // Open PayPal dashboard in a new tab
+    window.open('https://www.paypal.com/dashboard', '_blank');
+    toast({
+      title: 'Opening Dashboard',
+      description: 'Redirecting to your PayPal dashboard',
+      status: 'info',
+      duration: 2000,
+      isClosable: true,
+    });
   };
 
-  // Handle manual account ID update
   const handleManualAccountUpdate = async (e) => {
     e.preventDefault();
-    
-    if (!accountIdInput.trim()) {
+    if (!accountIdInput) {
       toast({
-        title: 'Input Required',
-        description: activePaymentProvider === 'paypal'
-          ? 'Please enter a PayPal merchant ID'
-          : 'Please enter a Stripe account ID',
-        status: 'warning',
+        title: 'Error',
+        description: 'Please enter a valid PayPal email or merchant ID',
+        status: 'error',
         duration: 3000,
         isClosable: true,
       });
       return;
     }
-    
+
     setIsUpdating(true);
+    setError(null);
+
     try {
-      const endpoint = activePaymentProvider === 'paypal'
-        ? '/api/provider/paypal/update-account'
-        : '/api/provider/stripe/update-account';
-        
-      const payload = activePaymentProvider === 'paypal'
-        ? { merchantId: accountIdInput.trim() }
-        : { accountId: accountIdInput.trim() };
-        
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/provider/paypal/manual-account-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          paypalEmail: accountIdInput
+        }),
       });
-      
+
       const data = await response.json();
-      
-      if (response.ok && data.success) {
-        toast({
-          title: 'Account Updated',
-          description: activePaymentProvider === 'paypal'
-            ? `Successfully linked to PayPal merchant: ${data.merchantId}`
-            : `Successfully linked to Stripe account: ${data.accountId}`,
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
-        setAccountIdInput('');
-        handleRefreshStatus(); // Refresh the status
-      } else {
-        toast({
-          title: 'Update Failed',
-          description: data.error || `Failed to update ${activePaymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} account`,
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update account');
       }
-    } catch (error) {
-      console.error('Error updating account:', error);
+
       toast({
-        title: 'Update Error',
-        description: error.message || 'An unexpected error occurred',
+        title: 'Success',
+        description: 'Your PayPal account information has been updated',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+
+      // Reset the input and refresh status
+      setAccountIdInput('');
+      await checkPayPalStatus();
+    } catch (err) {
+      setError(err.message);
+      toast({
+        title: 'Error',
+        description: err.message,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -378,240 +257,167 @@ export default function PaymentsSettingsPage() {
     }
   };
 
-  // Determine badge color based on connection status
   const getBadgeColor = (status) => {
-    if (!status || !status.connected) return 'red';
-    if (status.accountType === 'SANDBOX') return 'orange';
-    return 'green';
+    switch (status) {
+      case 'ACTIVE':
+        return 'green';
+      case 'PENDING':
+        return 'yellow';
+      case 'RESTRICTED':
+      case 'UNDER_REVIEW':
+        return 'orange';
+      case 'INACTIVE':
+      case 'REJECTED':
+        return 'red';
+      default:
+        return 'gray';
+    }
   };
 
   return (
     <SettingsLayout>
-      <Box p={5} shadow="md" borderWidth="1px" borderRadius="md">
-        <Heading size="lg" mb={4}>Payment Settings</Heading>
-        <Divider mb={6} />
-        
-        <Stack spacing={6}>
-          <Card>
-            <CardBody>
-              <Heading size="md" mb={4}>
-                {activePaymentProvider === 'paypal' ? 'PayPal Pro' : 'Stripe Connect'} Status
-              </Heading>
-              
+      <Stack spacing={6}>
+        <Box>
+          <Heading size="lg" mb={4}>Payment Settings</Heading>
+          <Text>
+            Connect your PayPal account to receive payments from clients.
+          </Text>
+        </Box>
+
+        {paymentAlert && (
+          <Alert status={paymentAlert.status} variant="left-accent">
+            <AlertIcon />
+            <Box>
+              <AlertTitle>{paymentAlert.title}</AlertTitle>
+              <AlertDescription>
+                {paymentAlert.message}
+                {paymentAlert.details && (
+                  <Text mt={2} fontSize="sm" color="gray.600">
+                    {paymentAlert.details}
+                  </Text>
+                )}
+              </AlertDescription>
+            </Box>
+          </Alert>
+        )}
+
+        <Card>
+          <CardBody>
+            <VStack spacing={6} align="stretch">
+              <HStack justifyContent="space-between">
+                <Box>
+                  <Heading size="md" display="flex" alignItems="center">
+                    <FaPaypal style={{ marginRight: '8px' }} /> PayPal Integration
+                  </Heading>
+                  <Text mt={1} color="gray.600">
+                    Connect your PayPal account to receive payments
+                  </Text>
+                </Box>
+                {paypalStatus.connected && (
+                  <Badge 
+                    colorScheme={getBadgeColor(paypalStatus.details?.status)} 
+                    fontSize="0.8em" 
+                    p={1}
+                  >
+                    {paypalStatus.details?.status || 'CONNECTED'}
+                  </Badge>
+                )}
+              </HStack>
+
               {isLoading ? (
                 <Box textAlign="center" py={4}>
                   <Spinner size="md" />
-                  <Text mt={2}>
-                    Checking your {activePaymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} connection...
-                  </Text>
+                  <Text mt={2}>Checking PayPal connection...</Text>
                 </Box>
-              ) : paymentAlert ? (
-                <>
-                  <Alert status={paymentAlert.status} mb={4} flexDirection="column" alignItems="flex-start">
-                    <Box display="flex" width="100%">
-                      <AlertIcon />
-                      <AlertTitle>{paymentAlert.title}</AlertTitle>
-                    </Box>
-                    <AlertDescription mt={2}>
-                      {paymentAlert.message}
-                      {paymentAlert.details && (
-                        <Text mt={2} fontSize="sm" fontStyle="italic">
-                          {paymentAlert.details}
-                        </Text>
-                      )}
-                    </AlertDescription>
-                  </Alert>
-                  
-                  <Box mt={4}>
-                    <Text mb={2}>
-                      If you've already set up your {activePaymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} account but it's not showing here, try refreshing the status:
-                    </Text>
-                    <Button
-                      onClick={handleRefreshStatus}
-                      colorScheme={activePaymentProvider === 'paypal' ? 'blue' : 'blue'}
-                      size="md"
-                      isLoading={isLoading}
-                    >
-                      Force Refresh Status
-                    </Button>
-                  </Box>
-                </>
-              ) : activePaymentProvider === 'paypal' ? (
-                // PayPal Connected Account Status
+              ) : (
                 <>
                   {paypalStatus.connected ? (
-                    <>
-                      <Box mb={4} display="flex" alignItems="center">
-                        <Badge colorScheme={getBadgeColor(paypalStatus)}>
-                          {paypalStatus.accountType === 'SANDBOX' ? 'SANDBOX MODE' : 'CONNECTED'}
-                        </Badge>
-                        {paypalStatus.accountType === 'SANDBOX' && (
-                          <Badge colorScheme="blue">TESTING</Badge>
+                    <Box>
+                      <HStack>
+                        <Button size="sm" onClick={handleRefreshStatus}>
+                          Refresh Status
+                        </Button>
+                        <Button size="sm" onClick={handleViewDashboard}>
+                          View PayPal Dashboard
+                        </Button>
+                      </HStack>
+                      
+                      <Divider my={4} />
+                      
+                      <VStack align="flex-start" spacing={2}>
+                        {paypalStatus.details?.email && (
+                          <HStack>
+                            <Text fontWeight="bold">PayPal Email:</Text>
+                            <Text>{paypalStatus.details.email}</Text>
+                          </HStack>
                         )}
-                      </Box>
-                      {paypalStatus.details && (
-                        <Box mt={2}>
-                          <Text fontWeight="bold" mb={1}>Merchant ID:</Text>
-                          <Text mb={3} fontSize="sm" fontFamily="mono">
-                            {paypalStatus.details.merchantId}
-                          </Text>
-                          <Text fontWeight="bold" mb={1}>PayPal Email:</Text>
-                          <Text mb={4}>{paypalStatus.details.primaryEmail}</Text>
-                          {paypalStatus.details.payments?.canReceivePayments ? (
-                            <Badge colorScheme="green" mt={2}>Payments Enabled</Badge>
-                          ) : (
-                            <Alert status="warning" mt={2}>
-                              <AlertIcon />
-                              Payments are not enabled. Please complete your PayPal onboarding.
-                            </Alert>
-                          )}
-                        </Box>
-                      )}
-                      <Stack direction="row" spacing={4} mt={4}>
-                        <Button 
-                          onClick={handleRefreshStatus} 
-                          size="sm"
-                          colorScheme="blue" 
-                          variant="outline"
-                        >
-                          Refresh Status
-                        </Button>
-                        <PayPalConnectButton 
-                          onSuccess={handleRefreshStatus}
-                          isReconnect={true}
-                        />
-                      </Stack>
-                    </>
+                        {paypalStatus.details?.merchantId && (
+                          <HStack>
+                            <Text fontWeight="bold">Merchant ID:</Text>
+                            <Text>{paypalStatus.details.merchantId}</Text>
+                          </HStack>
+                        )}
+                        <HStack>
+                          <Text fontWeight="bold">Connected:</Text>
+                          <Text>{new Date(paypalStatus.details?.createdAt).toLocaleString()}</Text>
+                        </HStack>
+                      </VStack>
+                    </Box>
                   ) : (
                     <>
-                      <Text mb={4}>Connect your PayPal account to receive payments for your services.</Text>
-                      <PayPalConnectButton 
-                        onSuccess={() => setPaypalStatus(prev => ({ ...prev, loading: true }))}
-                      />
+                      <Box my={4}>
+                        <Text mb={4}>
+                          Connect your PayPal account to receive payments from customers directly to your account.
+                        </Text>
+                        <PayPalConnectButton />
+                      </Box>
                     </>
                   )}
-                </>
-              ) : (
-                // Stripe Connected Account Status
-                <>
-                  {stripeStatus.isConnected ? (
-                    <>
-                      <Box mb={4} display="flex" alignItems="center">
-                        <Badge colorScheme="green" mr={2}>Connected</Badge>
-                        <Text>Your Stripe account is connected and ready to receive payments.</Text>
-                      </Box>
-                      {stripeStatus.details && (
-                        <Box mt={2}>
-                          <Text><strong>Account ID:</strong> {stripeStatus.details.accountId}</Text>
-                          {stripeStatus.details.payoutsEnabled ? (
-                            <Badge colorScheme="green" mt={2}>Payouts Enabled</Badge>
-                          ) : (
-                            <Alert status="warning" mt={2}>
+
+                  <Accordion allowToggle mt={4}>
+                    <AccordionItem>
+                      <h2>
+                        <AccordionButton>
+                          <Box flex="1" textAlign="left" display="flex" alignItems="center">
+                            <FaWrench style={{ marginRight: '8px' }} />
+                            Manual Account Setup
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel pb={4}>
+                        <Text mb={4} fontSize="sm" color="gray.600">
+                          If the automatic connection isn't working, you can manually enter your PayPal email address.
+                        </Text>
+                        <form onSubmit={handleManualAccountUpdate}>
+                          <FormControl id="paypalEmail" isRequired mb={4}>
+                            <FormLabel>PayPal Email Address</FormLabel>
+                            <Input 
+                              type="email" 
+                              value={accountIdInput}
+                              onChange={(e) => setAccountIdInput(e.target.value)}
+                              placeholder="name@example.com"
+                            />
+                          </FormControl>
+                          {error && (
+                            <Alert status="error" mb={4}>
                               <AlertIcon />
-                              Payouts are not enabled. Please complete your Stripe onboarding.
+                              <AlertDescription fontSize="sm">{error}</AlertDescription>
                             </Alert>
                           )}
-                        </Box>
-                      )}
-                      <Stack direction="row" spacing={4} mt={4}>
-                        <Button 
-                          onClick={handleRefreshStatus} 
-                          size="sm"
-                          colorScheme="blue" 
-                          variant="outline"
-                        >
-                          Refresh Status
-                        </Button>
-                        <StripeConnectButton 
-                          onSuccess={handleRefreshStatus}
-                          isReconnect={true}
-                        />
-                      </Stack>
-                    </>
-                  ) : (
-                    <>
-                      <Text mb={4}>Connect your Stripe account to receive payments for your services.</Text>
-                      <StripeConnectButton 
-                        onSuccess={() => setStripeStatus(prev => ({ ...prev, loading: true }))}
-                      />
-                    </>
-                  )}
+                          <Button type="submit" colorScheme="brand" isLoading={isUpdating}>
+                            Update Account
+                          </Button>
+                        </form>
+                      </AccordionPanel>
+                    </AccordionItem>
+                  </Accordion>
                 </>
               )}
-            </CardBody>
-          </Card>
-          
-          <Card>
-            <CardBody>
-              <Heading size="md" mb={4}>Payout Settings</Heading>
-              <Text>
-                Manage your payout schedule and bank account information directly in your 
-                {activePaymentProvider === 'paypal' ? ' PayPal' : ' Stripe'} Dashboard.
-              </Text>
-              {(activePaymentProvider === 'paypal' && paypalStatus.connected) || 
-               (activePaymentProvider === 'stripe' && stripeStatus.isConnected) ? (
-                <Button 
-                  mt={4} 
-                  colorScheme="blue"
-                  leftIcon={activePaymentProvider === 'paypal' ? <FaPaypal /> : undefined}
-                  onClick={handleViewDashboard}
-                >
-                  Go to {activePaymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} Dashboard
-                </Button>
-              ) : null}
-            </CardBody>
-          </Card>
-          
-          <Card>
-            <CardBody>
-              <Accordion allowToggle>
-                <AccordionItem>
-                  <h2>
-                    <AccordionButton>
-                      <Box as="span" flex='1' textAlign='left'>
-                        <Text fontWeight="bold">Advanced Settings (Troubleshooting)</Text>
-                      </Box>
-                      <AccordionIcon />
-                    </AccordionButton>
-                  </h2>
-                  <AccordionPanel pb={4}>
-                    <Box mt={4}>
-                      <Text mb={2} fontSize="sm" color="gray.600">
-                        {activePaymentProvider === 'paypal'
-                          ? 'If you know your PayPal merchant ID and need to manually link it, you can enter it below. This is only needed if the automatic linking fails.'
-                          : 'If you know your Stripe account ID and need to manually link it, you can enter it below. This is only needed if the automatic linking fails.'
-                        }
-                      </Text>
-                      
-                      <form onSubmit={handleManualAccountUpdate}>
-                        <FormControl mb={4}>
-                          <FormLabel>
-                            {activePaymentProvider === 'paypal' ? 'PayPal Merchant ID' : 'Stripe Account ID'}
-                          </FormLabel>
-                          <Input 
-                            placeholder={activePaymentProvider === 'paypal' ? 'merchant_id...' : 'acct_...'}
-                            value={accountIdInput}
-                            onChange={(e) => setAccountIdInput(e.target.value)}
-                          />
-                        </FormControl>
-                        
-                        <Button 
-                          type="submit"
-                          colorScheme="blue"
-                          isLoading={isUpdating}
-                          loadingText="Updating..."
-                        >
-                          Update {activePaymentProvider === 'paypal' ? 'Merchant ID' : 'Account ID'}
-                        </Button>
-                      </form>
-                    </Box>
-                  </AccordionPanel>
-                </AccordionItem>
-              </Accordion>
-            </CardBody>
-          </Card>
-        </Stack>
-      </Box>
+            </VStack>
+          </CardBody>
+        </Card>
+      </Stack>
     </SettingsLayout>
   );
 } 
