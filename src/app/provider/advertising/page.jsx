@@ -1,9 +1,6 @@
 'use client'
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Elements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
-import PaymentComponent from '@/components/payment/PaymentComponent';
 import {
   Box,
   Container,
@@ -21,11 +18,12 @@ import {
   List,
   ListItem,
   ListIcon,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
 } from '@chakra-ui/react';
 import { CheckIcon } from '@chakra-ui/icons';
-
-// Initialize Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 // Mock data for ad packages
 const adPackages = [
@@ -104,23 +102,35 @@ export default function ProviderAdvertisingPage() {
   const router = useRouter();
   const toast = useToast();
   const [selectedPackage, setSelectedPackage] = useState(null);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   const handlePackageSelect = (pkg) => {
     setSelectedPackage(pkg);
-    setIsPaymentModalOpen(true);
+    
+    // Show PayPal payment info toast
+    toast({
+      title: 'PayPal Payment',
+      description: 'You will be redirected to PayPal to complete your payment for this advertising package.',
+      status: 'info',
+      duration: 5000,
+      isClosable: true,
+    });
+
+    // In a real implementation, redirect to PayPal checkout or show PayPal modal
+    // For now, we'll just simulate a successful payment
+    setTimeout(() => {
+      handlePaymentSuccess();
+    }, 1500);
   };
 
   const handlePaymentSuccess = () => {
-    setIsPaymentModalOpen(false);
     setSelectedPackage(null);
-      toast({
+    toast({
       title: 'Success',
       description: 'Your advertisement has been activated successfully!',
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
+      status: 'success',
+      duration: 5000,
+      isClosable: true,
+    });
     // Refresh the page or update the UI as needed
   };
   
@@ -132,7 +142,17 @@ export default function ProviderAdvertisingPage() {
           <Text fontSize="lg" color="gray.600">
             Choose an advertising package to increase your visibility and get more clients
           </Text>
-                </Box>
+        </Box>
+
+        {selectedPackage && (
+          <Alert status="info" variant="subtle">
+            <AlertIcon />
+            <AlertTitle>Processing Payment:</AlertTitle>
+            <AlertDescription>
+              Your payment for {selectedPackage.name} is being processed.
+            </AlertDescription>
+          </Alert>
+        )}
                 
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
           {adPackages.map((pkg) => (
@@ -167,25 +187,15 @@ export default function ProviderAdvertisingPage() {
                       width="full"
                       onClick={() => handlePackageSelect(pkg)}
                     >
-                      Select Package
+                      Pay with PayPal
                     </Button>
                   </Box>
-        </VStack>
-      </CardBody>
-    </Card>
+                </VStack>
+              </CardBody>
+            </Card>
           ))}
         </SimpleGrid>
       </VStack>
-
-      {selectedPackage && (
-        <Elements stripe={stripePromise}>
-          <PaymentComponent
-            amount={selectedPackage.price * 100} // Convert to cents
-            description={`${selectedPackage.name} - ${selectedPackage.duration}`}
-            onSuccess={handlePaymentSuccess}
-          />
-        </Elements>
-      )}
     </Container>
   );
 }

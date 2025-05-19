@@ -5,7 +5,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/prisma/client';
 import { logger } from '@/lib/logger';
-import Stripe from 'stripe';
 
 /**
  * Fetch all transactions for admin view
@@ -30,109 +29,72 @@ export async function GET() {
       );
     }
     
-    // Initialize Stripe
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json(
-        { success: false, error: 'Stripe secret key not configured' },
-        { status: 500 }
-      );
-    }
+    logger.info('Admin fetching all transactions');
     
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    
-    // Fetch payment intents from Stripe (transactions)
-    const paymentIntents = await stripe.paymentIntents.list({
-      limit: 100
+    // Fetch transactions directly from the database instead of from Stripe
+    const dbTransactions = await prisma.transaction.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      },
+      include: {
+        offer: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            service: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+        party: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      take: 100 // Limit to the latest 100 transactions
     });
     
-    // Get payment intents and corresponding charges
-    const transactions = [];
-    
-    for (const intent of paymentIntents.data) {
-      // Get the charge data if available
-      let chargeData = {};
-      if (intent.latest_charge) {
-        const charge = await stripe.charges.retrieve(intent.latest_charge);
-        chargeData = {
-          receipt_url: charge.receipt_url,
-          receipt_number: charge.receipt_number,
-          failure_message: charge.failure_message
-        };
-      }
-      
-      // Map Status from Stripe to our app status
-      let status;
-      switch (intent.status) {
-        case 'succeeded':
-          status = 'COMPLETED';
-          break;
-        case 'processing':
-          status = 'PENDING';
-          break;
-        case 'requires_payment_method':
-        case 'requires_confirmation':
-        case 'requires_action':
-        case 'requires_capture':
-          status = 'PENDING';
-          break;
-        case 'canceled':
-          status = intent.cancellation_reason === 'requested_by_customer' ? 'REFUNDED' : 'FAILED';
-          break;
-        default:
-          status = 'PENDING';
-      }
-      
-      // Try to find associated party and user information if available
-      let partyInfo = { id: null, name: null };
-      let userInfo = { id: null, name: null, email: null };
-      
-      if (intent.metadata && intent.metadata.partyId) {
-        try {
-          const party = await prisma.party.findUnique({
-            where: { id: intent.metadata.partyId },
-            select: { id: true, name: true }
-          });
-          if (party) {
-            partyInfo = party;
-          }
-        } catch (err) {
-          console.error(`Error fetching party info for ${intent.metadata.partyId}:`, err);
-        }
-      }
-      
-      if (intent.metadata && intent.metadata.userId) {
-        try {
-          const user = await prisma.user.findUnique({
-            where: { id: intent.metadata.userId },
-            select: { id: true, name: true, email: true }
-          });
-          if (user) {
-            userInfo = user;
-          }
-        } catch (err) {
-          console.error(`Error fetching user info for ${intent.metadata.userId}:`, err);
-        }
-      }
-      
-      // Add transaction
-      transactions.push({
-        id: intent.id,
-        amount: intent.amount / 100, // Stripe amounts are in cents
-        currency: intent.currency,
-        status: status,
-        description: intent.description || 'Payment',
-        createdAt: new Date(intent.created * 1000).toISOString(),
-        updatedAt: intent.canceled_at ? new Date(intent.canceled_at * 1000).toISOString() : null,
-        partyId: partyInfo.id,
-        partyName: partyInfo.name,
-        userId: userInfo.id,
-        userName: userInfo.name,
-        userEmail: userInfo.email,
-        receiptUrl: chargeData.receipt_url,
-        receiptNumber: chargeData.receipt_number,
-        failureMessage: chargeData.failure_message
-      });
-    }
+    // Format the transactions for the response
+    const transactions = dbTransactions.map(transaction => {
+      return {
+        id: transaction.id,
+        amount: Number(transaction.amount),
+        status: transaction.status,
+        createdAt: transaction.createdAt.toISOString(),
+        updatedAt: transaction.updatedAt.toISOString(),
+        paymentIntentId: transaction.paymentIntentId || null,
+        paymentMethod: transaction.paymentMethodId ? 'PayPal' : 'Unknown',
+        partyId: transaction.party?.id || null,
+        partyName: transaction.party?.name || 'Unknown Party',
+        userId: transaction.offer?.client?.id || null,
+        userName: transaction.offer?.client?.name || 'Unknown User',
+        userEmail: transaction.offer?.client?.email || 'unknown@example.com',
+        providerId: transaction.offer?.provider?.id || null,
+        providerName: transaction.offer?.provider?.name || 'Unknown Provider',
+        serviceName: transaction.offer?.service?.name || 'Unknown Service',
+        escrowStartTime: transaction.escrowStartTime ? transaction.escrowStartTime.toISOString() : null,
+        escrowEndTime: transaction.escrowEndTime ? transaction.escrowEndTime.toISOString() : null,
+        clientFeePercent: transaction.clientFeePercent,
+        providerFeePercent: transaction.providerFeePercent
+      };
+    });
     
     // Return the transactions
     return NextResponse.json({
@@ -140,11 +102,11 @@ export async function GET() {
       data: transactions
     });
   } catch (error) {
-    console.error('Error fetching transactions from Stripe:', error);
+    logger.error('Error fetching transactions:', error);
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to fetch transactions from Stripe',
+        error: 'Failed to fetch transactions',
         details: error.message 
       },
       { status: 500 }
