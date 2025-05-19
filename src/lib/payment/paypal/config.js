@@ -7,8 +7,21 @@ import { logger } from '@/lib/logger';
  */
 export const getPayPalConfig = async () => {
   try {
-    // Check if we're in development mode
+    // Check if we're in development mode or build phase
     const isDevelopment = process.env.NODE_ENV === 'development';
+    const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+    
+    // During build phase, always return dummy values
+    if (isBuildPhase) {
+      return {
+        mode: 'sandbox',
+        clientId: 'dummy-build-client-id',
+        clientSecret: 'dummy-build-client-secret',
+        partnerId: 'dummy-build-partner-id',
+        webhookId: 'dummy-build-webhook-id',
+        webhookSecret: 'dummy-build-webhook-secret',
+      };
+    }
     
     // Try to get settings from the database first
     const settings = await prisma.systemSettings.findFirst();

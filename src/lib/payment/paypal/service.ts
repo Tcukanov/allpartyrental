@@ -17,17 +17,19 @@ export class PayPalClient {
   constructor() {
     // In development, use dummy values if environment variables aren't set
     const isDevelopment = process.env.NODE_ENV === 'development';
+    // Check if we're in the build phase
+    const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
     
     this.clientId = process.env.PAYPAL_SANDBOX_CLIENT_ID || 
-                   (isDevelopment ? 'dummy-development-client-id' : '');
+                   ((isDevelopment || isBuildPhase) ? 'dummy-development-client-id' : '');
     
     this.clientSecret = process.env.PAYPAL_SANDBOX_CLIENT_SECRET || 
-                       (isDevelopment ? 'dummy-development-client-secret' : '');
+                       ((isDevelopment || isBuildPhase) ? 'dummy-development-client-secret' : '');
     
-    // Only throw an error in production if credentials are missing
-    if (!isDevelopment && (!this.clientId || !this.clientSecret)) {
+    // Only throw an error in production if credentials are missing and we're not in build phase
+    if (!isDevelopment && !isBuildPhase && (!this.clientId || !this.clientSecret)) {
       throw new Error('PayPal credentials are not configured');
-    } else if (isDevelopment && (!process.env.PAYPAL_SANDBOX_CLIENT_ID || !process.env.PAYPAL_SANDBOX_CLIENT_SECRET)) {
+    } else if (isDevelopment && !isBuildPhase && (!process.env.PAYPAL_SANDBOX_CLIENT_ID || !process.env.PAYPAL_SANDBOX_CLIENT_SECRET)) {
       console.warn('⚠️ Running with dummy PayPal credentials. Set PAYPAL_SANDBOX_CLIENT_ID and PAYPAL_SANDBOX_CLIENT_SECRET for actual API calls.');
     }
   }
@@ -72,13 +74,14 @@ export class PayPalClient {
    */
   private async request(endpoint: string, method: string, data?: any): Promise<any> {
     try {
-      // Check if using dummy credentials in development mode
+      // Check if using dummy credentials in development mode or during build
       const isDevelopment = process.env.NODE_ENV === 'development';
-      const usingDummyCredentials = isDevelopment && 
+      const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+      const usingDummyCredentials = (isDevelopment || isBuildPhase) && 
         (this.clientId === 'dummy-development-client-id' || 
          !process.env.PAYPAL_SANDBOX_CLIENT_ID);
       
-      // Return mock responses when using dummy credentials in development
+      // Return mock responses when using dummy credentials in development or during build
       if (usingDummyCredentials) {
         logger.info(`PayPal mock request: ${method} ${endpoint}`);
         return this.getMockResponse(endpoint, method, data);
@@ -744,6 +747,16 @@ export const paymentService = {
  * Helper function to get a provider's connected PayPal account
  */
 async function getProviderPayPalAccount(providerId: string) {
+  // Check if we're in the build phase
+  const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+  if (isBuildPhase) {
+    return {
+      providerId,
+      paypalMerchantId: 'dummy-merchant-id',
+      paypalEmail: 'dummy@example.com'
+    };
+  }
+  
   // In a real app, retrieve the provider's PayPal account from your database
   // This is a placeholder implementation
   logger.debug(`Getting PayPal account for provider: ${providerId}`);
