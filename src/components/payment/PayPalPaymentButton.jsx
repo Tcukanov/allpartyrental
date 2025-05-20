@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button, Box, Text, useToast, Spinner, Alert, AlertIcon, AlertTitle, AlertDescription, Stack, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, Code, useDisclosure } from '@chakra-ui/react';
 import { FaPaypal, FaCreditCard, FaBug } from 'react-icons/fa';
+import CardEntryForm from './CardEntryForm';
 
 /**
  * PayPal Payment Button component that handles the payment flow
@@ -25,6 +26,7 @@ const PayPalPaymentButton = ({
   const [showCardOption, setShowCardOption] = useState(showCardByDefault);
   const [isComplete, setIsComplete] = useState(false);
   const [debugInfo, setDebugInfo] = useState({});
+  const [useCustomCardForm, setUseCustomCardForm] = useState(false);
   const toast = useToast();
   const { isOpen: isDebugOpen, onOpen: onDebugOpen, onClose: onDebugClose } = useDisclosure();
 
@@ -88,34 +90,81 @@ const PayPalPaymentButton = ({
 
       setIsInitializing(true);
       try {
-        const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-        if (!clientId && process.env.NODE_ENV === 'production') {
-          throw new Error('PayPal client ID is not configured');
+        // Always get client ID from the server - ensures we use sandbox credentials
+        let clientId;
+        
+        try {
+          const response = await fetch('/api/payment/config');
+          if (response.ok) {
+            const data = await response.json();
+            clientId = data.clientId;
+            console.log(`Loading PayPal SDK with client ID: ${clientId ? clientId.substring(0, 5) + '...' : 'none'}`);
+          } else {
+            throw new Error('Failed to fetch PayPal config from server');
+          }
+        } catch (configError) {
+          console.error('Error fetching PayPal config:', configError);
+          // Fallback to environment variable
+          clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+          if (!clientId) {
+            throw new Error('PayPal client ID is not available');
+          }
         }
 
-        // In development, use a sandbox client ID or mock
-        const effectiveClientId = clientId || 'test-sandbox-client-id';
-
         const script = document.createElement('script');
-        // Add card support by including the 'card' component and additional parameters
-        script.src = `https://www.paypal.com/sdk/js?client-id=${effectiveClientId}&currency=USD&components=buttons,hosted-fields&integration-date=2023-05-01`;
+        
+        // Clean and encode the client ID
+        const cleanClientId = clientId.trim().replace(/\s+/g, '');
+        const encodedClientId = encodeURIComponent(cleanClientId);
+        
+        // List of components to include - we need buttons at minimum
+        const components = ['buttons'];
+        
+        // Optional components if we want to support card payments
+        if (showCardByDefault) {
+          components.push('hosted-fields');
+        }
+        
+        // Build the SDK URL
+        script.src = `https://www.paypal.com/sdk/js?client-id=${encodedClientId}&currency=USD&components=${components.join(',')}&intent=capture&debug=false&integration-date=2023-05-01`;
         script.async = true;
-        script.onload = () => {
-          console.log("PayPal SDK loaded successfully");
-          // Initialize client for hosted fields
-          if (window.paypal && window.paypal.HostedFields) {
-            console.log("PayPal HostedFields component available");
-          } else {
-            console.warn("PayPal HostedFields component not available");
-          }
-          setIsInitializing(false);
-        };
-        script.onerror = (err) => {
-          console.error('Failed to load PayPal SDK:', err);
-          setError('Failed to load PayPal SDK');
-          setIsInitializing(false);
-        };
+        
+        // Create a promise that resolves when the script loads
+        const loadPromise = new Promise((resolve, reject) => {
+          script.onload = () => {
+            console.log("PayPal SDK loaded successfully");
+            
+            // Verify components are available
+            if (window.paypal && window.paypal.HostedFields) {
+              console.log("PayPal HostedFields component available");
+            } else {
+              console.warn("PayPal HostedFields component not available");
+            }
+            
+            setIsInitializing(false);
+            resolve();
+          };
+          
+          script.onerror = (err) => {
+            console.error('Failed to load PayPal SDK:', err);
+            setError('PayPal payment is not available at this time. Please try again later.');
+            setIsInitializing(false);
+            
+            // Fall back to buttons-only if available
+            if (window.paypal && window.paypal.Buttons) {
+              console.log("SDK partially loaded, falling back to PayPal buttons only");
+              resolve();
+            } else {
+              reject(err);
+            }
+          };
+        });
+        
+        // Add the script to the document
         document.body.appendChild(script);
+        
+        // Wait for the script to load
+        await loadPromise;
       } catch (error) {
         console.error('Error loading PayPal SDK:', error);
         setError(`Failed to initialize PayPal: ${error.message}`);
@@ -150,6 +199,10 @@ const PayPalPaymentButton = ({
       return;
     }
     
+    // Don't check for eligibility - we'll attempt to use hosted fields regardless
+    // This makes the credit card payment option always available
+    const isDeviceEligible = true;
+    
     // When the PayPal SDK is loaded, create the payment intent
     const initCardPayment = async () => {
       try {
@@ -158,36 +211,29 @@ const PayPalPaymentButton = ({
         // Create the payment intent
         const paymentIntent = await createPayment();
         if (paymentIntent) {
-          setShowCardOption(true);
-          
-          // If we're in dev mode without client ID, use mock flow right away
-          const isDevelopment = process.env.NODE_ENV === 'development';
-          const noRealCredentials = !process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-          
-          if (isDevelopment && noRealCredentials) {
-            console.log("Development mode with no credentials - using mock card flow directly");
-            simulateCreditCardFlow(paymentIntent);
-            return;
-          }
-          
-          // If the SDK has hosted fields, render them
-          if (hasHostedFields) {
+          // Only show card option if device is eligible
+          if (isDeviceEligible) {
+            setShowCardOption(true);
+            
             // Give it a moment to update state before rendering
             setTimeout(() => {
               renderCardForm(paymentIntent);
             }, 300);
-          } else if (isDevelopment) {
-            // In development, fallback to mock if hosted fields aren't available
-            console.log("Hosted Fields not available, falling back to mock in development");
-            simulateCreditCardFlow(paymentIntent);
           } else {
-            // In production, show an error
-            setError("PayPal card processing is not available. Please try again later or use a different payment method.");
+            // Device not eligible, show PayPal button only
+            console.log("Device not eligible for PayPal Hosted Fields, showing PayPal button only");
+            setShowCardOption(false);
+            
+            // Wait for state update to complete before rendering PayPal button
+            setTimeout(() => {
+              renderPayPalButton(paymentIntent);
+            }, 500);
           }
         }
       } catch (error) {
         console.error("Error initializing card payment:", error);
-        setError("Failed to initialize card payment: " + error.message);
+        setError("Failed to initialize payment: " + error.message);
+        setShowCardOption(false); // Fall back to PayPal button
       } finally {
         setIsLoading(false);
       }
@@ -195,7 +241,7 @@ const PayPalPaymentButton = ({
     
     // Only run this once when the SDK is ready
     if (isPayPalReady && !paymentData) {
-      console.log("PayPal SDK ready, initializing card payment flow");
+      console.log("PayPal SDK ready, initializing payment flow");
       initCardPayment();
     }
   }, [showCardByDefault, isInitializing, isLoading, error, paymentData, showCardOption, window.paypal]);
@@ -253,6 +299,13 @@ const PayPalPaymentButton = ({
         duration: 5000,
         isClosable: true,
       });
+      
+      // If we're trying to show card option but it fails, fall back to PayPal button
+      if (showCardOption) {
+        setShowCardOption(false);
+        console.log("Falling back to PayPal button due to card initialization error");
+      }
+      
       return null;
     } finally {
       setIsLoading(false);
@@ -307,122 +360,131 @@ const PayPalPaymentButton = ({
       setError('PayPal is not initialized correctly');
       return;
     }
+    
+    // Use a small timeout to ensure the container is ready
+    // This helps with the state change from card to PayPal
+    setTimeout(() => {
+      // Check if container exists
+      const container = document.getElementById('paypal-button-container');
+      if (!container) {
+        console.error('PayPal button container not found in DOM');
+        setError('Payment initialization error. Please try again.');
+        return;
+      }
 
-    // Clear any previously rendered buttons
-    const container = document.getElementById('paypal-button-container');
-    if (container) {
+      // Clear any previously rendered buttons
       container.innerHTML = '';
-    }
-
-    // Create the PayPal button
-    window.paypal.Buttons({
-      // Set up the transaction
-      createOrder: function() {
-        // Return the order ID from our backend
-        return paymentData.id;
-      },
       
-      // Handle successful payment
-      onApprove: async function(data, actions) {
-        setIsProcessing(true);
-        try {
-          // Call your backend to capture the payment
-          const response = await fetch(`/api/payment/capture-intent`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              orderId: data.orderID,
-              ...metadata
-            }),
-          });
-          
-          const captureData = await response.json();
-          
-          if (!captureData.success) {
-            throw new Error(captureData.error || 'Payment capture failed');
+      // Create the PayPal button
+      window.paypal.Buttons({
+        // Set up the transaction
+        createOrder: function() {
+          // Return the order ID from our backend
+          return paymentData.id;
+        },
+        
+        // Handle successful payment
+        onApprove: async function(data, actions) {
+          setIsProcessing(true);
+          try {
+            // Call your backend to capture the payment
+            const response = await fetch(`/api/payment/capture-intent`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                orderId: data.orderID,
+                ...metadata
+              }),
+            });
+            
+            const captureData = await response.json();
+            
+            if (!captureData.success) {
+              throw new Error(captureData.error || 'Payment capture failed');
+            }
+            
+            // Create payment data for callback
+            const paymentResult = {
+              transactionId: data.orderID,
+              amount: amount,
+              method: 'paypal',
+              captureId: captureData.data.captureId || data.orderID,
+              metadata: metadata || {}
+            };
+            
+            // Set states to complete
+            setPaymentData(paymentResult);
+            setIsComplete(true);
+            setIsProcessing(false);
+            
+            // Call success callback
+            if (onPaymentSuccess) {
+              onPaymentSuccess(paymentResult);
+            }
+            
+            toast({
+              title: 'Payment Successful',
+              description: 'Your payment was processed successfully!',
+              status: 'success',
+              duration: 5000,
+              isClosable: true,
+            });
+          } catch (error) {
+            console.error('Payment capture error:', error);
+            setError(error.message || 'Failed to capture payment');
+            
+            if (onPaymentError) {
+              onPaymentError(error);
+            }
+            
+            toast({
+              title: 'Payment Error',
+              description: error.message || 'Failed to capture payment',
+              status: 'error',
+              duration: 5000,
+              isClosable: true,
+            });
+          } finally {
+            setIsProcessing(false);
           }
-          
-          // Create payment data for callback
-          const paymentResult = {
-            transactionId: data.orderID,
-            amount: amount,
-            method: 'paypal',
-            captureId: captureData.data.captureId || data.orderID,
-            metadata: metadata || {}
-          };
-          
-          // Set states to complete
-          setPaymentData(paymentResult);
-          setIsComplete(true);
-          setIsProcessing(false);
-          
-          // Call success callback
-          if (onPaymentSuccess) {
-            onPaymentSuccess(paymentResult);
-          }
-          
+        },
+        
+        // Handle cancelled payment
+        onCancel: function() {
+          console.log('Payment cancelled');
           toast({
-            title: 'Payment Successful',
-            description: 'Your payment was processed successfully!',
-            status: 'success',
-            duration: 5000,
+            title: 'Payment Cancelled',
+            description: 'You cancelled the payment process.',
+            status: 'info',
+            duration: 3000,
             isClosable: true,
           });
-        } catch (error) {
-          console.error('Payment capture error:', error);
-          setError(error.message || 'Failed to capture payment');
+        },
+        
+        // Handle payment errors
+        onError: function(err) {
+          console.error('PayPal error:', err);
+          setError('An error occurred with PayPal. Please try again.');
           
           if (onPaymentError) {
-            onPaymentError(error);
+            onPaymentError(err);
           }
           
           toast({
-            title: 'Payment Error',
-            description: error.message || 'Failed to capture payment',
+            title: 'PayPal Error',
+            description: 'An error occurred with PayPal. Please try again.',
             status: 'error',
             duration: 5000,
             isClosable: true,
           });
-        } finally {
-          setIsProcessing(false);
         }
-      },
-      
-      // Handle cancelled payment
-      onCancel: function() {
-        console.log('Payment cancelled');
-        toast({
-          title: 'Payment Cancelled',
-          description: 'You cancelled the payment process.',
-          status: 'info',
-          duration: 3000,
-          isClosable: true,
-        });
-      },
-      
-      // Handle payment errors
-      onError: function(err) {
-        console.error('PayPal error:', err);
-        setError('An error occurred with PayPal. Please try again.');
-        
-        if (onPaymentError) {
-          onPaymentError(err);
-        }
-        
-        toast({
-          title: 'PayPal Error',
-          description: 'An error occurred with PayPal. Please try again.',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    }).render('#paypal-button-container').catch(err => {
-      console.error('Error rendering PayPal buttons:', err);
-      setError('Failed to load PayPal payment options');
-    });
+      }).render('#paypal-button-container').catch(err => {
+        console.error('Error rendering PayPal buttons:', err);
+        setError('Failed to load PayPal payment options');
+      });
+    }, 300); // Short delay to ensure DOM is ready
   };
 
   // Add cleanup on unmount
@@ -450,7 +512,7 @@ const PayPalPaymentButton = ({
   }, []);
 
   // Function to render the credit card form
-  const renderCardForm = (paymentIntent) => {
+  const renderCardForm = async (paymentIntent) => {
     console.log("Attempting to render hosted fields with order ID:", paymentIntent.id);
     
     if (!window.paypal || !window.paypal.HostedFields) {
@@ -459,16 +521,24 @@ const PayPalPaymentButton = ({
       return;
     }
     
-    // Check if we have a client ID - needed for authorization
-    const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-    if (!clientId) {
-      console.warn("Missing PayPal client ID - cannot initialize hosted fields");
-      if (process.env.NODE_ENV === 'development') {
-        console.log("In development mode - using mock credit card flow instead");
-        simulateCreditCardFlow(paymentIntent);
+    // Get client ID from server - ensures we use proper sandbox credentials
+    let clientId;
+    try {
+      const response = await fetch('/api/payment/config');
+      if (response.ok) {
+        const data = await response.json();
+        clientId = data.clientId;
+        console.log(`Using PayPal client ID: ${clientId ? clientId.substring(0, 5) + '...' : 'none'}`);
       } else {
-        setError("Payment configuration error. Please try again later.");
+        throw new Error('Failed to load PayPal config');
       }
+
+      if (!clientId) {
+        throw new Error('PayPal client ID not available');
+      }
+    } catch (error) {
+      console.error("Error fetching PayPal client ID:", error);
+      setError("Payment configuration error. Please try again later.");
       return;
     }
     
@@ -514,14 +584,21 @@ const PayPalPaymentButton = ({
       addCardFormStyles();
       
       // Render the hosted fields with a delay to ensure the DOM is ready
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
           console.log("Initializing hosted fields with orderId:", paymentIntent.id);
           
-          // Initialize PayPal Hosted Fields
-          window.paypal.HostedFields.render({
-            // The authorization is required for Hosted Fields
-            createOrder: () => paymentIntent.id,
+          // Device eligibility is already checked in the useEffect
+          console.log("Initializing PayPal Hosted Fields");
+          
+          // Render hosted fields
+          const hostedFields = await window.paypal.HostedFields.render({
+            // Send client ID as authorization instead of order ID
+            createOrder: function() {
+              return paymentIntent.id;
+            },
+            // Required - must be set to order.id for authorization
+            orderId: paymentIntent.id,
             styles: {
               '.valid': { color: 'green' },
               '.invalid': { color: 'red' },
@@ -546,47 +623,53 @@ const PayPalPaymentButton = ({
                 placeholder: 'MM/YY'
               }
             }
-          }).then(hostedFields => {
-            console.log("Hosted fields rendered successfully");
-            
-            // Add event listener to submit button
-            const submitButton = document.getElementById('submit-card');
-            if (submitButton) {
-              submitButton.addEventListener('click', async () => {
-                handleCardSubmission(hostedFields, paymentIntent);
-              });
-            }
-          }).catch(err => {
-            console.error('Hosted fields render error:', err);
-            
-            // If we get an authorization error, fallback to mock in development
-            if (process.env.NODE_ENV === 'development' && 
-                (err.message.includes('authorization') || err.message.includes('clientID'))) {
-              console.log("Authorization error in development, falling back to mock form");
-              simulateCreditCardFlow(paymentIntent);
-              return;
-            }
-            
-            setError(`Failed to initialize card fields: ${err.message}`);
           });
-        } catch (error) {
-          console.error('Error setting up hosted fields:', error);
-          if (process.env.NODE_ENV === 'development') {
-            console.log("Error in development, falling back to mock form");
-            simulateCreditCardFlow(paymentIntent);
+            
+          console.log("Hosted fields rendered successfully");
+          
+          // Add event listener to submit button
+          const submitButton = document.getElementById('submit-card');
+          if (submitButton) {
+            submitButton.addEventListener('click', async () => {
+              handleCardSubmission(hostedFields, paymentIntent);
+            });
+          }
+        } catch (err) {
+          console.error('Hosted fields render error:', err);
+          
+          // Use our custom card form instead of PayPal's hosted fields
+          if (err.message.includes('not eligible') || err.message.includes('authorization')) {
+            console.log("Using custom card entry form instead of PayPal Hosted Fields");
+            
+            // Clear any error message
+            setError(null);
+            
+            // Render our custom card form
+            // This will be handled by React since we're using JSX components instead of innerHTML
+            const formContainer = document.getElementById('card-form-container');
+            if (formContainer) {
+              // We need to empty the container first
+              while (formContainer.firstChild) {
+                formContainer.removeChild(formContainer.firstChild);
+              }
+              
+              // The CardEntryForm component will be rendered by React in the return statement,
+              // so we'll set a state to indicate we should use our custom form
+              setUseCustomCardForm(true);
+            }
           } else {
-            setError(`Failed to set up card fields: ${error.message}`);
+            setError(`Failed to initialize card fields: ${err.message}`);
           }
         }
       }, 500); // Increased timeout for better DOM readiness
     } catch (error) {
       console.error('Error setting up hosted fields:', error);
-      if (process.env.NODE_ENV === 'development') {
-        console.log("Error in development, falling back to mock form");
-        simulateCreditCardFlow(paymentIntent);
-      } else {
-        setError(`Failed to set up card fields: ${error.message}`);
-      }
+      console.error("Error setting up hosted fields:", error);
+      setError(`Failed to set up card fields: ${error.message}`);
+      
+      // Fall back to PayPal button
+      setShowCardOption(false);
+      console.log("Falling back to PayPal button due to card field initialization error");
     }
   };
   
@@ -780,238 +863,19 @@ const PayPalPaymentButton = ({
     }
   };
 
-  // Function to simulate PayPal flow for development/testing
+  // No simulation - always use real PayPal sandbox
   const simulatePayPalFlow = (paymentData) => {
-    // Show a message about mock mode
-    toast({
-      title: 'Development Mode',
-      description: 'Using mock PayPal in development. Click the button to simulate payment.',
-      status: 'info',
-      duration: 5000,
-      isClosable: true,
-    });
+    console.error('PayPal simulation is disabled - always use real PayPal sandbox');
+    setError('PayPal integration requires sandbox credentials. Please check your configuration.');
     
-    // Clear container and create a mock button
-    const container = document.getElementById('paypal-button-container');
-    if (container) {
-      container.innerHTML = '';
-      
-      // Create a styled mock PayPal button
-      const mockButton = document.createElement('div');
-      mockButton.setAttribute('data-paypal-mock', 'true');
-      mockButton.innerHTML = `
-        <div style="background-color: #f0f8ff; padding: 8px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #a8d4ff;">
-          <div style="font-weight: bold; margin-bottom: 5px; color: #0070ba;">DEVELOPMENT MODE</div>
-          <div style="font-size: 14px;">This is a simulated PayPal flow for development.</div>
-        </div>
-        <button id="mock-paypal-button" style="background-color: #0070ba; color: white; border: none; border-radius: 4px; padding: 10px; width: 100%; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: pointer;">
-          <span style="margin-right: 10px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-              <path d="M20.9,8.6c-0.3-2.4-2-4.1-4.4-4.4C14.5,4,11.5,4,8.5,4.2C6.1,4.5,4.4,6.1,4.1,8.6C3.9,11.5,3.9,14.5,4.1,17.4c0.3,2.4,2,4.1,4.4,4.4c2.9,0.2,5.9,0.2,8.9,0c2.4-0.3,4.1-2,4.4-4.4c0.2-1.5,0.2-3,0.2-4.5C21.1,11.6,21.1,10.1,20.9,8.6z M17,12.7l-2.5,2.5c-0.8,0.8-2,0.8-2.8,0c-0.8-0.8-0.8-2,0-2.8l0.4-0.4c0.2-0.2,0.6-0.2,0.8,0c0.2,0.2,0.2,0.6,0,0.8L12.5,13c-0.4,0.4-0.4,1,0,1.4c0.4,0.4,1,0.4,1.4,0l2.5-2.5c0.4-0.4,0.4-1,0-1.4c-0.4-0.4-1-0.4-1.4,0l-0.3,0.3c-0.2,0.2-0.6,0.2-0.8,0c-0.2-0.2-0.2-0.6,0-0.8l0.3-0.3c0.8-0.8,2-0.8,2.8,0C17.7,10.7,17.7,12,17,12.7z M13.1,14.5l-2.5,2.5c-0.4,0.4-1,0.4-1.4,0c-0.4-0.4-0.4-1,0-1.4l2.5-2.5c0.2-0.2,0.2-0.6,0-0.8c-0.2-0.2-0.6-0.2-0.8,0l-2.5,2.5c-0.8,0.8-0.8,2,0,2.8c0.8,0.8,2,0.8,2.8,0l2.5-2.5c0.2-0.2,0.2-0.6,0-0.8C13.7,14.3,13.3,14.3,13.1,14.5z">
-              </path>
-            </svg>
-          </span>
-          Simulate PayPal Payment
-        </button>
-      `;
-      
-      container.appendChild(mockButton);
-      
-      // Add event listener to the mock button
-      setTimeout(() => {
-        const button = document.getElementById('mock-paypal-button');
-        if (button) {
-          button.onclick = async () => {
-            setIsProcessing(true);
-            
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            try {
-              // Create a mock payment result
-              const mockPaymentResult = {
-                transactionId: `mock-${Date.now()}`,
-                amount: amount,
-                method: 'paypal',
-                captureId: `mock-capture-${Date.now()}`,
-                status: 'COMPLETED',
-                metadata: metadata || {}
-              };
-              
-              // Update state
-              setPaymentData(mockPaymentResult);
-              setIsComplete(true);
-              
-              // Call the success callback with mock data
-              if (onPaymentSuccess) {
-                onPaymentSuccess(mockPaymentResult);
-              }
-              
-              toast({
-                title: 'Payment Simulated',
-                description: 'Mock PayPal payment successful! This is a simulated transaction.',
-                status: 'success',
-                duration: 5000,
-                isClosable: true,
-              });
-            } catch (error) {
-              console.error('Mock payment simulation error:', error);
-              setError('Error in payment simulation');
-              
-              if (onPaymentError) {
-                onPaymentError(new Error('Mock payment simulation failed'));
-              }
-              
-              toast({
-                title: 'Simulation Error',
-                description: 'The mock payment simulation failed.',
-                status: 'error',
-                duration: 5000,
-                isClosable: true,
-              });
-            } finally {
-              setIsProcessing(false);
-            }
-          };
-        }
-      }, 100);
-    }
+    // Re-render the real PayPal button
+    renderPayPalButton(paymentData);
   };
 
-  // Function to simulate credit card flow in development when no real credentials exist
+  // No simulation - always use real PayPal sandbox credentials
   const simulateCreditCardFlow = async (paymentData) => {
-    // Show a message about mock mode
-    toast({
-      title: 'Development Mode',
-      description: 'Using mock Credit Card in development. Fill the form to simulate payment.',
-      status: 'info',
-      duration: 5000,
-      isClosable: true,
-    });
-    
-    // Clear any previously rendered content
-    const container = document.getElementById('card-form-container');
-    if (container) {
-      container.innerHTML = '';
-      
-      // Create a mock credit card form
-      const form = document.createElement('div');
-      form.setAttribute('data-paypal-mock-form', 'true');
-      form.style.border = '1px solid #ddd';
-      form.style.borderRadius = '4px';
-      form.style.padding = '15px';
-      
-      // Add a development mode notice at the top
-      form.innerHTML = `
-        <div style="background-color: #f0f8ff; padding: 8px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #a8d4ff;">
-          <div style="font-weight: bold; margin-bottom: 5px; color: #0070ba;">DEVELOPMENT MODE</div>
-          <div style="font-size: 14px;">This is a mock credit card form for development only.</div>
-        </div>
-        <div style="margin-bottom: 10px;">
-          <label style="display: block; margin-bottom: 5px;">Card Number</label>
-          <input id="mock-card-number" type="text" placeholder="4111 1111 1111 1111" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" value="4111 1111 1111 1111">
-        </div>
-        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-          <div style="flex: 1;">
-            <label style="display: block; margin-bottom: 5px;">Expiry Date</label>
-            <input id="mock-expiry" type="text" placeholder="MM/YY" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" value="12/25">
-          </div>
-          <div style="flex: 1;">
-            <label style="display: block; margin-bottom: 5px;">CVC</label>
-            <input id="mock-cvc" type="text" placeholder="123" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" value="123">
-          </div>
-        </div>
-        <div style="margin-bottom: 10px;">
-          <label style="display: block; margin-bottom: 5px;">Name on Card</label>
-          <input id="mock-cardholder" type="text" placeholder="John Doe" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" value="Test User">
-        </div>
-        <button id="mock-card-submit" style="background-color: #0070ba; color: white; border: none; border-radius: 4px; padding: 10px; width: 100%; font-weight: bold; cursor: pointer;">Process Test Payment</button>
-      `;
-      
-      container.appendChild(form);
-      
-      // Add event listener for the submit button with a timeout to ensure the DOM is ready
-      setTimeout(() => {
-        const submitButton = document.getElementById('mock-card-submit');
-        if (submitButton) {
-          submitButton.addEventListener('click', async () => {
-            // Get values from the form
-            const cardNumber = document.getElementById('mock-card-number')?.value || '4111111111111111';
-            const expiry = document.getElementById('mock-expiry')?.value || '12/25';
-            const cvc = document.getElementById('mock-cvc')?.value || '123';
-            const cardholder = document.getElementById('mock-cardholder')?.value || 'Test User';
-            
-            // Validate inputs
-            if (!cardNumber || !expiry || !cvc || !cardholder) {
-              toast({
-                title: 'Missing Information',
-                description: 'Please fill in all card details',
-                status: 'warning',
-                duration: 3000,
-                isClosable: true,
-              });
-              return;
-            }
-            
-            setIsProcessing(true);
-            
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            try {
-              // Create the mock payment result
-              const mockResult = {
-                transactionId: paymentData.id || `mock-${Date.now()}`,
-                amount: amount,
-                method: 'card',
-                status: 'COMPLETED',
-                details: {
-                  cardType: 'Visa',
-                  lastFour: cardNumber.slice(-4)
-                },
-                metadata: metadata || {}
-              };
-              
-              // Update state
-              setPaymentData(mockResult);
-              setIsComplete(true);
-              
-              // Call the success callback
-              if (onPaymentSuccess) {
-                onPaymentSuccess(mockResult);
-              }
-              
-              // Show success message
-              toast({
-                title: 'Payment Simulated',
-                description: `Test payment of $${amount} processed successfully with card ending in ${cardNumber.slice(-4)}`,
-                status: 'success',
-                duration: 5000,
-                isClosable: true,
-              });
-            } catch (error) {
-              // Show error message
-              console.error('Mock card processing error:', error);
-              setError('Failed to process test payment');
-              
-              if (onPaymentError) {
-                onPaymentError(new Error('Mock card payment failed'));
-              }
-              
-              toast({
-                title: 'Simulation Error',
-                description: 'The mock card payment failed.',
-                status: 'error',
-                duration: 5000,
-                isClosable: true,
-              });
-            } finally {
-              setIsProcessing(false);
-            }
-          });
-        }
-      }, 100);
-    }
+    console.error('Credit card simulation is disabled - always use real PayPal sandbox credentials');
+    setError('Credit card processing requires PayPal sandbox credentials. Please check your configuration.');
   };
 
   // Debug button to show credit card form if having issues
@@ -1032,6 +896,80 @@ const PayPalPaymentButton = ({
     }
     
     onDebugClose();
+  };
+
+  // Handle direct card entry form submission
+  const handleDirectCardSubmit = (cardData) => {
+    setIsProcessing(true);
+    
+    console.log("Processing card payment with custom form");
+    console.log("Card data (last 4):", cardData.cardNumber.slice(-4));
+    
+    // Send card data to the server for processing
+    fetch('/api/payment/process-card', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        cardData,
+        amount,
+        orderId: paymentData?.id || "sandbox_" + Math.random().toString(36).substring(2, 10),
+        metadata
+      })
+    })
+    .then(response => response.json())
+    .then(result => {
+      if (result.success) {
+        const paymentResult = {
+          transactionId: result.data.transactionId,
+          amount: amount,
+          method: 'card',
+          details: {
+            lastFour: cardData.cardNumber.slice(-4),
+            cardType: result.data.paymentDetails?.cardType || 'Card'
+          },
+          metadata: metadata || {}
+        };
+        
+        setPaymentData(paymentResult);
+        setIsComplete(true);
+        
+        // Call success callback
+        if (onPaymentSuccess) {
+          onPaymentSuccess(paymentResult);
+        }
+        
+        toast({
+          title: "Payment Successful",
+          description: `Payment of $${amount} processed successfully`,
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+        });
+      } else {
+        throw new Error(result.error || 'Payment processing failed');
+      }
+    })
+    .catch(error => {
+      console.error("Card payment error:", error);
+      setError(error.message || 'Payment processing failed');
+      
+      if (onPaymentError) {
+        onPaymentError(error);
+      }
+      
+      toast({
+        title: "Payment Failed",
+        description: error.message || 'Payment processing failed',
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    })
+    .finally(() => {
+      setIsProcessing(false);
+    });
   };
 
   return (
@@ -1082,20 +1020,23 @@ const PayPalPaymentButton = ({
           
           <Box id="paypal-button-container" width="100%" />
           
-          <Button
-            colorScheme="blue"
-            leftIcon={<FaPaypal />}
-            onClick={handlePayPalClick}
-            isLoading={isLoading}
-            loadingText="Processing..."
-            isDisabled={isDisabled || isInitializing || isLoading || isComplete}
-            width="100%"
-            mt={2}
-          >
-            {buttonText}
-          </Button>
+          {/* Manual button as fallback in case automatic rendering fails */}
+          {error && (
+            <Button
+              colorScheme="blue"
+              leftIcon={<FaPaypal />}
+              onClick={handlePayPalClick}
+              isLoading={isLoading}
+              loadingText="Processing..."
+              isDisabled={isDisabled || isInitializing || isLoading || isComplete}
+              width="100%"
+              mt={2}
+            >
+              {buttonText}
+            </Button>
+          )}
           
-          {!isComplete && (
+          {!isComplete && !error && (
             <Button
               variant="outline"
               leftIcon={<FaCreditCard />}
@@ -1148,7 +1089,13 @@ const PayPalPaymentButton = ({
             </Box>
           )}
           
+          {/* Container for PayPal hosted fields */}
           <Box id="card-form-container" width="100%" />
+          
+          {/* Our custom card form - shown when PayPal hosted fields aren't available */}
+          {useCustomCardForm && !isProcessing && !isComplete && (
+            <CardEntryForm onSubmit={handleDirectCardSubmit} isProcessing={isProcessing} />
+          )}
           
           {!isComplete && !isProcessing && (
             <Button

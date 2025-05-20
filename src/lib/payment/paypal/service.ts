@@ -74,17 +74,9 @@ export class PayPalClient {
    */
   private async request(endpoint: string, method: string, data?: any): Promise<any> {
     try {
-      // Check if using dummy credentials in development mode or during build
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
-      const usingDummyCredentials = (isDevelopment || isBuildPhase) && 
-        (this.clientId === 'dummy-development-client-id' || 
-         !process.env.PAYPAL_SANDBOX_CLIENT_ID);
-      
-      // Return mock responses when using dummy credentials in development or during build
-      if (usingDummyCredentials) {
-        logger.info(`PayPal mock request: ${method} ${endpoint}`);
-        return this.getMockResponse(endpoint, method, data);
+      // Always use real PayPal sandbox credentials
+      if (!process.env.PAYPAL_SANDBOX_CLIENT_ID || !process.env.PAYPAL_SANDBOX_CLIENT_SECRET) {
+        throw new Error('PayPal credentials are required - please check your .env file');
       }
       
       const token = await this.getAccessToken();
@@ -126,110 +118,9 @@ export class PayPalClient {
    * Generate mock responses for development environment when using dummy credentials
    */
   private getMockResponse(endpoint: string, method: string, data?: any): any {
-    // Generate a UUID for IDs
-    const mockId = `MOCK-${Math.random().toString(36).substring(2, 15)}`;
-    
-    // Extract amount if present in request data
-    let amount = '10.00';
-    let currency = 'USD';
-    
-    if (data && data.purchase_units && data.purchase_units.length > 0) {
-      if (data.purchase_units[0].amount) {
-        amount = data.purchase_units[0].amount.value || amount;
-        currency = data.purchase_units[0].amount.currency_code || currency;
-      }
-    }
-    
-    // Handle different endpoints
-    if (endpoint.includes('/v2/checkout/orders') && method === 'POST') {
-      // Mock create order response
-      console.log(`Creating mock PayPal order with ID: ${mockId} for amount: ${amount} ${currency}`);
-      return {
-        id: mockId,
-        status: 'CREATED',
-        links: [
-          {
-            href: `https://mock-api.paypal.com/v2/checkout/orders/${mockId}`,
-            rel: 'self',
-            method: 'GET'
-          },
-          {
-            href: `https://mock-api.paypal.com/v2/checkout/orders/${mockId}/capture`,
-            rel: 'capture',
-            method: 'POST'
-          }
-        ],
-        purchase_units: [
-          {
-            reference_id: `mock-ref-${Date.now()}`,
-            amount: {
-              currency_code: currency,
-              value: amount
-            }
-          }
-        ]
-      };
-    } else if (endpoint.includes('/v2/checkout/orders') && endpoint.includes('/capture')) {
-      // Mock capture response
-      const orderId = endpoint.split('/')[4];
-      console.log(`Capturing mock PayPal order with ID: ${orderId}`);
-      return {
-        id: orderId,
-        status: 'COMPLETED',
-        purchase_units: [
-          {
-            reference_id: `mock-ref-${Date.now()}`,
-            amount: {
-              currency_code: currency,
-              value: amount
-            },
-            payments: {
-              captures: [
-                {
-                  id: `MOCK-CAPTURE-${Math.random().toString(36).substring(2, 10)}`,
-                  status: 'COMPLETED',
-                  amount: {
-                    currency_code: currency,
-                    value: amount
-                  },
-                  final_capture: true,
-                  disbursement_mode: "INSTANT",
-                  create_time: new Date().toISOString(),
-                  update_time: new Date().toISOString()
-                }
-              ]
-            }
-          }
-        ]
-      };
-    } else if (endpoint.includes('/v2/customer/partner-referrals')) {
-      // Mock partner referral response
-      return {
-        links: [
-          {
-            href: 'https://mock-api.paypal.com/merchantonboard',
-            rel: 'action_url',
-            method: 'GET'
-          }
-        ]
-      };
-    } else if (endpoint.includes('/v1/oauth2/token')) {
-      // Mock token response
-      return {
-        access_token: 'MOCK-ACCESS-TOKEN',
-        token_type: 'Bearer',
-        expires_in: 32400
-      };
-    }
-    
-    // Default mock response
-    return {
-      mock: true,
-      mockId: mockId,
-      originalEndpoint: endpoint,
-      originalMethod: method,
-      originalData: data
-    };
+    // This method is no longer used - we always want to use real sandbox credentials
+    logger.error(`Attempting to use mock response for ${method} ${endpoint} - this is no longer supported`);
+    throw new Error('Mock responses are disabled - please use real PayPal sandbox credentials');
   }
 
   /**
@@ -502,27 +393,13 @@ export const paymentService = {
     
     try {
       let order;
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      const usingMockCredentials = isDevelopment && 
-        (!process.env.PAYPAL_SANDBOX_CLIENT_ID || 
-         !process.env.PAYPAL_SANDBOX_CLIENT_SECRET);
       
-      // If we're in development with no credentials, return a mock order right away
-      if (usingMockCredentials) {
-        logger.info(`Using mock PayPal in development mode`);
-        const mockId = `MOCK-${Math.random().toString(36).substring(2, 15)}`;
-        return {
-          id: mockId,
-          client_secret: mockId,
-          amount,
-          currency,
-          status: 'CREATED',
-          paypal_order: {
-            id: mockId,
-            status: 'CREATED',
-            links: []
-          }
-        };
+      // Always use real PayPal sandbox credentials
+      logger.info(`Using real PayPal sandbox credentials for payment`);
+      
+      // Ensure we have credentials
+      if (!process.env.PAYPAL_SANDBOX_CLIENT_ID || !process.env.PAYPAL_SANDBOX_CLIENT_SECRET) {
+        throw new Error('PayPal credentials are required - please check your .env file');
       }
       
       // If provider has a connected PayPal account and we have their merchant ID
