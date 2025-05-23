@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Heading, Text, Box, Alert, AlertIcon, Button, Flex, Spinner, VStack } from '@chakra-ui/react';
+import { Heading, Text, Box, Alert, AlertIcon, Button, Flex, Spinner, VStack, Tag, HStack } from '@chakra-ui/react';
 import { FaCheckCircle, FaArrowLeft } from 'react-icons/fa';
 
 export default function PayPalDemoCallbackPage() {
@@ -42,13 +42,14 @@ export default function PayPalDemoCallbackPage() {
   // Function to update the provider's PayPal status
   const updateProviderPayPalStatus = async (merchantId) => {
     try {
-      const response = await fetch('/api/provider/paypal/account-check', {
+      const response = await fetch('/api/provider/paypal/account-check?sandbox=true', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          merchantId: merchantId
+          merchantId: merchantId,
+          sandbox: true
         })
       });
       
@@ -68,36 +69,45 @@ export default function PayPalDemoCallbackPage() {
       <VStack spacing={6} align="center">
         {status === 'processing' && (
           <>
-            <Heading size="lg">Processing Your PayPal Connection</Heading>
+            <HStack>
+              <Heading size="lg">Processing Your PayPal Connection</Heading>
+              <Tag colorScheme="purple">Sandbox</Tag>
+            </HStack>
             <Spinner size="xl" color="blue.500" thickness="4px" />
-            <Text>Connecting your PayPal account to All Party Rent...</Text>
+            <Text>Connecting your PayPal Sandbox account to All Party Rent...</Text>
           </>
         )}
         
         {status === 'success' && (
           <>
-            <Heading size="lg" color="green.500">PayPal Connected Successfully!</Heading>
+            <HStack>
+              <Heading size="lg" color="green.500">PayPal Connected Successfully!</Heading>
+              <Tag colorScheme="purple">Sandbox</Tag>
+            </HStack>
             <Box fontSize="5xl" color="green.500">
               <FaCheckCircle />
             </Box>
             <Alert status="success" borderRadius="md">
               <AlertIcon />
-              Your PayPal account has been successfully connected to All Party Rent.
+              Your PayPal Sandbox account has been successfully connected to All Party Rent.
             </Alert>
             <Box mt={3}>
-              <Text fontWeight="bold">Mock Merchant ID:</Text>
+              <Text fontWeight="bold">Sandbox Merchant ID:</Text>
               <Text>{merchantId}</Text>
             </Box>
-            <Text>You can now receive payments for your services through PayPal.</Text>
+            <Text>You can now receive sandbox payments for your services through PayPal.</Text>
           </>
         )}
         
         {status === 'error' && (
           <>
-            <Heading size="lg" color="red.500">Connection Failed</Heading>
+            <HStack>
+              <Heading size="lg" color="red.500">Connection Failed</Heading>
+              <Tag colorScheme="purple">Sandbox</Tag>
+            </HStack>
             <Alert status="error" borderRadius="md">
               <AlertIcon />
-              We couldn't connect your PayPal account. Please try again.
+              We couldn't connect your PayPal Sandbox account. Please try again.
             </Alert>
           </>
         )}

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 import { NotificationType } from '@prisma/client'; 
+import { offerRequiresAction } from '@/utils/statusConfig';
 
 export async function POST(
   request: NextRequest,
@@ -12,6 +13,7 @@ export async function POST(
     const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
+      console.error('Approve request: No session or user found');
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
@@ -21,6 +23,8 @@ export async function POST(
     // Unwrap the params Promise
     const unwrappedParams = await params;
     const { id } = unwrappedParams;
+    console.log(`Processing approval for offer ID: ${id}`);
+    
     // Check if user is a provider
     const user = await prisma.user.findUnique({
       where: { email: session.user.email as string },
@@ -28,6 +32,7 @@ export async function POST(
     });
 
     if (!user || user.role !== 'PROVIDER') {
+      console.error(`User ${session.user.email} is not a provider`);
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Only providers can access this endpoint' } },
         { status: 403 }
@@ -54,6 +59,7 @@ export async function POST(
     });
 
     if (!offer) {
+      console.error(`Offer with ID ${id} not found`);
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Offer not found' } },
         { status: 404 }
@@ -62,20 +68,23 @@ export async function POST(
 
     // Check if the provider owns the service
     if (offer.service.providerId !== user.id) {
+      console.error(`Provider ${user.id} does not own service ${offer.service.id}`);
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'You can only manage offers for your own services' } },
         { status: 403 }
       );
     }
 
-    // Check if the offer is in PENDING status
-    if (offer.status !== 'PENDING') {
+    // Check if the offer status allows approval
+    if (!offerRequiresAction(offer.status)) {
+      console.error(`Offer status ${offer.status} does not allow approval`);
       return NextResponse.json(
-        { success: false, error: { code: 'BAD_REQUEST', message: 'Only pending offers can be approved' } },
+        { success: false, error: { code: 'BAD_REQUEST', message: `Offers with status ${offer.status} cannot be approved` } },
         { status: 400 }
       );
     }
 
+    console.log(`Updating offer ${id} status to APPROVED`);
     // Update the offer status to APPROVED
     const updatedOffer = await prisma.offer.update({
       where: { id },
@@ -84,7 +93,28 @@ export async function POST(
       }
     });
 
+    // Check for an existing transaction
+    console.log(`Checking for existing transaction for offer ${id}`);
+    const existingTransaction = await prisma.transaction.findUnique({
+      where: { offerId: id }
+    });
+
+    // If there's a transaction, update its status to PROVIDER_REVIEW
+    if (existingTransaction) {
+      console.log(`Updating transaction ${existingTransaction.id} to PROVIDER_REVIEW status`);
+      await prisma.transaction.update({
+        where: { id: existingTransaction.id },
+        data: {
+          status: 'PROVIDER_REVIEW',
+          reviewDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+        }
+      });
+    } else {
+      console.log(`No existing transaction found for offer ${id}`);
+    }
+
     // Create a notification for the client
+    console.log(`Creating notification for client ${offer.client.id}`);
     await prisma.notification.create({
       data: {
         userId: offer.client.id,
@@ -95,6 +125,7 @@ export async function POST(
       }
     });
 
+    console.log(`Successfully approved offer ${id}`);
     return NextResponse.json({
       success: true,
       data: updatedOffer

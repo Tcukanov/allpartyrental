@@ -47,6 +47,11 @@ const SettingsLayout = ({ children }) => {
       name: 'Security',
       path: '/provider/settings/security',
       icon: FiShield
+    },
+    {
+      name: 'Payment Dashboard',
+      path: '/provider/payments/dashboard',
+      icon: FiCreditCard
     }
   ];
 

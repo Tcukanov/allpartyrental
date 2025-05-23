@@ -31,7 +31,8 @@ import {
 } from '@chakra-ui/react';
 import { ChatIcon, CalendarIcon } from '@chakra-ui/icons';
 import { formatDistanceToNow } from 'date-fns';
-import { OfferStatus } from '@prisma/client';
+import { OfferStatus, TransactionStatus } from '@prisma/client';
+import { getOfferStatusConfig, getTransactionStatusConfig, offerRequiresAction, transactionRequiresAction } from '@/utils/statusConfig';
 
 interface Offer {
   id: string;
@@ -57,6 +58,10 @@ interface Offer {
       date: string;
       startTime: string;
     }
+  };
+  transaction?: {
+    id: string;
+    status: string;
   };
   createdAt: string;
 }
@@ -109,7 +114,16 @@ export default function ProviderRequestsPage() {
         // Continue with main request even if health check fails
       }
       
-      const response = await fetch('/api/provider/requests');
+      // Add cache-busting query parameter to prevent caching
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/provider/requests?t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`Error fetching requests: ${response.status} ${response.statusText}`);
@@ -134,6 +148,15 @@ export default function ProviderRequestsPage() {
       }
       
       if (data.success) {
+        console.log('Fetched offers successfully:', data.data?.length || 0, 'offers');
+        // Log detailed status of each offer for debugging
+        if (data.data && data.data.length > 0) {
+          console.log('Offer statuses:', data.data.map(offer => ({
+            id: offer.id,
+            status: offer.status,
+            transactionStatus: offer.transaction?.status || 'NONE'
+          })));
+        }
         setOffers(data.data || []);
       } else {
         throw new Error(data.error?.message || 'Failed to fetch offers');
@@ -155,22 +178,40 @@ export default function ProviderRequestsPage() {
 
   const handleApprove = async (offerId: string) => {
     try {
+      console.log(`Attempting to approve offer: ${offerId}`);
+      
       const response = await fetch(`/api/provider/requests/${offerId}/approve`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
       
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+      // Log full response for debugging
+      console.log(`Approve response status: ${response.status}`);
+      const responseText = await response.text();
+      console.log(`Approve response body: ${responseText}`);
+      
+      // Try to parse as JSON if possible
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+        throw new Error(`Server returned non-JSON response: ${responseText.substring(0, 100)}...`);
       }
       
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${data?.error?.message || 'Unknown error'}`);
+      }
       
       if (data.success) {
-        // Update the offer status in the local state
-        setOffers(offers.map(offer => 
-          offer.id === offerId ? { ...offer, status: 'APPROVED' } : offer
-        ));
+        console.log(`Successfully approved offer: ${offerId}`);
         
+        // Close the dialog first
+        onClose();
+        
+        // Show success toast
         toast({
           title: 'Success',
           description: 'Offer approved successfully',
@@ -178,6 +219,10 @@ export default function ProviderRequestsPage() {
           duration: 3000,
           isClosable: true,
         });
+        
+        // Important: Immediately refresh offers from the server
+        // Don't rely on state updates which may not trigger a re-render
+        fetchOffers();
       } else {
         throw new Error(data.error?.message || 'Failed to approve offer');
       }
@@ -187,11 +232,11 @@ export default function ProviderRequestsPage() {
         title: 'Error',
         description: err instanceof Error ? err.message : 'Failed to approve offer',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
     } finally {
-      onClose();
+      // Clean up state
       setSelectedOffer(null);
       setActionType(null);
     }
@@ -199,22 +244,40 @@ export default function ProviderRequestsPage() {
 
   const handleReject = async (offerId: string) => {
     try {
+      console.log(`Attempting to reject offer: ${offerId}`);
+      
       const response = await fetch(`/api/provider/requests/${offerId}/reject`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
       
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+      // Log full response for debugging
+      console.log(`Reject response status: ${response.status}`);
+      const responseText = await response.text();
+      console.log(`Reject response body: ${responseText}`);
+      
+      // Try to parse as JSON if possible
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+        throw new Error(`Server returned non-JSON response: ${responseText.substring(0, 100)}...`);
       }
       
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${data?.error?.message || 'Unknown error'}`);
+      }
       
       if (data.success) {
-        // Update the offer status in the local state
-        setOffers(offers.map(offer => 
-          offer.id === offerId ? { ...offer, status: 'REJECTED' } : offer
-        ));
+        console.log(`Successfully rejected offer: ${offerId}`);
         
+        // Close the dialog first
+        onClose();
+        
+        // Show success toast
         toast({
           title: 'Success',
           description: 'Offer rejected successfully',
@@ -222,6 +285,10 @@ export default function ProviderRequestsPage() {
           duration: 3000,
           isClosable: true,
         });
+        
+        // Important: Immediately refresh offers from the server
+        // Don't rely on state updates which may not trigger a re-render
+        fetchOffers();
       } else {
         throw new Error(data.error?.message || 'Failed to reject offer');
       }
@@ -231,11 +298,11 @@ export default function ProviderRequestsPage() {
         title: 'Error',
         description: err instanceof Error ? err.message : 'Failed to reject offer',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
     } finally {
-      onClose();
+      // Clean up state
       setSelectedOffer(null);
       setActionType(null);
     }
@@ -302,19 +369,30 @@ export default function ProviderRequestsPage() {
     }
   };
 
-  const getStatusBadge = (status: OfferStatus) => {
-    const colorScheme = {
-      PENDING: 'yellow',
-      APPROVED: 'green',
-      REJECTED: 'red',
-      CANCELLED: 'gray'
-    }[status];
-
-    return (
-      <Badge colorScheme={colorScheme}>
-        {status}
-      </Badge>
-    );
+  const getStatusBadge = (offer: Offer) => {
+    // Always prioritize the offer status as that's what the provider is most concerned with
+    const offerConfig = getOfferStatusConfig(offer.status);
+    const offerBadge = <Badge colorScheme={offerConfig.color}>{offerConfig.label}</Badge>;
+    
+    // For pending offers, just show pending
+    if (offer.status === 'PENDING') {
+      return offerBadge;
+    }
+    
+    // For approved offers, we might also want to show transaction status
+    if (offer.status === 'APPROVED' && offer.transaction?.status) {
+      const txConfig = getTransactionStatusConfig(offer.transaction.status);
+      return (
+        <Flex gap={2} align="center">
+          <Badge colorScheme={offerConfig.color}>{offerConfig.label}</Badge>
+          <Text fontSize="xs">→</Text>
+          <Badge colorScheme={txConfig.color}>{txConfig.label}</Badge>
+        </Flex>
+      );
+    }
+    
+    // For rejected or cancelled, just show that status
+    return offerBadge;
   };
 
   if (loading) {
@@ -354,7 +432,7 @@ export default function ProviderRequestsPage() {
                 <Th>Service</Th>
                 <Th>Party</Th>
                 <Th>Price</Th>
-                <Th>Status</Th>
+                <Th width="180px">Status</Th>
                 <Th>Date</Th>
                 <Th>Actions</Th>
               </Tr>
@@ -376,10 +454,11 @@ export default function ProviderRequestsPage() {
                     </Button>
                   </Td>
                   <Td>${offer.price}</Td>
-                  <Td>{getStatusBadge(offer.status)}</Td>
+                  <Td>{getStatusBadge(offer)}</Td>
                   <Td>{formatDistanceToNow(new Date(offer.createdAt), { addSuffix: true })}</Td>
                   <Td>
                     <Flex gap={2}>
+                      {/* Show approve and reject buttons only for pending offers */}
                       {offer.status === 'PENDING' && (
                         <>
                           <Button
@@ -398,14 +477,17 @@ export default function ProviderRequestsPage() {
                           </Button>
                         </>
                       )}
-                      <Button
-                        size="sm"
-                        colorScheme="blue"
-                        leftIcon={<Icon as={ChatIcon} />}
-                        onClick={() => handleCreateChat(offer)}
-                      >
-                        Chat
-                      </Button>
+                      {/* Show chat button for all offers except REJECTED and CANCELLED */}
+                      {offer.status !== 'REJECTED' && offer.status !== 'CANCELLED' && (
+                        <Button
+                          size="sm"
+                          colorScheme="blue"
+                          leftIcon={<Icon as={ChatIcon} />}
+                          onClick={() => handleCreateChat(offer)}
+                        >
+                          Chat
+                        </Button>
+                      )}
                     </Flex>
                   </Td>
                 </Tr>

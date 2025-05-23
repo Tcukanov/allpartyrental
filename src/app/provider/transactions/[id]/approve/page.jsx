@@ -27,6 +27,7 @@ import { useSession } from 'next-auth/react';
 import { CheckCircleIcon, WarningIcon } from '@chakra-ui/icons';
 import { formatCurrency } from '@/lib/utils/formatters';
 import React from 'react';
+import { transactionRequiresAction } from '@/utils/statusConfig';
 
 /**
  * Page for a provider to approve a transaction
@@ -84,7 +85,7 @@ export default function ApproveTransactionPage({ params }) {
         setTransaction(data.data);
         
         // Check if transaction can be approved
-        if (data.data.status !== 'PROVIDER_REVIEW') {
+        if (!transactionRequiresAction(data.data.status)) {
           setError(`This transaction cannot be approved because its status is ${data.data.status}`);
         }
         
@@ -136,7 +137,7 @@ export default function ApproveTransactionPage({ params }) {
       setSuccess(true);
       toast({
         title: 'Transaction approved',
-        description: 'The payment has been placed in escrow for 24 hours',
+        description: 'Payment has been processed and will be transferred directly to your PayPal account',
         status: 'success',
         duration: 5000,
         isClosable: true,
@@ -203,8 +204,8 @@ export default function ApproveTransactionPage({ params }) {
               <Icon as={CheckCircleIcon} w={16} h={16} color="green.500" />
               <Heading size="lg">Service Request Approved!</Heading>
               <Text textAlign="center">
-                You have successfully approved the service request. The payment will be held in escrow
-                for 24 hours and then automatically released to you.
+                You have successfully approved the service request. The payment has been processed and 
+                transferred directly to your PayPal account. The transaction is now marked as completed.
               </Text>
               <Button 
                 colorScheme="blue" 
@@ -271,8 +272,8 @@ export default function ApproveTransactionPage({ params }) {
                 <Box>
                   <AlertTitle>Payment Process</AlertTitle>
                   <AlertDescription>
-                    By approving this request, the client's payment will be placed in escrow for 24 hours.
-                    After that period, the funds will be automatically released to your account.
+                    By approving this request, you confirm the booking and authorize payment processing.
+                    The payment will be immediately transferred to your PayPal account.
                   </AlertDescription>
                 </Box>
               </Alert>

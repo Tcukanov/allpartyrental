@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // Temporarily disabled to prevent tab switching reloads in development
   // Suppress specific warnings
   webpack: (config, { isServer }) => {
     if (!isServer) {

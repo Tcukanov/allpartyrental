@@ -31,66 +31,29 @@ import {
   AlertIcon,
   AlertTitle,
   AlertDescription,
+  ButtonGroup,
+  IconButton,
+  Link,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Tooltip,
+  VStack
 } from '@chakra-ui/react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { SearchIcon, ExternalLinkIcon } from '@chakra-ui/icons';
-
-// Mock transaction data for display while API is being fixed
-const MOCK_TRANSACTIONS = [
-  {
-    id: "tx_mock1",
-    amount: 299.99,
-    status: "COMPLETED",
-    description: "Payment for Birthday Party Decorations",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    partyId: "party_123",
-    userId: "user_456",
-    partyName: "Alice's Birthday",
-    userName: "John Doe",
-    userEmail: "john@example.com"
-  },
-  {
-    id: "tx_mock2",
-    amount: 149.50,
-    status: "PENDING",
-    description: "Deposit for Wedding Photography",
-    createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    updatedAt: new Date(Date.now() - 86400000).toISOString(),
-    partyId: "party_789",
-    userId: "user_101",
-    partyName: "Smith Wedding",
-    userName: "Sarah Smith",
-    userEmail: "sarah@example.com"
-  },
-  {
-    id: "tx_mock3",
-    amount: 75.00,
-    status: "REFUNDED",
-    description: "Cancelled catering service",
-    createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-    updatedAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    partyId: "party_456",
-    userId: "user_789",
-    partyName: "Corporate Event",
-    userName: "Michael Johnson",
-    userEmail: "michael@example.com"
-  },
-  {
-    id: "tx_mock4",
-    amount: 350.00,
-    status: "FAILED",
-    description: "Failed payment for entertainment services",
-    createdAt: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
-    updatedAt: new Date(Date.now() - 259200000).toISOString(),
-    partyId: "party_321",
-    userId: "user_654",
-    partyName: "Children's Party",
-    userName: "Emily Davis",
-    userEmail: "emily@example.com"
-  }
-];
+import { 
+  SearchIcon, 
+  ExternalLinkIcon, 
+  ChevronDownIcon, 
+  InfoIcon,
+  ViewIcon,
+  EditIcon,
+  CheckIcon
+} from '@chakra-ui/icons';
+import { FiRefreshCw, FiDownload, FiEye, FiTool } from 'react-icons/fi';
+import NextLink from 'next/link';
 
 export default function AdminTransactionsPage() {
   const { data: session, status } = useSession();
@@ -106,101 +69,81 @@ export default function AdminTransactionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [apiError, setApiError] = useState(null);
-  const [useMockData, setUseMockData] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch transactions
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      if (status === 'unauthenticated') {
-        router.push('/auth/signin');
-        return;
-      }
+  const fetchTransactions = async () => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+      return;
+    }
 
-      if (status === 'authenticated' && session.user.role !== 'ADMIN') {
-        toast({
-          title: 'Access denied',
-          description: 'You do not have permission to view this page',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-        router.push('/');
-        return;
-      }
+    if (status === 'authenticated' && session.user.role !== 'ADMIN') {
+      toast({
+        title: 'Access denied',
+        description: 'You do not have permission to view this page',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      router.push('/');
+      return;
+    }
 
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/admin/transactions');
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/admin/transactions');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch transactions');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setTransactions(data.data || []);
         
-        if (!response.ok) {
-          // If api returns an error, use mock data
-          const errorData = await response.json();
-          console.error('API Error:', errorData);
-          
-          setApiError(errorData.error || 'Failed to fetch transactions');
-          
-          // Fall back to mock data
-          setUseMockData(true);
-          setTransactions(MOCK_TRANSACTIONS);
-          
-          // Calculate statistics from mock data
-          const total = MOCK_TRANSACTIONS.reduce((sum, t) => sum + (t.amount || 0), 0);
-          setStatistics({
-            totalAmount: total.toFixed(2),
-            thisMonth: total.toFixed(2),
-            avgAmount: (total / MOCK_TRANSACTIONS.length).toFixed(2),
-            count: MOCK_TRANSACTIONS.length
-          });
-          
-          return;
-        }
+        // Calculate statistics
+        const total = data.data.reduce((sum, t) => sum + (t.amount || 0), 0);
+        const now = new Date();
+        const thisMonth = data.data.filter(t => {
+          const date = new Date(t.createdAt);
+          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        }).reduce((sum, t) => sum + (t.amount || 0), 0);
         
-        const data = await response.json();
-        
-        if (data.success) {
-          setTransactions(data.data || []);
-          
-          // Calculate statistics
-          const total = data.data.reduce((sum, t) => sum + (t.amount || 0), 0);
-          const now = new Date();
-          const thisMonth = data.data.filter(t => {
-            const date = new Date(t.createdAt);
-            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-          }).reduce((sum, t) => sum + (t.amount || 0), 0);
-          
-          setStatistics({
-            totalAmount: total.toFixed(2),
-            thisMonth: thisMonth.toFixed(2),
-            avgAmount: data.data.length > 0 ? (total / data.data.length).toFixed(2) : 0,
-            count: data.data.length
-          });
-        } else {
-          throw new Error(data.error || 'Failed to fetch transactions');
-        }
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-        
-        // Set error message and use mock data
-        setApiError(error.message || 'Failed to fetch transactions');
-        setUseMockData(true);
-        setTransactions(MOCK_TRANSACTIONS);
-        
-        // Calculate statistics from mock data
-        const total = MOCK_TRANSACTIONS.reduce((sum, t) => sum + (t.amount || 0), 0);
         setStatistics({
           totalAmount: total.toFixed(2),
-          thisMonth: total.toFixed(2),
-          avgAmount: (total / MOCK_TRANSACTIONS.length).toFixed(2),
-          count: MOCK_TRANSACTIONS.length
+          thisMonth: thisMonth.toFixed(2),
+          avgAmount: data.data.length > 0 ? (total / data.data.length).toFixed(2) : 0,
+          count: data.data.length
         });
-      } finally {
-        setIsLoading(false);
+      } else {
+        throw new Error(data.error || 'Failed to fetch transactions');
       }
-    };
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to fetch transactions: ${error.message}`,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     fetchTransactions();
   }, [session, status, router, toast]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchTransactions();
+  };
 
   // Filter transactions based on status and search term
   const filteredTransactions = transactions.filter(transaction => {
@@ -210,7 +153,10 @@ export default function AdminTransactionsPage() {
       transaction.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.partyId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.userId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      transaction.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.providerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.serviceName?.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesFilter && matchesSearch;
   });
@@ -229,22 +175,111 @@ export default function AdminTransactionsPage() {
         return 'green';
       case 'PENDING':
         return 'yellow';
+      case 'ESCROW':
+        return 'blue';
+      case 'PROVIDER_REVIEW':
+        return 'orange';
+      case 'APPROVED':
+        return 'green';
+      case 'DECLINED':
+        return 'red';
       case 'FAILED':
         return 'red';
       case 'REFUNDED':
         return 'purple';
+      case 'DISPUTED':
+        return 'red';
       default:
         return 'gray';
     }
   };
 
+  // Generate PayPal dashboard URL
+  const getPayPalDashboardUrl = () => {
+    return 'https://sandbox.paypal.com/merchantapps/home#/activity/all';
+  };
+
+  // Export transactions to CSV
+  const exportToCsv = () => {
+    const csvData = filteredTransactions.map(t => ({
+      ID: t.id,
+      Date: formatDate(t.createdAt),
+      Amount: t.amount,
+      Status: t.status,
+      Client: t.userName || 'N/A',
+      Provider: t.providerName || 'N/A',
+      Service: t.serviceName || 'N/A',
+      Party: t.partyName || 'N/A',
+      PaymentIntentId: t.paymentIntentId || 'N/A'
+    }));
+
+    const csvContent = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).map(value => 
+        typeof value === 'string' ? `"${value}"` : value
+      ).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <Container maxW="container.xl" py={8}>
       <Box mb={8}>
-        <Heading as="h1" size="xl">Transaction Management</Heading>
-        <Text color="gray.600" mt={2}>
-          Monitor and manage all financial transactions in the system
-        </Text>
+        <Flex justify="space-between" align="center" mb={4}>
+          <VStack align="start" spacing={1}>
+            <Heading as="h1" size="xl">Transaction Management</Heading>
+            <Text color="gray.600">
+              Monitor and manage all financial transactions in the system
+            </Text>
+          </VStack>
+          
+          <ButtonGroup>
+            <Tooltip label="Refresh data">
+              <IconButton
+                icon={<FiRefreshCw />}
+                onClick={handleRefresh}
+                isLoading={isRefreshing}
+                aria-label="Refresh"
+                variant="outline"
+              />
+            </Tooltip>
+            <Tooltip label="Export to CSV">
+              <IconButton
+                icon={<FiDownload />}
+                onClick={exportToCsv}
+                aria-label="Export"
+                variant="outline"
+                isDisabled={filteredTransactions.length === 0}
+              />
+            </Tooltip>
+            <Button
+              as="a"
+              href={getPayPalDashboardUrl()}
+              target="_blank"
+              rightIcon={<ExternalLinkIcon />}
+              colorScheme="blue"
+              variant="outline"
+            >
+              PayPal Dashboard
+            </Button>
+            <Button
+              as={NextLink}
+              href="/debug/payment-tracker"
+              rightIcon={<FiTool />}
+              colorScheme="purple"
+              variant="outline"
+            >
+              Payment Tracker
+            </Button>
+          </ButtonGroup>
+        </Flex>
       </Box>
 
       {isLoading ? (
@@ -253,25 +288,6 @@ export default function AdminTransactionsPage() {
         </Flex>
       ) : (
         <>
-          {useMockData && (
-            <Alert status="warning" mb={6}>
-              <AlertIcon />
-              <Box>
-                <AlertTitle>Using demo data</AlertTitle>
-                <AlertDescription>
-                  {apiError ? (
-                    <>
-                      The transaction API returned an error: "{apiError}". We're showing mock data for demonstration purposes.
-                      The real transaction data will be available once the database schema is updated.
-                    </>
-                  ) : (
-                    "Showing mock transaction data for demonstration. Real transaction data will be available soon."
-                  )}
-                </AlertDescription>
-              </Box>
-            </Alert>
-          )}
-
           {/* Statistics Cards */}
           <SimpleGrid columns={{ base: 1, md: 4 }} spacing={6} mb={8}>
             <Card>
@@ -324,16 +340,21 @@ export default function AdminTransactionsPage() {
                 onChange={(e) => setFilter(e.target.value)}
               >
                 <option value="all">All Statuses</option>
-                <option value="COMPLETED">Completed</option>
                 <option value="PENDING">Pending</option>
+                <option value="ESCROW">Escrow</option>
+                <option value="PROVIDER_REVIEW">Provider Review</option>
+                <option value="APPROVED">Approved</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="DECLINED">Declined</option>
                 <option value="FAILED">Failed</option>
                 <option value="REFUNDED">Refunded</option>
+                <option value="DISPUTED">Disputed</option>
               </Select>
             </HStack>
             
             <HStack>
               <Input
-                placeholder="Search transactions..."
+                placeholder="Search transactions, users, services..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 width={{ base: 'full', md: '300px' }}
@@ -350,48 +371,117 @@ export default function AdminTransactionsPage() {
               <Table variant="simple">
                 <Thead>
                   <Tr>
-                    <Th>ID</Th>
+                    <Th>Transaction ID</Th>
                     <Th>Date</Th>
-                    <Th>Description</Th>
+                    <Th>Service</Th>
+                    <Th>Client</Th>
+                    <Th>Provider</Th>
                     <Th isNumeric>Amount</Th>
                     <Th>Status</Th>
-                    <Th>Party ID</Th>
-                    <Th>User ID</Th>
+                    <Th>PayPal ID</Th>
+                    <Th width="200px">Actions</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
                   {filteredTransactions.map((transaction) => (
                     <Tr key={transaction.id}>
-                      <Td>{transaction.id}</Td>
-                      <Td>{formatDate(transaction.createdAt)}</Td>
-                      <Td>{transaction.description || 'N/A'}</Td>
-                      <Td isNumeric>${transaction.amount?.toFixed(2) || '0.00'} {transaction.currency ? transaction.currency.toUpperCase() : ''}</Td>
                       <Td>
-                        <Badge colorScheme={getStatusColor(transaction.status)}>
+                        <Text fontFamily="mono" fontSize="sm">
+                          {transaction.id.substring(0, 8)}...
+                        </Text>
+                      </Td>
+                      <Td>{formatDate(transaction.createdAt)}</Td>
+                      <Td>
+                        <VStack align="start" spacing={1}>
+                          <Text fontWeight="medium">{transaction.serviceName || 'N/A'}</Text>
+                          <Text fontSize="xs" color="gray.500">
+                            {transaction.partyName || 'Unknown Party'}
+                          </Text>
+                        </VStack>
+                      </Td>
+                      <Td>
+                        <VStack align="start" spacing={1}>
+                          <Text fontWeight="medium">{transaction.userName || 'N/A'}</Text>
+                          <Text fontSize="xs" color="gray.500">
+                            {transaction.userEmail || 'unknown@example.com'}
+                          </Text>
+                        </VStack>
+                      </Td>
+                      <Td>
+                        <Text fontWeight="medium">{transaction.providerName || 'N/A'}</Text>
+                      </Td>
+                      <Td isNumeric>
+                        <Text fontWeight="bold">${transaction.amount?.toFixed(2) || '0.00'}</Text>
+                      </Td>
+                      <Td>
+                        <Badge colorScheme={getStatusColor(transaction.status)} size="sm">
                           {transaction.status || 'N/A'}
                         </Badge>
-                        {transaction.failureMessage && (
-                          <Text fontSize="xs" color="red.500" mt={1}>
-                            {transaction.failureMessage}
+                      </Td>
+                      <Td>
+                        {transaction.paymentIntentId ? (
+                          <Text fontFamily="mono" fontSize="xs">
+                            {transaction.paymentIntentId.substring(0, 12)}...
                           </Text>
+                        ) : (
+                          <Text fontSize="xs" color="gray.400">No PayPal ID</Text>
                         )}
                       </Td>
-                      <Td>{transaction.partyName || transaction.partyId || 'N/A'}</Td>
                       <Td>
-                        {transaction.userName || transaction.userId || 'N/A'}
-                        {transaction.receiptUrl && (
-                          <Button 
-                            as="a" 
-                            href={transaction.receiptUrl} 
-                            target="_blank" 
-                            size="xs" 
-                            colorScheme="blue" 
-                            leftIcon={<ExternalLinkIcon />}
-                            ml={2}
-                          >
-                            Receipt
-                          </Button>
-                        )}
+                        <ButtonGroup size="sm" spacing={2}>
+                          <Tooltip label="View Details">
+                            <IconButton
+                              as={NextLink}
+                              href={`/admin/transactions/${transaction.id}`}
+                              icon={<ViewIcon />}
+                              variant="outline"
+                              colorScheme="blue"
+                              aria-label="View details"
+                            />
+                          </Tooltip>
+                          
+                          <Menu>
+                            <MenuButton as={IconButton} icon={<ChevronDownIcon />} variant="outline" size="sm">
+                            </MenuButton>
+                            <MenuList>
+                              <MenuItem 
+                                icon={<FiTool />}
+                                as={NextLink}
+                                href={`/debug/payment-tracker?transactionId=${transaction.id}`}
+                              >
+                                Debug Payment
+                              </MenuItem>
+                              
+                              {transaction.paymentIntentId && (
+                                <MenuItem 
+                                  icon={<InfoIcon />}
+                                  as={NextLink}
+                                  href={`/debug/payment-tracker?orderId=${transaction.paymentIntentId}`}
+                                >
+                                  Debug PayPal Order
+                                </MenuItem>
+                              )}
+                              
+                              <MenuItem 
+                                icon={<ExternalLinkIcon />}
+                                as="a"
+                                href={`/api/transactions/${transaction.id}/approve`}
+                                target="_blank"
+                              >
+                                Approve Transaction
+                              </MenuItem>
+                              
+                              <MenuItem 
+                                icon={<ExternalLinkIcon />}
+                                as="a"
+                                href={getPayPalDashboardUrl()}
+                                target="_blank"
+                              >
+                                View in PayPal
+                              </MenuItem>
+                            </MenuList>
+                          </Menu>
+                        </ButtonGroup>
                       </Td>
                     </Tr>
                   ))}
@@ -399,14 +489,27 @@ export default function AdminTransactionsPage() {
               </Table>
             </Box>
           ) : (
-            <Box textAlign="center" py={10}>
-              <Text fontSize="lg">No transactions found</Text>
-              <Text color="gray.500">
-                {filter !== 'all' || searchTerm 
-                  ? 'Try changing your filters or search term'
-                  : 'There are no transactions in the system yet'}
-              </Text>
-            </Box>
+            <Card>
+              <CardBody textAlign="center" py={10}>
+                <Text fontSize="lg" color="gray.500">
+                  {searchTerm || filter !== 'all' 
+                    ? 'No transactions match your current filters' 
+                    : 'No transactions found'
+                  }
+                </Text>
+                {(searchTerm || filter !== 'all') && (
+                  <Button 
+                    mt={4} 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilter('all');
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </CardBody>
+            </Card>
           )}
         </>
       )}

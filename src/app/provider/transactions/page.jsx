@@ -34,18 +34,10 @@ import { useRouter } from 'next/navigation';
 import { getSession } from 'next-auth/react';
 import { FiClock, FiCalendar, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
 import Link from 'next/link';
+import { getTransactionStatusConfig, transactionRequiresAction } from '@/utils/statusConfig';
 
 const TransactionStatusBadge = ({ status }) => {
-  const statusConfig = {
-    'PENDING': { color: 'gray', label: 'Pending' },
-    'PROVIDER_REVIEW': { color: 'yellow', label: 'Action Required' },
-    'DECLINED': { color: 'red', label: 'Declined' },
-    'COMPLETED': { color: 'green', label: 'Completed' },
-    'REFUNDED': { color: 'purple', label: 'Refunded' },
-    'CANCELLED': { color: 'orange', label: 'Cancelled' }
-  };
-
-  const config = statusConfig[status] || { color: 'gray', label: status };
+  const config = getTransactionStatusConfig(status);
   
   return (
     <Badge colorScheme={config.color} fontSize="0.8em" px={2} py={1} borderRadius="md">
@@ -105,15 +97,15 @@ export default function ProviderTransactionsPage() {
 
   // Filter transactions by status
   const pendingReviewTransactions = transactions.filter(
-    tx => tx.status === 'PROVIDER_REVIEW'
+    tx => transactionRequiresAction(tx.status)
   );
   
   const activeTransactions = transactions.filter(
-    tx => tx.status === 'COMPLETED' && tx.escrowEndTime && new Date(tx.escrowEndTime) > new Date()
+    tx => tx.status === 'ACTIVE' || tx.status === 'IN_PROGRESS'
   );
   
   const completedTransactions = transactions.filter(
-    tx => tx.status === 'COMPLETED' && (!tx.escrowEndTime || new Date(tx.escrowEndTime) <= new Date())
+    tx => tx.status === 'COMPLETED'
   );
   
   const cancelledTransactions = transactions.filter(
@@ -177,7 +169,7 @@ export default function ProviderTransactionsPage() {
       toast({
         title: actionType === 'approve' ? 'Request Approved' : 'Request Declined',
         description: actionType === 'approve' 
-          ? 'Transaction is now complete. Payment will be released after 24 hours.' 
+          ? 'Transaction is now complete. Payment is being processed and will be transferred to your account.' 
           : 'The client has been notified and will receive a refund.',
         status: 'success',
         duration: 5000,
@@ -245,17 +237,10 @@ export default function ProviderTransactionsPage() {
                 <Text>Created: {formatDate(transaction.createdAt)}</Text>
               </Flex>
               
-              {transaction.status === 'PROVIDER_REVIEW' && transaction.reviewDeadline && (
+              {transactionRequiresAction(transaction.status) && transaction.reviewDeadline && (
                 <Flex align="center">
                   <Icon as={FiClock} mr={1} color="orange.500" />
                   <Text>Respond by: {formatDate(transaction.reviewDeadline)}</Text>
-                </Flex>
-              )}
-              
-              {transaction.status === 'ESCROW' && transaction.escrowEndTime && (
-                <Flex align="center">
-                  <Icon as={FiClock} mr={1} color="blue.500" />
-                  <Text>Payout on: {formatDate(transaction.escrowEndTime)}</Text>
                 </Flex>
               )}
             </Flex>
@@ -272,7 +257,7 @@ export default function ProviderTransactionsPage() {
                 View Service
               </Button>
               
-              {transaction.status === 'PROVIDER_REVIEW' && (
+              {transactionRequiresAction(transaction.status) && (
                 <Flex gap={2}>
                   <Button
                     leftIcon={<FiCheck />}
@@ -292,12 +277,6 @@ export default function ProviderTransactionsPage() {
                     Decline
                   </Button>
                 </Flex>
-              )}
-              
-              {transaction.status === 'ESCROW' && (
-                <Text fontSize="sm" color="blue.500">
-                  Funds will be released on {formatDate(transaction.escrowEndTime)}
-                </Text>
               )}
             </Flex>
           </Box>
@@ -425,7 +404,7 @@ export default function ProviderTransactionsPage() {
 
             <AlertDialogBody>
               {actionType === 'approve' 
-                ? "You're approving this service request. Payment will be processed and held in escrow until service is completed." 
+                ? "You're approving this service request. Payment will be processed and transferred to your PayPal account immediately." 
                 : "You're declining this service request. The client will be notified and receive a refund."
               }
             </AlertDialogBody>

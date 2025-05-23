@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma/client';
+import { offerRequiresAction } from '@/utils/statusConfig';
+import { authOptions } from '@/lib/auth/auth-options';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session || !session.user) {
+      console.error('Reject request: No session or user found');
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
@@ -19,6 +22,8 @@ export async function POST(
     // Unwrap the params Promise
     const unwrappedParams = await params;
     const { id } = unwrappedParams;
+    console.log(`Processing rejection for offer ID: ${id}`);
+    
     // Check if user is a provider
     const user = await prisma.user.findUnique({
       where: { email: session.user.email as string },
@@ -26,6 +31,7 @@ export async function POST(
     });
 
     if (!user || user.role !== 'PROVIDER') {
+      console.error(`User ${session.user.email} is not a provider`);
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Only providers can access this endpoint' } },
         { status: 403 }
@@ -47,6 +53,7 @@ export async function POST(
     });
 
     if (!serviceOffer) {
+      console.error(`Offer with ID ${id} not found`);
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Offer not found' } },
         { status: 404 }
@@ -55,16 +62,18 @@ export async function POST(
 
     // Check if the provider owns the service
     if (serviceOffer.service.providerId !== user.id) {
+      console.error(`Provider ${user.id} does not own service ${serviceOffer.service.id}`);
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'You can only manage offers for your own services' } },
         { status: 403 }
       );
     }
 
-    // Check if the offer is in PENDING status
-    if (serviceOffer.status !== 'PENDING') {
+    // Check if the offer status allows rejection
+    if (!offerRequiresAction(serviceOffer.status)) {
+      console.error(`Offer status ${serviceOffer.status} does not allow rejection`);
       return NextResponse.json(
-        { success: false, error: { code: 'BAD_REQUEST', message: 'Only pending offers can be rejected' } },
+        { success: false, error: { code: 'BAD_REQUEST', message: `Offers with status ${serviceOffer.status} cannot be rejected` } },
         { status: 400 }
       );
     }
@@ -74,10 +83,13 @@ export async function POST(
     try {
       const body = await request.json();
       reasonForRejection = body.reason || '';
+      console.log(`Rejection reason: "${reasonForRejection}"`);
     } catch (e) {
+      console.log('No rejection reason provided');
       // No body or invalid JSON, continue without reason
     }
 
+    console.log(`Updating offer ${id} status to REJECTED`);
     // Update the offer status to REJECTED
     const updatedOffer = await prisma.offer.update({
       where: { id },
@@ -87,7 +99,28 @@ export async function POST(
       }
     });
 
+    // Check for any existing transaction and update its status
+    console.log(`Checking for existing transaction for offer ${id}`);
+    const existingTransaction = await prisma.transaction.findUnique({
+      where: { offerId: id }
+    });
+
+    // If there's a transaction, update its status to DECLINED
+    if (existingTransaction) {
+      console.log(`Updating transaction ${existingTransaction.id} to DECLINED status`);
+      await prisma.transaction.update({
+        where: { id: existingTransaction.id },
+        data: {
+          status: 'DECLINED',
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      console.log(`No existing transaction found for offer ${id}`);
+    }
+
     // Create a notification for the client
+    console.log(`Creating notification for client ${serviceOffer.clientId}`);
     await prisma.notification.create({
       data: {
         userId: serviceOffer.clientId,
@@ -100,6 +133,7 @@ export async function POST(
       }
     });
 
+    console.log(`Successfully rejected offer ${id}`);
     return NextResponse.json({
       success: true,
       data: updatedOffer

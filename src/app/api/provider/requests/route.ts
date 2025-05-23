@@ -100,6 +100,12 @@ export async function GET(request: NextRequest) {
               }
             }
           }
+        },
+        transaction: {
+          select: {
+            id: true,
+            status: true
+          }
         }
       },
       orderBy: {
@@ -110,6 +116,14 @@ export async function GET(request: NextRequest) {
     });
 
     console.log(`Found ${offers.length} offers matching the criteria`);
+    
+    // Debug log to show the status of each offer
+    if (offers.length > 0) {
+      console.log('Offer details:');
+      offers.forEach(offer => {
+        console.log(`- Offer ID: ${offer.id}, Status: ${offer.status}, TransactionStatus: ${offer.transaction?.status || 'N/A'}`);
+      });
+    }
 
     // Count total offers matching the criteria
     const totalCount = await prisma.offer.count({

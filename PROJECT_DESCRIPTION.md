@@ -19,7 +19,41 @@ BOUNCE HOUSES, PHOTO BOOTH, ETC
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: NextAuth.js
 - **Deployment**: Vercel
-- **Payment Processing**: PayPal (with escrow functionality)
+- **Payment Processing**: PayPal Marketplace (with automatic commission splitting)
+
+## Payment System - PayPal Marketplace
+
+AllPartyRent uses **PayPal Marketplace** for secure, automated payment processing with built-in commission handling:
+
+### **How It Works:**
+1. **Client Payment**: Clients pay through PayPal credit card forms (Service Price + 5% client fee)
+2. **Automatic Splitting**: PayPal automatically splits payments:
+   - **Provider receives**: Service Price - 12% platform commission (instant transfer)
+   - **Platform keeps**: 12% commission + 5% client fee
+3. **Instant Payouts**: Providers receive money directly when bookings are confirmed
+4. **No Manual Transfers**: Zero intervention required for provider payments
+
+### **Provider Onboarding:**
+- Providers can connect their PayPal business accounts through our onboarding flow
+- Connected providers get instant payments via marketplace
+- Non-connected providers fall back to manual payout system
+- PayPal handles all KYC and compliance requirements
+
+### **Payment Structure:**
+```
+Example: $100 Service
+├── Client Pays: $105 (service + 5% client fee)
+├── Provider Gets: $88 (service - 12% commission) [INSTANT]
+└── Platform Keeps: $17 (12% commission + 5% client fee)
+```
+
+### **Benefits:**
+- ✅ Instant provider payments
+- ✅ Automatic commission deduction
+- ✅ Reduced transaction fees
+- ✅ PayPal's fraud protection
+- ✅ No manual accounting for payouts
+- ✅ Better cash flow for providers
 
 ## Core Features
 
@@ -39,16 +73,23 @@ BOUNCE HOUSES, PHOTO BOOTH, ETC
    - Dynamic filters based on category (size, color, material, etc.)
    - Text search functionality
 
-4. **Bookings**
+4. **Bookings & Payments**
    - Party planning
    - Service requests
    - Quotes/Offers from providers
-   - Transactions and payments
+   - PayPal Marketplace transactions with automatic splitting
+   - Instant provider payouts for connected accounts
 
 5. **Location System**
    - City management with default city support
    - Provider service areas
    - Location-based service discovery
+
+6. **Provider Payment Integration**
+   - PayPal onboarding flow for providers
+   - Payment status tracking
+   - Automatic marketplace vs. manual payment detection
+   - Commission tracking and reporting
 
 ## Key Routes & Pages
 
@@ -58,20 +99,27 @@ BOUNCE HOUSES, PHOTO BOOTH, ETC
 - `/[location]/[service]` - Browse services by location and category
 - `/admin/*` - Admin dashboard routes
 - `/provider/*` - Provider dashboard routes
+  - `/provider/settings/payments` - PayPal onboarding & payment settings
 - `/client/*` - Client dashboard routes
 
 ## Database Schema
 
 Key models include:
 - `User` - Base user model with authentication
-- `Provider` - Provider profile information
+- `Provider` - Provider profile information + PayPal marketplace data
+  - `paypalMerchantId` - Provider's PayPal merchant ID
+  - `paypalOnboardingComplete` - Whether provider completed PayPal setup
+  - `paypalStatus` - Current onboarding status (NOT_STARTED, IN_PROGRESS, COMPLETED)
 - `Service` - Service listings
 - `ServiceCategory` - Categories for services
 - `ServiceAddon` - Add-ons for services
 - `City` - Location information
 - `ProviderCity` - Junction table for provider service areas
 - `Party` - Client party planning data
-- `Transaction` - Payment transactions
+- `Transaction` - Payment transactions with commission tracking
+  - `clientFeePercent` - Client fee percentage applied
+  - `providerFeePercent` - Provider commission percentage
+  - `isMarketplacePayment` - Whether payment used marketplace splitting
 
 ## API Structure
 
@@ -80,8 +128,52 @@ Key models include:
 - `/api/categories/*` - Category management endpoints
 - `/api/admin/*` - Admin-only endpoints
 - `/api/provider/*` - Provider-only endpoints
+  - `/api/provider/paypal-status` - Get provider PayPal connection status
+  - `/api/provider/paypal-onboard` - Start PayPal onboarding process
 - `/api/client/*` - Client-only endpoints
+- `/api/payments/*` - Payment processing endpoints
+  - `/api/payments/create` - Create marketplace or regular payment orders
+  - `/api/payments/capture` - Capture payments with automatic splitting
 - `/api/transactions/*` - Transaction processing endpoints
+
+## Payment Flow
+
+### **1. Payment Creation**
+```javascript
+// Automatically tries marketplace payment first
+const paymentResult = await paymentService.createMarketplacePaymentOrder(
+  transactionId,
+  servicePrice,
+  providerId,
+  { paymentMethod: 'card_fields' }
+);
+
+// Falls back to regular payment if provider not connected
+if (!provider.paypalMerchantId) {
+  return await paymentService.createPaymentOrder(transactionId, servicePrice);
+}
+```
+
+### **2. Payment Capture**
+```javascript
+// PayPal automatically handles commission splitting
+const captureResult = await paymentService.capturePayment(orderId);
+
+// Marketplace payments: Provider gets money instantly
+// Regular payments: Manual payout required
+```
+
+### **3. Provider Onboarding**
+```javascript
+// Generate PayPal partner referral link
+const referral = await paypalClient.createPartnerReferral(
+  providerEmail,
+  returnUrl
+);
+
+// Provider completes PayPal business account setup
+// System automatically detects completion and enables marketplace payments
+```
 
 ## Frontend Components
 
@@ -90,6 +182,10 @@ The UI is built with Chakra UI and follows these design patterns:
 - Server components for data fetching and initial rendering
 - Client components for interactive UI elements
 - Consistent filter UI pattern across service listing pages
+- **PayPal Components**:
+  - `PayPalCreditCardForm` - Embedded credit card payment form
+  - `PayPalOnboarding` - Provider onboarding flow
+  - `PayPalConnectButton` - Payment connection interface
 
 ## Code Organization
 
@@ -102,11 +198,18 @@ The UI is built with Chakra UI and follows these design patterns:
    - Handle user interactions
    - Manage state
    - Fetch additional data via API routes
+   - PayPal SDK integration
 
 3. **API Routes**
    - Follow RESTful patterns
    - Include authentication checks
    - Return standardized response formats
+   - PayPal Marketplace API integration
+
+4. **Payment Services**
+   - `PayPalClient` - Direct PayPal API communication
+   - `PaymentService` - Business logic for marketplace payments
+   - Automatic fallback between marketplace and regular payments
    
 ## Filter System
 
@@ -120,6 +223,21 @@ The platform uses a consistent filtering pattern across service browsing pages:
 - NextAuth.js handles authentication
 - Role-based access control (client, provider, admin)
 - Protected API routes and pages
+
+## Environment Variables
+
+### **Required for PayPal Marketplace:**
+```env
+# PayPal Credentials
+NEXT_PUBLIC_PAYPAL_CLIENT_ID="your-paypal-client-id"
+PAYPAL_CLIENT_SECRET="your-paypal-client-secret"
+PAYPAL_ENVIRONMENT="SANDBOX" # or "LIVE"
+
+# Marketplace Settings
+PAYPAL_PLATFORM_MERCHANT_ID="your-platform-merchant-id"
+PAYPAL_PARTNER_ID="your-partner-id"
+PAYPAL_PARTNER_ATTRIBUTION_ID="your-partner-attribution-id"
+```
 
 ## Patterns to Follow
 
@@ -143,24 +261,40 @@ When modifying or adding code to this project, follow these patterns:
    }, { status: errorCode });
    ```
 
-2. **Component Structure**
+2. **Payment Processing**
+   ```javascript
+   // Always try marketplace payment first
+   try {
+     return await paymentService.createMarketplacePaymentOrder(...);
+   } catch (marketplaceError) {
+     // Fallback to regular payment
+     return await paymentService.createPaymentOrder(...);
+   }
+   ```
+
+3. **Component Structure**
    - Server components fetch initial data
    - Client components handle interactions
    - Separate business logic from UI
 
-3. **Filtering Pattern**
+4. **Filtering Pattern**
    - Filters at the top bar
    - More complex filters in the left sidebar
    - Results in a responsive grid
 
-4. **Error Handling**
+5. **Error Handling**
    - Wrap API calls in try/catch blocks
    - Provide meaningful error messages
    - Log errors with appropriate detail level
 
-5. **Database Operations**
+6. **Database Operations**
    - Use Prisma for all database operations
    - Structure complex queries with appropriate joins
    - Implement proper transaction handling for multi-step operations
+
+7. **Payment Integration**
+   - Always check provider PayPal connection status
+   - Handle both marketplace and regular payment flows
+   - Provide clear feedback on payment structure to users
 
 By following these patterns, the codebase will maintain consistency and be easier to extend and maintain. 

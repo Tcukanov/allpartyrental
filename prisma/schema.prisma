@@ -70,6 +70,9 @@ model Provider {
   paypalMerchantId      String?
   paypalEmail           String?
   paypalOnboardingComplete Boolean @default(false)
+  accountType           String?
+  paypalStatus          String?
+  paypalEnvironment     String?
   user                  User     @relation(fields: [userId], references: [id])
 }
 
@@ -284,18 +287,32 @@ model Notification {
 }
 
 model Advertisement {
-  id        String            @id @default(cuid())
-  userId    String
-  type      AdvertisementType
-  startDate DateTime
-  endDate   DateTime
-  isActive  Boolean           @default(true)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  user      User              @relation(fields: [userId], references: [id])
+  id          String               @id @default(cuid())
+  userId      String
+  providerId  String?              // For backward compatibility
+  packageId   String
+  packageName String
+  price       Decimal
+  duration    String
+  features    String[]             @default([])
+  status      AdvertisementStatus  @default(PENDING_PAYMENT)
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean              @default(false)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  user        User                 @relation(fields: [userId], references: [id])
 }
 
 model SystemSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdminSetting {
   id        String   @id @default(cuid())
   key       String   @unique
   value     String
@@ -388,6 +405,8 @@ enum OfferStatus {
 
 enum TransactionStatus {
   PENDING
+  PENDING_PAYMENT
+  PAID_PENDING_PROVIDER_ACCEPTANCE
   ESCROW
   COMPLETED
   REFUNDED
@@ -395,6 +414,7 @@ enum TransactionStatus {
   PROVIDER_REVIEW
   APPROVED
   DECLINED
+  CANCELLED
 }
 
 enum NotificationType {
@@ -408,4 +428,11 @@ enum NotificationType {
 enum AdvertisementType {
   HOMEPAGE
   FIRST_WAVE
+}
+
+enum AdvertisementStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  EXPIRED
+  CANCELLED
 }

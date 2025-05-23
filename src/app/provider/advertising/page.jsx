@@ -22,6 +22,7 @@ import {
   AlertIcon,
   AlertTitle,
   AlertDescription,
+  Spinner
 } from '@chakra-ui/react';
 import { CheckIcon } from '@chakra-ui/icons';
 
@@ -102,28 +103,102 @@ export default function ProviderAdvertisingPage() {
   const router = useRouter();
   const toast = useToast();
   const [selectedPackage, setSelectedPackage] = useState(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
 
-  const handlePackageSelect = (pkg) => {
+  const createAdvertisementTransaction = async (packageData) => {
+    try {
+      const response = await fetch('/api/advertisements/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          packageId: packageData.id,
+          packageName: packageData.name,
+          price: packageData.price,
+          duration: packageData.duration,
+          features: packageData.features
+        }),
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create advertisement transaction');
+      }
+
+      return data.data.transactionId;
+    } catch (error) {
+      console.error('Error creating advertisement transaction:', error);
+      throw error;
+    }
+  };
+
+  const createAdvertisementPayment = async (transactionId, amount, description) => {
+    try {
+      const response = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactionId,
+          serviceAmount: amount,
+          description
+        }),
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create payment');
+      }
+
+      return data.data;
+    } catch (error) {
+      console.error('Error creating payment:', error);
+      throw error;
+    }
+  };
+
+  const handlePackageSelect = async (pkg) => {
     setSelectedPackage(pkg);
+    setProcessingPayment(true);
     
-    // Show PayPal payment info toast
-    toast({
-      title: 'PayPal Payment',
-      description: 'You will be redirected to PayPal to complete your payment for this advertising package.',
-      status: 'info',
-      duration: 5000,
-      isClosable: true,
-    });
-
-    // In a real implementation, redirect to PayPal checkout or show PayPal modal
-    // For now, we'll just simulate a successful payment
-    setTimeout(() => {
-      handlePaymentSuccess();
-    }, 1500);
+    try {
+      // Create advertisement transaction
+      const transactionId = await createAdvertisementTransaction(pkg);
+      
+      // Create payment order
+      const paymentData = await createAdvertisementPayment(
+        transactionId, 
+        pkg.price, 
+        `Advertisement Package: ${pkg.name}`
+      );
+      
+      // Redirect to PayPal for payment
+      if (paymentData.approvalUrl) {
+        window.location.href = paymentData.approvalUrl;
+      } else {
+        throw new Error('No approval URL received from PayPal');
+      }
+      
+    } catch (error) {
+      console.error('Error processing advertisement payment:', error);
+      setProcessingPayment(false);
+      setSelectedPackage(null);
+      
+      toast({
+        title: 'Payment Failed',
+        description: error.message || 'Something went wrong. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
 
   const handlePaymentSuccess = () => {
     setSelectedPackage(null);
+    setProcessingPayment(false);
     toast({
       title: 'Success',
       description: 'Your advertisement has been activated successfully!',
@@ -144,12 +219,12 @@ export default function ProviderAdvertisingPage() {
           </Text>
         </Box>
 
-        {selectedPackage && (
+        {processingPayment && (
           <Alert status="info" variant="subtle">
-            <AlertIcon />
+            <Spinner size="sm" mr={3} />
             <AlertTitle>Processing Payment:</AlertTitle>
             <AlertDescription>
-              Your payment for {selectedPackage.name} is being processed.
+              You will be redirected to PayPal to complete your payment for {selectedPackage?.name}.
             </AlertDescription>
           </Alert>
         )}
@@ -186,8 +261,11 @@ export default function ProviderAdvertisingPage() {
                       colorScheme="blue"
                       width="full"
                       onClick={() => handlePackageSelect(pkg)}
+                      isLoading={processingPayment && selectedPackage?.id === pkg.id}
+                      loadingText="Processing..."
+                      isDisabled={processingPayment}
                     >
-                      Pay with PayPal
+                      {processingPayment && selectedPackage?.id === pkg.id ? 'Processing...' : 'Purchase with PayPal'}
                     </Button>
                   </Box>
                 </VStack>

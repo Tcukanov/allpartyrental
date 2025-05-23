@@ -46,20 +46,10 @@ import { useRouter } from 'next/navigation';
 import { getSession } from 'next-auth/react';
 import { FiClock, FiCalendar, FiDollarSign, FiMapPin, FiUsers, FiPackage } from 'react-icons/fi';
 import Link from 'next/link';
+import { getTransactionStatusConfig } from '@/utils/statusConfig';
 
 const TransactionStatusBadge = ({ status }) => {
-  const statusConfig = {
-    'PENDING': { color: 'gray', label: 'Pending' },
-    'PROVIDER_REVIEW': { color: 'yellow', label: 'Awaiting Provider Review' },
-    'DECLINED': { color: 'red', label: 'Declined' },
-    'COMPLETED': { color: 'green', label: 'Completed' },
-    'ESCROW': { color: 'blue', label: 'Payment in Escrow' },
-    'REFUNDED': { color: 'purple', label: 'Refunded' },
-    'CANCELLED': { color: 'orange', label: 'Cancelled' }
-  };
-
-  console.log(`Rendering badge for status: ${status}`);
-  const config = statusConfig[status] || { color: 'gray', label: status };
+  const config = getTransactionStatusConfig(status);
   
   return (
     <Badge colorScheme={config.color} fontSize="0.8em" px={2} py={1} borderRadius="md">
@@ -168,11 +158,10 @@ export default function ClientTransactionsPage() {
           const statusPriority = {
             'PENDING': 0,
             'PROVIDER_REVIEW': 1,
-            'ESCROW': 2,
-            'COMPLETED': 3,
-            'DECLINED': 4,
-            'REFUNDED': 5,
-            'CANCELLED': 6
+            'COMPLETED': 2,
+            'DECLINED': 3,
+            'REFUNDED': 4,
+            'CANCELLED': 5
           };
           
           const currentStatusPriority = statusPriority[tx.status] || 0;
@@ -255,12 +244,8 @@ export default function ClientTransactionsPage() {
     tx => tx.status === 'PENDING' || tx.status === 'PROVIDER_REVIEW'
   );
   
-  const activeTransactions = filteredTransactions.filter(
-    tx => tx.status === 'COMPLETED' && tx.escrowEndTime && new Date(tx.escrowEndTime) > new Date()
-  );
-  
   const completedTransactions = filteredTransactions.filter(
-    tx => tx.status === 'COMPLETED' && (!tx.escrowEndTime || new Date(tx.escrowEndTime) <= new Date())
+    tx => tx.status === 'COMPLETED'
   );
   
   const cancelledTransactions = filteredTransactions.filter(
@@ -574,7 +559,6 @@ export default function ClientTransactionsPage() {
           <TabList>
             <Tab>All ({filteredTransactions.length})</Tab>
             <Tab>Pending ({pendingTransactions.length})</Tab>
-            <Tab>Active ({activeTransactions.length})</Tab>
             <Tab>Completed ({completedTransactions.length})</Tab>
             <Tab>Cancelled ({cancelledTransactions.length})</Tab>
           </TabList>
@@ -593,17 +577,6 @@ export default function ClientTransactionsPage() {
                 <Text textAlign="center" py={4}>No pending transactions</Text>
               ) : (
                 pendingTransactions.map(transaction => (
-                  <TransactionCard key={transaction.id} transaction={transaction} />
-                ))
-              )}
-            </TabPanel>
-            
-            {/* Active Transactions */}
-            <TabPanel px={0}>
-              {activeTransactions.length === 0 ? (
-                <Text textAlign="center" py={4}>No active transactions</Text>
-              ) : (
-                activeTransactions.map(transaction => (
                   <TransactionCard key={transaction.id} transaction={transaction} />
                 ))
               )}

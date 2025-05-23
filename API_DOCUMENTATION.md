@@ -711,13 +711,74 @@ Marks all notifications as read.
 }
 ```
 
-## Transactions
+## Transactions & Payments (PayPal Marketplace)
+
+AllPartyRent uses **PayPal Marketplace** for automated payment processing with commission splitting.
+
+### Payment Flow Overview
+1. **Client Payment**: Clients pay via PayPal credit card forms
+2. **Automatic Splitting**: PayPal splits payments between provider and platform
+3. **Instant Payouts**: Connected providers receive money immediately
+4. **Commission Handling**: Platform commission deducted automatically
+
+### POST /payments/create
+Creates a PayPal payment order with marketplace splitting.
+
+**Request Body:**
+```json
+{
+  "serviceId": "service-id",
+  "bookingDate": "2024-01-15",
+  "hours": 4
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "orderId": "paypal-order-id",
+  "transactionId": "transaction-id",
+  "offerId": "offer-id",
+  "amount": 105.00,
+  "isMarketplacePayment": true,
+  "breakdown": {
+    "servicePrice": 100.00,
+    "clientPays": 105.00,
+    "providerReceives": 88.00,
+    "platformCommission": 17.00
+  }
+}
+```
+
+### POST /payments/capture
+Captures a PayPal payment and processes commission splitting.
+
+**Request Body:**
+```json
+{
+  "orderId": "paypal-order-id"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "captureId": "paypal-capture-id",
+  "transactionId": "transaction-id",
+  "amountReceived": 105.00,
+  "platformCommission": 17.00,
+  "providerPayment": 88.00,
+  "isMarketplacePayment": true
+}
+```
 
 ### GET /transactions
 Gets transactions for the authenticated user.
 
 **Query Parameters:**
-- `status`: Filter by status (PENDING, PAID, etc.)
+- `status`: Filter by status (PENDING_PAYMENT, PAID_PENDING_PROVIDER_ACCEPTANCE, COMPLETED, etc.)
 - `page`: Page number for pagination
 - `limit`: Results per page
 
@@ -728,20 +789,30 @@ Gets transactions for the authenticated user.
   "data": [
     {
       "id": "transaction-id",
-      "amount": 100,
-      "status": "PENDING",
+      "amount": 100.00,
+      "status": "PAID_PENDING_PROVIDER_ACCEPTANCE",
+      "clientFeePercent": 5.0,
+      "providerFeePercent": 12.0,
+      "isMarketplacePayment": true,
+      "paymentIntentId": "paypal-order-id",
+      "paymentMethodId": "paypal-capture-id",
       "createdAt": "2023-06-01T12:00:00.000Z",
-      "service": {
-        "id": "service-id",
-        "name": "Service Name"
-      },
-      "client": {
-        "id": "client-id",
-        "name": "Client Name"
-      },
-      "provider": {
-        "id": "provider-id",
-        "name": "Provider Name"
+      "offer": {
+        "id": "offer-id",
+        "price": 100.00,
+        "service": {
+          "id": "service-id",
+          "name": "Service Name"
+        },
+        "client": {
+          "id": "client-id",
+          "name": "Client Name"
+        },
+        "provider": {
+          "id": "provider-id",
+          "name": "Provider Name",
+          "paypalOnboardingComplete": true
+        }
       }
     }
   ],
@@ -754,31 +825,6 @@ Gets transactions for the authenticated user.
 }
 ```
 
-### POST /transactions
-Creates a new transaction.
-
-**Request Body:**
-```json
-{
-  "serviceId": "service-id",
-  "partyId": "party-id",
-  "amount": 100,
-  "description": "Payment for service"
-}
-```
-
-**Response:**
-```json
-{
-  "id": "new-transaction-id",
-  "serviceId": "service-id",
-  "partyId": "party-id",
-  "amount": 100,
-  "status": "PENDING",
-  "description": "Payment for service"
-}
-```
-
 ### GET /transactions/[id]
 Gets a specific transaction by ID.
 
@@ -786,72 +832,108 @@ Gets a specific transaction by ID.
 ```json
 {
   "id": "transaction-id",
-  "amount": 100,
-  "status": "PENDING",
+  "amount": 100.00,
+  "status": "COMPLETED",
+  "clientFeePercent": 5.0,
+  "providerFeePercent": 12.0,
+  "isMarketplacePayment": true,
+  "paymentIntentId": "paypal-order-id",
+  "paymentMethodId": "paypal-capture-id",
   "createdAt": "2023-06-01T12:00:00.000Z",
-  "service": {
-    "id": "service-id",
-    "name": "Service Name"
-  },
-  "client": {
-    "id": "client-id",
-    "name": "Client Name"
-  },
-  "provider": {
-    "id": "provider-id",
-    "name": "Provider Name"
+  "offer": {
+    "id": "offer-id",
+    "price": 100.00,
+    "description": "Booking for Service Name on 2024-01-15",
+    "service": {
+      "id": "service-id",
+      "name": "Service Name"
+    },
+    "client": {
+      "id": "client-id",
+      "name": "Client Name"
+    },
+    "provider": {
+      "id": "provider-id",
+      "name": "Provider Name",
+      "paypalMerchantId": "provider-paypal-merchant-id",
+      "paypalOnboardingComplete": true
+    }
   }
 }
 ```
 
-### POST /transactions/[id]/pay
-Processes payment for a transaction.
+### POST /bookings/accept
+Provider accepts a booking (completes the transaction).
 
 **Request Body:**
 ```json
 {
-  "paymentMethod": "CREDIT_CARD",
-  "paymentDetails": {
-    "cardNumber": "4111111111111111",
-    "expiryMonth": 12,
-    "expiryYear": 2025,
-    "cvc": "123"
+  "transactionId": "transaction-id"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Booking accepted successfully",
+  "isMarketplacePayment": true,
+  "status": "COMPLETED"
+}
+```
+
+### Provider PayPal Integration
+
+### GET /provider/paypal-status
+Gets provider's PayPal connection status.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "businessName": "Provider Business Name",
+    "paypalMerchantId": "provider-merchant-id",
+    "paypalOnboardingComplete": true,
+    "paypalStatus": "COMPLETED"
   }
 }
 ```
 
-**Response:**
+### POST /provider/paypal-onboard
+Starts PayPal onboarding process for providers.
+
+**Request Body:**
 ```json
 {
-  "success": true,
-  "status": "PAID",
-  "message": "Payment processed successfully"
+  "returnUrl": "https://yoursite.com/provider/settings/payments?onboarding=complete"
 }
 ```
-
-### POST /transactions/[id]/approve
-Approves a transaction (provider confirms service completion).
-
-**Response:**
-```json
-{
-  "success": true,
-  "status": "COMPLETED",
-  "message": "Transaction approved successfully"
-}
-```
-
-### POST /transactions/[id]/decline
-Declines a transaction.
 
 **Response:**
 ```json
 {
   "success": true,
-  "status": "DECLINED",
-  "message": "Transaction declined successfully"
+  "onboardingUrl": "https://www.sandbox.paypal.com/webapps/merchantboarding/webflow/externalpartnerflow?token=...",
+  "message": "Redirect to PayPal to complete onboarding"
 }
 ```
+
+### Payment Structure
+
+**For $100 Service:**
+```
+Client Pays: $105.00 (service + 5% client fee)
+├── Provider Gets: $88.00 (service - 12% commission) [INSTANT via marketplace]
+└── Platform Keeps: $17.00 (12% commission + 5% client fee)
+```
+
+**Transaction Statuses:**
+- `PENDING_PAYMENT` - Waiting for client payment
+- `PAID_PENDING_PROVIDER_ACCEPTANCE` - Payment received, waiting for provider to accept
+- `COMPLETED` - Provider accepted, transaction complete
+- `CANCELLED` - Transaction cancelled
+- `REFUNDED` - Payment refunded
 
 ## Categories & Cities
 

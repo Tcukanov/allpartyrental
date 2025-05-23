@@ -8,6 +8,40 @@ The application follows a hybrid rendering approach with Next.js App Router:
 - Server components for data fetching and initial rendering
 - Client components (marked with "use client") for interactive elements
 - API routes using Next.js API route handlers
+- **PayPal Marketplace integration for automated commission splitting**
+
+## Payment System Architecture
+
+AllPartyRent uses **PayPal Marketplace** for commission-based payments:
+
+### **Key Payment Components:**
+- `PayPalClient` - Direct PayPal API communication
+- `PaymentService` - Business logic layer with marketplace fallback
+- `PayPalCreditCardForm` - Embedded payment form component
+- `PayPalOnboarding` - Provider account connection flow
+
+### **Payment Flow Logic:**
+1. Always attempt marketplace payment first (if provider connected)
+2. Fallback to regular payment (if provider not connected)
+3. Automatic commission splitting via PayPal
+4. Instant provider payouts for marketplace payments
+
+### **Database Fields for Payments:**
+```typescript
+// Provider model additions
+model Provider {
+  paypalMerchantId         String?  // PayPal marketplace merchant ID
+  paypalOnboardingComplete Boolean  @default(false)
+  paypalStatus            String?   // NOT_STARTED, IN_PROGRESS, COMPLETED
+}
+
+// Transaction model additions  
+model Transaction {
+  clientFeePercent    Float?   // Client fee percentage (5%)
+  providerFeePercent  Float?   // Provider commission (12%)
+  isMarketplacePayment Boolean @default(false)
+}
+```
 
 ## File Structure
 
@@ -15,22 +49,34 @@ The application follows a hybrid rendering approach with Next.js App Router:
 src/
 ├── app/                    # Next.js App Router pages
 │   ├── api/                # API routes
+│   │   ├── payments/       # Payment processing endpoints
+│   │   └── provider/       # Provider-specific endpoints
 │   ├── [location]/         # Dynamic city/category routes
 │   │   └── [service]/      # Service category within location
 │   ├── services/           # Services browsing pages
 │   ├── admin/              # Admin dashboard
 │   ├── provider/           # Provider dashboard
+│   │   └── settings/       # Provider settings
+│   │       └── payments/   # PayPal onboarding
 │   └── client/             # Client dashboard
 ├── components/             # Reusable React components
 │   ├── layout/             # Layout components
 │   ├── ui/                 # UI components
 │   ├── services/           # Service-related components
-│   └── payment/            # Payment-related components
+│   ├── payment/            # Payment-related components
+│   │   ├── PayPalCreditCardForm.jsx
+│   │   └── ServiceRequestButton.jsx
+│   └── provider/           # Provider components
+│       ├── PayPalOnboarding.jsx
+│       └── PayPalConnectButton.jsx
 ├── lib/                    # Utility libraries
 │   ├── auth/               # Authentication utilities
 │   ├── prisma/             # Database client
 │   ├── cities/             # City-related utilities
-│   └── notifications/      # Notification utilities
+│   ├── notifications/      # Notification utilities
+│   └── payment/            # Payment processing
+│       ├── paypal-client.js      # PayPal API wrapper
+│       └── payment-service.js    # Payment business logic
 └── prisma/                 # Prisma schema and migrations
     ├── schema.prisma       # Database schema
     └── migrations/         # Database migrations
@@ -42,22 +88,106 @@ src/
    - React components use PascalCase (e.g., `ServiceCard.tsx`)
    - Utility files use kebab-case (e.g., `default-city.ts`)
    - API route files named `route.ts` in appropriate directories
+   - Payment files use kebab-case (e.g., `paypal-client.js`)
 
 2. **Components**:
    - Component names match their filenames
    - Page components are typically named `Page` or include the word "Page"
    - Client components are marked with `"use client"` directive
+   - Payment components prefixed with "PayPal"
 
 3. **Functions**:
    - HTTP methods in API routes (GET, POST, PUT, DELETE)
    - Utility functions use camelCase
    - React event handlers prefixed with `handle` (e.g., `handleSubmit`)
+   - Payment functions descriptive (`createMarketplacePaymentOrder`)
 
 4. **Variables**:
    - State variables use camelCase
    - Constants use UPPER_SNAKE_CASE for global constants
+   - Payment amounts use descriptive names (`clientPays`, `providerReceives`)
 
 ## Common Patterns
+
+### Payment Service Pattern
+
+```javascript
+// Always try marketplace payment first
+export async function createPaymentOrder(transactionId, serviceAmount, providerId) {
+  try {
+    // Try marketplace payment if provider has connected PayPal
+    return await paymentService.createMarketplacePaymentOrder(
+      transactionId,
+      serviceAmount,
+      providerId,
+      { paymentMethod: 'card_fields' }
+    );
+  } catch (marketplaceError) {
+    console.log('Marketplace payment failed, using regular payment:', marketplaceError);
+    // Fallback to regular payment
+    return await paymentService.createPaymentOrder(
+      transactionId,
+      serviceAmount,
+      { paymentMethod: 'card_fields' }
+    );
+  }
+}
+```
+
+### PayPal Component Pattern
+
+```javascript
+"use client";
+
+import React, { useState, useEffect, useRef } from 'react';
+
+export default function PayPalCreditCardForm({ amount, onSuccess, onError }) {
+  const paypalRef = useRef();
+  const [isLoading, setIsLoading] = useState(true);
+  const [cardFields, setCardFields] = useState(null);
+  
+  useEffect(() => {
+    if (window.paypal && paypalRef.current) {
+      initializePayPalCardFields();
+    }
+  }, [amount]);
+  
+  const initializePayPalCardFields = () => {
+    window.paypal.CardFields({
+      createOrder: async () => {
+        // Create PayPal order via API
+        const response = await fetch('/api/payments/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serviceId, bookingDate })
+        });
+        const data = await response.json();
+        return data.orderId;
+      },
+      onApprove: async (data) => {
+        // Capture payment via API
+        const response = await fetch('/api/payments/capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: data.orderID })
+        });
+        const result = await response.json();
+        onSuccess(result);
+      },
+      onError: (err) => {
+        console.error('PayPal error:', err);
+        onError(err);
+      }
+    }).render(paypalRef.current);
+  };
+  
+  return (
+    <Box>
+      <div ref={paypalRef} />
+    </Box>
+  );
+}
+```
 
 ### API Route Pattern
 
@@ -93,6 +223,64 @@ export async function GET(request: NextRequest) {
           details: error instanceof Error ? error.message : 'Unknown error'
         } 
       },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### Payment API Route Pattern
+
+```javascript
+import { NextResponse } from 'next/server';
+import { PaymentService } from '@/lib/payment/payment-service.js';
+
+const paymentService = new PaymentService();
+
+export async function POST(request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { serviceId, bookingDate } = await request.json();
+    
+    // Get service and provider info
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+      include: { provider: true }
+    });
+    
+    // Try marketplace payment first
+    let paymentResult;
+    try {
+      paymentResult = await paymentService.createMarketplacePaymentOrder(
+        transactionId,
+        servicePrice,
+        service.providerId,
+        { paymentMethod: 'card_fields' }
+      );
+    } catch (marketplaceError) {
+      // Fallback to regular payment
+      paymentResult = await paymentService.createPaymentOrder(
+        transactionId,
+        servicePrice,
+        { paymentMethod: 'card_fields' }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      orderId: paymentResult.orderId,
+      amount: paymentResult.clientPays,
+      isMarketplacePayment: paymentResult.isMarketplacePayment
+    });
+    
+  } catch (error) {
+    console.error('Payment error:', error);
+    return NextResponse.json(
+      { error: 'Payment failed', details: error.message },
       { status: 500 }
     );
   }
@@ -158,6 +346,28 @@ export default function ClientComponent({ initialData }) {
     // UI implementation
   );
 }
+```
+
+### Provider Payment Status Pattern
+
+```javascript
+// Check provider PayPal connection status
+const checkProviderPaymentStatus = async (providerId) => {
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: {
+      paypalMerchantId: true,
+      paypalOnboardingComplete: true,
+      paypalStatus: true
+    }
+  });
+  
+  return {
+    isConnected: provider?.paypalMerchantId && provider?.paypalOnboardingComplete,
+    status: provider?.paypalStatus || 'NOT_STARTED',
+    canUseMarketplace: Boolean(provider?.paypalMerchantId)
+  };
+};
 ```
 
 ### Filter Pattern Implementation
