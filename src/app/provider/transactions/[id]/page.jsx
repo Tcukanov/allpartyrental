@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import {
   Box,
   Container,
@@ -56,6 +56,9 @@ export default function TransactionDetailsPage({ params }) {
   const router = useRouter();
   const toast = useToast();
 
+  // Unwrap params using React.use() as required by Next.js 15
+  const { id } = use(params);
+
   const formatAmount = (amount) => {
     return Number(amount).toFixed(2);
   };
@@ -73,7 +76,7 @@ export default function TransactionDetailsPage({ params }) {
         }
         
         // Fetch transaction details
-        const response = await fetch(`/api/provider/transactions/${params.id}`);
+        const response = await fetch(`/api/provider/transactions/${id}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch transaction details');
@@ -96,7 +99,7 @@ export default function TransactionDetailsPage({ params }) {
     }
     
     fetchTransaction();
-  }, [params.id, router, toast]);
+  }, [id, router, toast]);
 
   if (loading) {
     return (

@@ -32,164 +32,88 @@ const PayPalCreditCardForm = ({
   const expiryRef = useRef();
   const cvvRef = useRef();
   const nameRef = useRef();
-  const isRenderingRef = useRef(false);
+  const paypalInstanceRef = useRef(null);
+  const isInitializedRef = useRef(false);
   const instanceIdRef = useRef(Math.random().toString(36).substr(2, 9));
-  const hasInitializedRef = useRef(false);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
-  const [debugInfo, setDebugInfo] = useState('');
+  const [debugInfo, setDebugInfo] = useState('Loading PayPal SDK...');
   const [cardFields, setCardFields] = useState(null);
-  const [fieldsRendered, setFieldsRendered] = useState(false);
+  const [fieldsReady, setFieldsReady] = useState(false);
   const toast = useToast();
 
-  // More aggressive cleanup function
-  const clearPayPalFields = () => {
-    console.log(`[${instanceIdRef.current}] Clearing PayPal fields...`);
+  // Cleanup function
+  const cleanup = () => {
+    console.log(`[${instanceIdRef.current}] Cleaning up PayPal fields...`);
     try {
-      // Clear each container and check for existing content
-      [cardNumberRef, expiryRef, cvvRef, nameRef].forEach((ref, index) => {
-        const fieldNames = ['cardNumber', 'expiry', 'cvv', 'name'];
+      // Clear DOM elements
+      [cardNumberRef, expiryRef, cvvRef, nameRef].forEach((ref) => {
         if (ref.current) {
-          console.log(`[${instanceIdRef.current}] Clearing ${fieldNames[index]} field, current children:`, ref.current.children.length);
           ref.current.innerHTML = '';
-          // Force DOM cleanup
-          while (ref.current.firstChild) {
-            ref.current.removeChild(ref.current.firstChild);
-          }
         }
       });
       
-      setFieldsRendered(false);
+      // Reset state
       setCardFields(null);
-      isRenderingRef.current = false;
-      hasInitializedRef.current = false;
-      console.log(`[${instanceIdRef.current}] All fields cleared`);
+      setFieldsReady(false);
+      paypalInstanceRef.current = null;
+      isInitializedRef.current = false;
     } catch (error) {
-      console.error(`[${instanceIdRef.current}] Error during cleanup:`, error);
+      console.error(`[${instanceIdRef.current}] Cleanup error:`, error);
     }
   };
 
-  // Check if fields already exist in DOM
-  const fieldsAlreadyExist = () => {
-    const hasContent = [cardNumberRef, expiryRef, cvvRef, nameRef].some(ref => 
-      ref.current && ref.current.children.length > 0
-    );
-    console.log(`[${instanceIdRef.current}] Fields already exist check:`, hasContent);
-    return hasContent;
-  };
-
-  useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-    console.log(`[${instanceIdRef.current}] PayPal Component - Client ID:`, clientId ? 'Available' : 'Missing');
-    
-    if (!clientId) {
-      setError('PayPal configuration missing');
-      setIsLoading(false);
-      return;
-    }
-
-    // Global flag to prevent multiple initializations
-    if (window.__PAYPAL_FORM_INITIALIZED__) {
-      console.log(`[${instanceIdRef.current}] PayPal form already initialized globally, skipping...`);
-      setIsLoading(false);
-      return;
-    }
-
-    // Clear any existing fields first
-    clearPayPalFields();
-    setDebugInfo('Loading PayPal SDK...');
-    
-    // Check if PayPal script is already loaded
-    console.log(`[${instanceIdRef.current}] PayPal Component - Checking if PayPal already loaded`);
-    if (window.paypal) {
-      console.log(`[${instanceIdRef.current}] PayPal Component - PayPal already available, initializing`);
-      initializeCardFields();
-    } else {
-      console.log(`[${instanceIdRef.current}] PayPal Component - Loading PayPal script`);
-      loadPayPalScript();
-    }
-
-    return () => {
-      console.log(`[${instanceIdRef.current}] PayPal Component - Cleanup`);
-      // Don't clear global flag on cleanup to prevent re-initialization
-      clearPayPalFields();
-    };
-  }, []); // Only run once on mount
-
-  // Handle amount changes without reinitializing PayPal
-  useEffect(() => {
-    if (amount && debugInfo) {
-      setDebugInfo('Credit card form ready - click on fields to enter your card details');
-    }
-  }, [amount]);
-
-  // Handle page visibility changes to prevent re-initialization on tab switch
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log(`[${instanceIdRef.current}] Page hidden - preventing re-initialization`);
-      } else {
-        console.log(`[${instanceIdRef.current}] Page visible - checking field state`);
-        // Don't re-initialize if fields are already rendered
-        if (fieldsRendered) {
-          console.log(`[${instanceIdRef.current}] Fields already rendered, skipping re-initialization`);
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [fieldsRendered]);
-
+  // Load PayPal script if not already loaded
   const loadPayPalScript = () => {
-    const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&components=buttons,card-fields&intent=capture`;
-    script.async = true;
-    
-    script.onload = () => {
-      console.log('PayPal script loaded, initializing...');
-      setDebugInfo('PayPal SDK loaded, setting up form...');
-      initializeCardFields();
-    };
-    
-    script.onerror = () => {
-      console.error('Failed to load PayPal script');
-      setError('Failed to load PayPal payment system');
-      setIsLoading(false);
-    };
-    
-    document.head.appendChild(script);
-  };
-
-  const initializeCardFields = () => {
-    try {
-      console.log(`[${instanceIdRef.current}] Starting initializeCardFields...`);
-      
-      // Prevent duplicate initialization with additional safeguards
-      if (fieldsRendered || isRenderingRef.current || fieldsAlreadyExist() || hasInitializedRef.current) {
-        console.log(`[${instanceIdRef.current}] Skipping initialization - fieldsRendered: ${fieldsRendered}, isRendering: ${isRenderingRef.current}, fieldsExist: ${fieldsAlreadyExist()}, hasInitialized: ${hasInitializedRef.current}`);
+    return new Promise((resolve, reject) => {
+      if (window.paypal) {
+        console.log(`[${instanceIdRef.current}] PayPal already loaded`);
+        resolve();
         return;
       }
 
-      console.log(`[${instanceIdRef.current}] Proceeding with field initialization...`);
-      hasInitializedRef.current = true;
-      isRenderingRef.current = true;
+      const script = document.createElement('script');
+      script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&components=buttons,card-fields&intent=capture`;
+      script.async = true;
       
-      // Clear any existing fields first
-      clearPayPalFields();
+      script.onload = () => {
+        console.log(`[${instanceIdRef.current}] PayPal script loaded successfully`);
+        resolve();
+      };
       
-      setDebugInfo('Initializing credit card form...');
-      setIsLoading(false);
+      script.onerror = () => {
+        console.error(`[${instanceIdRef.current}] Failed to load PayPal script`);
+        reject(new Error('Failed to load PayPal SDK'));
+      };
       
+      document.head.appendChild(script);
+    });
+  };
+
+  // Initialize PayPal card fields
+  const initializeCardFields = async () => {
+    try {
+      console.log(`[${instanceIdRef.current}] Initializing card fields...`);
+      
+      if (!window.paypal) {
+        throw new Error('PayPal SDK not loaded');
+      }
+
+      if (isInitializedRef.current) {
+        console.log(`[${instanceIdRef.current}] Already initialized, skipping...`);
+        return;
+      }
+
+      setDebugInfo('Setting up payment form...');
+
       const cardFieldsInstance = window.paypal.CardFields({
         createOrder: async () => {
-          console.log('PayPal Card Form - Creating order');
+          console.log(`[${instanceIdRef.current}] Creating payment order...`);
           setDebugInfo('Creating payment order...');
           
           try {
-            console.log('PayPal Card Form - Making API call to /api/payments/create');
-            
             const response = await fetch('/api/payments/create', {
               method: 'POST',
               headers: {
@@ -203,46 +127,35 @@ const PayPalCreditCardForm = ({
               }),
             });
 
-            console.log('PayPal Card Form - Create order response status:', response.status);
-            
             if (!response.ok) {
               const errorText = await response.text();
-              console.error('PayPal Card Form - Create order failed:', response.status, errorText);
-              throw new Error(`HTTP ${response.status}: ${errorText}`);
+              console.error(`[${instanceIdRef.current}] Create order failed:`, response.status, errorText);
+              throw new Error(`Payment order creation failed: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('PayPal Card Form - Create order response data:', data);
+            console.log(`[${instanceIdRef.current}] Order created:`, data);
             
-            if (!data.success) {
-              console.error('PayPal Card Form - API returned error:', data.error);
+            if (!data.success || !data.orderId) {
               throw new Error(data.error || 'Failed to create payment order');
             }
 
-            if (!data.orderId) {
-              console.error('PayPal Card Form - No orderId in response:', data);
-              throw new Error('No order ID received from payment service');
-            }
-
-            setDebugInfo('Payment order created, ready for payment');
-            console.log('PayPal Card Form - Order created successfully:', data.orderId);
+            setDebugInfo('Payment order created successfully');
             return data.orderId;
             
           } catch (error) {
-            console.error('PayPal Card Form - Error creating order:', error);
-            setError('Failed to create payment order: ' + error.message);
+            console.error(`[${instanceIdRef.current}] Create order error:`, error);
+            setError(`Failed to create payment order: ${error.message}`);
             throw error;
           }
         },
 
         onApprove: async (data) => {
           try {
-            console.log('PayPal Card Form - Payment approved, capturing:', data.orderID);
-            setDebugInfo('Payment approved, processing...');
+            console.log(`[${instanceIdRef.current}] Payment approved:`, data.orderID);
+            setDebugInfo('Processing payment...');
+            setIsProcessing(true);
             
-            console.log('PayPal Card Form - Making API call to /api/payments/capture');
-            
-            // Capture payment via our API
             const response = await fetch('/api/payments/capture', {
               method: 'POST',
               headers: {
@@ -253,54 +166,46 @@ const PayPalCreditCardForm = ({
               }),
             });
 
-            console.log('PayPal Card Form - Capture response status:', response.status);
-            
             if (!response.ok) {
               const errorText = await response.text();
-              console.error('PayPal Card Form - Capture failed:', response.status, errorText);
-              throw new Error(`HTTP ${response.status}: ${errorText}`);
+              console.error(`[${instanceIdRef.current}] Capture failed:`, response.status, errorText);
+              throw new Error(`Payment capture failed: ${response.status}`);
             }
 
             const result = await response.json();
-            console.log('PayPal Card Form - Capture response data:', result);
+            console.log(`[${instanceIdRef.current}] Payment captured:`, result);
             
             if (!result.success) {
-              console.error('PayPal Card Form - Capture API returned error:', result.error);
               throw new Error(result.error || 'Payment capture failed');
             }
 
-            setIsProcessing(false);
             setDebugInfo('Payment completed successfully!');
-            console.log('PayPal Card Form - Payment completed successfully');
             onSuccess(result.data);
             
           } catch (error) {
-            console.error('PayPal Card Form - Error capturing payment:', error);
+            console.error(`[${instanceIdRef.current}] Capture error:`, error);
             setIsProcessing(false);
-            setError(error.message);
+            setError(`Payment processing failed: ${error.message}`);
             onError(error.message);
           }
         },
 
         onError: (err) => {
-          console.error('PayPal Card Form - PayPal error:', err);
+          console.error(`[${instanceIdRef.current}] PayPal error:`, err);
           setIsProcessing(false);
           
-          // Parse PayPal error for better user feedback
-          let errorMessage = 'Payment failed';
+          let errorMessage = 'Payment failed. Please try again.';
           
-          if (err.message && err.message.includes('Invalid card number')) {
-            errorMessage = 'Invalid card number. Please check your card number and try again.';
-          } else if (err.message && err.message.includes('UNPROCESSABLE_ENTITY')) {
-            errorMessage = 'Please check all your card details are correct. Use a valid test card number like 4032035728288280.';
-          } else if (err.message && err.message.includes('VALIDATION_ERROR')) {
-            errorMessage = 'Please check your card details and try again.';
-          } else if (err.message && err.message.includes('Window closed')) {
-            errorMessage = 'Payment window closed. Please try again.';
-          } else if (err.message && err.message.includes('422')) {
-            errorMessage = 'Invalid payment details. Please use a valid test card: 4032035728288280, expiry: 12/2030, CVV: 123';
-          } else if (err.message) {
-            errorMessage = err.message;
+          if (err.message) {
+            if (err.message.includes('Invalid card number')) {
+              errorMessage = 'Invalid card number. Please check and try again.';
+            } else if (err.message.includes('Window closed')) {
+              errorMessage = 'Payment window closed unexpectedly. Please try again.';
+            } else if (err.message.includes('422') || err.message.includes('UNPROCESSABLE_ENTITY')) {
+              errorMessage = 'Invalid payment details. For testing, use: 4032035728288280, 12/2030, 123';
+            } else {
+              errorMessage = err.message;
+            }
           }
           
           setError(errorMessage);
@@ -328,109 +233,167 @@ const PayPalCreditCardForm = ({
         }
       });
 
-      // Render individual card fields with modern styling
-      console.log(`[${instanceIdRef.current}] About to render PayPal card fields...`);
+      // Store the instance
+      paypalInstanceRef.current = cardFieldsInstance;
+      setCardFields(cardFieldsInstance);
+
+      // Render fields with better error handling and validation
+      console.log(`[${instanceIdRef.current}] Rendering card fields...`);
       
-      // Small delay to ensure DOM elements are ready
-      setTimeout(() => {
+      const renderField = async (fieldMethod, container, fieldName) => {
         try {
-          console.log(`[${instanceIdRef.current}] DOM ready, rendering PayPal fields now...`);
-          
-          // Render each field only if container is empty
-          if (cardFieldsInstance.NumberField && cardNumberRef.current && cardNumberRef.current.children.length === 0) {
-            console.log(`[${instanceIdRef.current}] Rendering card number field...`);
-            const numberField = cardFieldsInstance.NumberField();
-            numberField.render(cardNumberRef.current).catch(err => {
-              console.error(`[${instanceIdRef.current}] Error rendering number field:`, err);
-              setError('Failed to render card number field');
-              isRenderingRef.current = false;
-            });
-          } else {
-            console.log(`[${instanceIdRef.current}] Skipping card number field - already exists or unavailable`);
+          if (!fieldMethod) {
+            console.warn(`[${instanceIdRef.current}] ${fieldName} field method not available`);
+            return false;
           }
           
-          if (cardFieldsInstance.ExpiryField && expiryRef.current && expiryRef.current.children.length === 0) {
-            console.log(`[${instanceIdRef.current}] Rendering expiry field...`);
-            const expiryField = cardFieldsInstance.ExpiryField();
-            expiryField.render(expiryRef.current).catch(err => {
-              console.error(`[${instanceIdRef.current}] Error rendering expiry field:`, err);
-              setError('Failed to render expiry field');
-              isRenderingRef.current = false;
-            });
-          } else {
-            console.log(`[${instanceIdRef.current}] Skipping expiry field - already exists or unavailable`);
-          }
-          
-          if (cardFieldsInstance.CVVField && cvvRef.current && cvvRef.current.children.length === 0) {
-            console.log(`[${instanceIdRef.current}] Rendering CVV field...`);
-            const cvvField = cardFieldsInstance.CVVField();
-            cvvField.render(cvvRef.current).catch(err => {
-              console.error(`[${instanceIdRef.current}] Error rendering CVV field:`, err);
-              setError('Failed to render CVV field');
-              isRenderingRef.current = false;
-            });
-          } else {
-            console.log(`[${instanceIdRef.current}] Skipping CVV field - already exists or unavailable`);
-          }
-          
-          if (cardFieldsInstance.NameField && nameRef.current && nameRef.current.children.length === 0) {
-            console.log(`[${instanceIdRef.current}] Rendering name field...`);
-            const nameField = cardFieldsInstance.NameField();
-            nameField.render(nameRef.current).catch(err => {
-              console.error(`[${instanceIdRef.current}] Error rendering name field:`, err);
-              setError('Failed to render name field');
-              isRenderingRef.current = false;
-            });
-          } else {
-            console.log(`[${instanceIdRef.current}] Skipping name field - already exists or unavailable`);
+          if (!container) {
+            console.warn(`[${instanceIdRef.current}] ${fieldName} container not available`);
+            return false;
           }
 
-          console.log(`[${instanceIdRef.current}] All PayPal card fields processing completed`);
-          setCardFields(cardFieldsInstance);
-          setFieldsRendered(true);
-          window.__PAYPAL_FORM_INITIALIZED__ = true; // Set global flag
-          setDebugInfo('Credit card form ready - click on fields to enter your card details');
+          // Check if container is in DOM and visible
+          if (!document.body.contains(container)) {
+            console.warn(`[${instanceIdRef.current}] ${fieldName} container not in DOM`);
+            return false;
+          }
+
+          // Clear any existing content
+          container.innerHTML = '';
+          
+          console.log(`[${instanceIdRef.current}] Rendering ${fieldName} field...`);
+          
+          const field = fieldMethod();
+          await field.render(container);
+          
+          // Verify the field was actually rendered
+          const iframe = container.querySelector('iframe');
+          if (!iframe) {
+            console.warn(`[${instanceIdRef.current}] ${fieldName} field iframe not found after render`);
+            return false;
+          }
+          
+          console.log(`[${instanceIdRef.current}] ${fieldName} field rendered successfully`);
+          return true;
+          
         } catch (error) {
-          console.error(`[${instanceIdRef.current}] Error in field rendering timeout:`, error);
-          setError('Failed to render payment fields');
-          isRenderingRef.current = false;
+          console.error(`[${instanceIdRef.current}] Error rendering ${fieldName} field:`, error);
+          return false;
         }
-      }, 150); // Slightly longer delay
+      };
 
-      console.log(`[${instanceIdRef.current}] PayPal Card Form - Card fields initialization completed`);
+      // Add a small delay to ensure DOM is stable
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Render fields sequentially with validation
+      const fieldsToRender = [
+        { method: cardFieldsInstance.NameField, container: nameRef.current, name: 'Name' },
+        { method: cardFieldsInstance.NumberField, container: cardNumberRef.current, name: 'Number' },
+        { method: cardFieldsInstance.ExpiryField, container: expiryRef.current, name: 'Expiry' },
+        { method: cardFieldsInstance.CVVField, container: cvvRef.current, name: 'CVV' }
+      ];
+
+      const renderResults = [];
+      for (const field of fieldsToRender) {
+        const result = await renderField(field.method, field.container, field.name);
+        renderResults.push({ name: field.name, success: result });
+        
+        // Add small delay between field renders
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Check results
+      const successfulFields = renderResults.filter(r => r.success);
+      const failedFields = renderResults.filter(r => !r.success);
+
+      console.log(`[${instanceIdRef.current}] Field render results:`, renderResults);
+
+      if (successfulFields.length === 4) {
+        // All fields rendered successfully
+        isInitializedRef.current = true;
+        setFieldsReady(true);
+        setDebugInfo('Payment form ready - click on fields to enter your card details');
+        setIsLoading(false);
+        
+        console.log(`[${instanceIdRef.current}] All card fields initialized successfully`);
+      } else {
+        // Some fields failed
+        const failedFieldNames = failedFields.map(f => f.name).join(', ');
+        const errorMessage = `Failed to render payment fields: ${failedFieldNames}. Please refresh the page and try again.`;
+        console.error(`[${instanceIdRef.current}] ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
       
     } catch (error) {
-      console.error(`[${instanceIdRef.current}] PayPal Card Form - Error initializing card fields:`, error);
-      setError('Failed to initialize credit card form: ' + error.message);
+      console.error(`[${instanceIdRef.current}] Initialization error:`, error);
+      setError(`Failed to initialize payment form: ${error.message}`);
+      setIsLoading(false);
+      // Don't mark as initialized if there was an error
+      isInitializedRef.current = false;
     }
   };
 
-  const handleSubmit = async () => {
-    console.log(`[${instanceIdRef.current}] handleSubmit called`);
-    console.log(`[${instanceIdRef.current}] cardFields:`, cardFields);
-    console.log(`[${instanceIdRef.current}] isProcessing:`, isProcessing);
+  // Main initialization effect
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
     
-    if (!cardFields || isProcessing) {
-      console.log(`[${instanceIdRef.current}] Cannot submit - cardFields: ${cardFields}, isProcessing: ${isProcessing}`);
+    if (!clientId) {
+      setError('PayPal configuration missing');
+      setIsLoading(false);
+      return;
+    }
+
+    console.log(`[${instanceIdRef.current}] Starting PayPal initialization...`);
+    
+    const init = async () => {
+      try {
+        await loadPayPalScript();
+        // Add a small delay to ensure DOM is ready
+        setTimeout(() => {
+          initializeCardFields();
+        }, 500);
+      } catch (error) {
+        console.error(`[${instanceIdRef.current}] Initialization failed:`, error);
+        setError(error.message);
+        setIsLoading(false);
+      }
+    };
+
+    init();
+
+    // Cleanup on unmount
+    return cleanup;
+  }, []); // Only run once
+
+  // Handle form submission
+  const handleSubmit = async () => {
+    if (!cardFields || isProcessing || !fieldsReady) {
+      console.log(`[${instanceIdRef.current}] Cannot submit - cardFields: ${!!cardFields}, isProcessing: ${isProcessing}, fieldsReady: ${fieldsReady}`);
       return;
     }
 
     try {
       setIsProcessing(true);
-      setDebugInfo('Processing payment...');
-      console.log(`[${instanceIdRef.current}] Submitting card fields...`);
+      setDebugInfo('Validating payment details...');
+      console.log(`[${instanceIdRef.current}] Submitting payment...`);
       
-      // Submit the card fields
-      const result = await cardFields.submit();
-      console.log(`[${instanceIdRef.current}] Card fields submit result:`, result);
+      await cardFields.submit();
       
     } catch (error) {
       console.error(`[${instanceIdRef.current}] Submit error:`, error);
       setIsProcessing(false);
-      setError('Payment submission failed: ' + error.message);
+      
+      let errorMessage = 'Payment submission failed. Please try again.';
+      if (error.message && error.message.includes('Window closed')) {
+        errorMessage = 'Payment window closed. Please check your card details and try again.';
+      }
+      
+      setError(errorMessage);
+      onError(errorMessage);
     }
   };
 
+  // Error display with retry functionality
   if (error) {
     return (
       <Box 
@@ -453,6 +416,23 @@ const PayPalCreditCardForm = ({
             )}
           </Box>
         </Alert>
+        <Button
+          mt={4}
+          onClick={() => {
+            setError(null);
+            setDebugInfo('Retrying...');
+            cleanup();
+            // Add delay before retrying
+            setTimeout(() => {
+              setIsLoading(true);
+              initializeCardFields();
+            }, 1000);
+          }}
+          colorScheme="red"
+          variant="outline"
+        >
+          Try Again
+        </Button>
       </Box>
     );
   }
@@ -515,7 +495,7 @@ const PayPalCreditCardForm = ({
               <Spinner size="xl" color="blue.500" thickness="4px" />
               <Text color="gray.600" fontWeight="medium">Loading payment form...</Text>
               {debugInfo && (
-                <Text fontSize="sm" color="gray.500">
+                <Text fontSize="sm" color="gray.500" textAlign="center">
                   {debugInfo}
                 </Text>
               )}
@@ -536,10 +516,10 @@ const PayPalCreditCardForm = ({
         
         {/* Credit Card Form Fields */}
         {!isLoading && (
-          <VStack spacing={6} align="stretch" key="paypal-form-fields">
+          <VStack spacing={6} align="stretch">
             
             {/* Cardholder Name */}
-            <FormControl key="name-field">
+            <FormControl>
               <FormLabel 
                 fontSize="sm" 
                 fontWeight="semibold" 
@@ -556,18 +536,20 @@ const PayPalCreditCardForm = ({
                 borderRadius="lg"
                 bg="white"
                 position="relative"
+                cursor="text"
                 sx={{
                   '& iframe': {
                     width: '100%',
                     height: '48px',
-                    border: 'none'
+                    border: 'none',
+                    pointerEvents: 'auto'
                   }
                 }}
               />
             </FormControl>
 
             {/* Card Number */}
-            <FormControl key="number-field">
+            <FormControl>
               <FormLabel 
                 fontSize="sm" 
                 fontWeight="semibold" 
@@ -587,19 +569,21 @@ const PayPalCreditCardForm = ({
                 borderRadius="lg"
                 bg="white"
                 position="relative"
+                cursor="text"
                 sx={{
                   '& iframe': {
                     width: '100%',
                     height: '48px',
-                    border: 'none'
+                    border: 'none',
+                    pointerEvents: 'auto'
                   }
                 }}
               />
             </FormControl>
 
             {/* Expiry and CVV */}
-            <HStack spacing={4} key="expiry-cvv-fields">
-              <FormControl key="expiry-field">
+            <HStack spacing={4}>
+              <FormControl>
                 <FormLabel 
                   fontSize="sm" 
                   fontWeight="semibold" 
@@ -616,17 +600,19 @@ const PayPalCreditCardForm = ({
                   borderRadius="lg"
                   bg="white"
                   position="relative"
+                  cursor="text"
                   sx={{
                     '& iframe': {
                       width: '100%',
                       height: '48px',
-                      border: 'none'
+                      border: 'none',
+                      pointerEvents: 'auto'
                     }
                   }}
                 />
               </FormControl>
 
-              <FormControl key="cvv-field">
+              <FormControl>
                 <FormLabel 
                   fontSize="sm" 
                   fontWeight="semibold" 
@@ -646,11 +632,13 @@ const PayPalCreditCardForm = ({
                   borderRadius="lg"
                   bg="white"
                   position="relative"
+                  cursor="text"
                   sx={{
                     '& iframe': {
                       width: '100%',
                       height: '48px',
-                      border: 'none'
+                      border: 'none',
+                      pointerEvents: 'auto'
                     }
                   }}
                 />
@@ -678,7 +666,7 @@ const PayPalCreditCardForm = ({
               onClick={handleSubmit}
               isLoading={isProcessing}
               loadingText="Processing Payment..."
-              isDisabled={disabled || isLoading || !cardFields}
+              isDisabled={disabled || isLoading || !fieldsReady}
               size="lg"
               h="56px"
               bgGradient="linear(to-r, blue.600, purple.600)"

@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import {
   Box,
   Container,
@@ -41,7 +41,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
 import { useSession } from 'next-auth/react';
-import ServiceRequestButton from '@/components/services/ServiceRequestButton';
 import { getSession } from 'next-auth/react';
 
 // Fallback service data in case API isn't ready
@@ -141,9 +140,8 @@ export default function ServiceDetailPage({ params }) {
   const [serviceAddons, setServiceAddons] = useState([]);
   const [isLoadingAddons, setIsLoadingAddons] = useState(false);
   
-  // For client components, use React.use() to unwrap the params Promise
-  const unwrappedParams = React.use(params);
-  const { id } = unwrappedParams;
+  // Unwrap params using React.use() as required by Next.js 15
+  const { id } = use(params);
   
   // Set user role from session
   useEffect(() => {
@@ -754,12 +752,15 @@ export default function ServiceDetailPage({ params }) {
                     )}
                     
               {!isOwner && session && session.user.role === 'CLIENT' && (
-                <ServiceRequestButton 
-                  service={{
-                    ...service,
-                    providerId: service.provider?.id
-                  }} 
-                />
+                <Button 
+                  colorScheme="blue" 
+                  size="lg"
+                  width="full"
+                  as={Link}
+                  href={`/book/${service.id}`}
+                >
+                  Book Now
+                </Button>
               )}
               
               {isOwner && (
@@ -769,8 +770,8 @@ export default function ServiceDetailPage({ params }) {
               )}
               
               {!session && (
-                <Button colorScheme="blue" width="full" as="a" href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/services/${id}`)}`}>
-                  Login to Request
+                <Button colorScheme="blue" width="full" as="a" href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/book/${id}`)}`}>
+                  Sign in to Book
                 </Button>
               )}
             </Stack>

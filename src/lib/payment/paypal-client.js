@@ -300,4 +300,4 @@ class PayPalClient {
   }
 }
 
-module.exports = { PayPalClient }; 
+export { PayPalClient }; 

@@ -23,9 +23,6 @@ import { BellIcon, TimeIcon, InfoIcon, WarningIcon, CheckIcon } from '@chakra-ui
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { io } from 'socket.io-client';
-
-let socket;
 
 const NotificationComponent = () => {
   const { data: session } = useSession();
@@ -37,14 +34,11 @@ const NotificationComponent = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   
-  // Initialize socket connection and fetch notifications
   useEffect(() => {
     if (!session || !session.user) return;
     
-    // Log user role for debugging
-    console.log(`Notification component initialized for ${session.user.role} user:`, session.user.name);
+    console.log(`Notification component effect runs for ${session.user.role} user:`, session.user.name);
     
-    // Fetch existing notifications
     const fetchNotifications = async () => {
       try {
         setIsLoading(true);
@@ -81,56 +75,16 @@ const NotificationComponent = () => {
     
     fetchNotifications();
     
-    // Initialize Socket.io
-    if (!socket) {
-      console.log('Initializing socket connection for notifications...');
-      socket = io({
-        path: '/api/socket',
-        auth: {
-          token: session.accessToken,
-        },
-      });
-      
-      socket.on('connect', () => {
-        console.log('Socket connected for notifications with ID:', socket.id);
-      });
-      
-      socket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
-      });
-      
-      socket.on('notification:new', (notification) => {
-        console.log('New notification received via socket:', notification);
-        
-        // Add new notification to state
-        setNotifications(prev => [notification, ...prev]);
-        setUnreadCount(prev => prev + 1);
-        
-        // Determine the status based on notification content
-        const status = isPositiveNotification(notification) ? 'success' : 'info';
-        
-        // Show toast for new notification
-        toast({
-          title: notification.title,
-          description: notification.content,
-          status: status,
-          duration: 5000,
-          isClosable: true,
-        });
-      });
-    }
+    // Temporarily disable socket.io initialization to avoid connection errors
+    // TODO: Re-implement socket.io properly for real-time notifications
+    console.log('Socket.io temporarily disabled - using polling only');
     
-    // Poll for new notifications every 30 seconds as a fallback
-    const pollingInterval = setInterval(fetchNotifications, 30000);
+    // Poll for new notifications every 10 seconds instead of 30
+    const pollingInterval = setInterval(fetchNotifications, 10000);
     
-    // Cleanup function
     return () => {
+      console.log('Notification component cleanup. User:', session?.user?.name);
       clearInterval(pollingInterval);
-      if (socket) {
-        socket.off('notification:new');
-        socket.off('connect');
-        socket.off('connect_error');
-      }
     };
   }, [session, toast]);
   
