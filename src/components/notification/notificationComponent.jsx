@@ -41,11 +41,22 @@ const NotificationComponent = () => {
     
     const fetchNotifications = async () => {
       try {
+        // Double-check session is still valid before making API call
+        if (!session || !session.user || !session.user.id) {
+          console.log('Skipping notification fetch - no valid session');
+          return;
+        }
+        
         setIsLoading(true);
         console.log('Fetching notifications for user:', session.user.id);
         const response = await fetch('/api/notifications');
         
         if (!response.ok) {
+          // If unauthorized, don't show error toast - session might have expired
+          if (response.status === 401) {
+            console.log('Unauthorized notification fetch - session may have expired');
+            return;
+          }
           console.error('Notification fetch error:', response.status, response.statusText);
           throw new Error(`Failed to fetch notifications: ${response.status}`);
         }
@@ -61,13 +72,16 @@ const NotificationComponent = () => {
         }
       } catch (error) {
         console.error('Fetch notifications error:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load notifications',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
+        // Only show toast for actual errors, not auth issues
+        if (!error.message.includes('401')) {
+          toast({
+            title: 'Error',
+            description: 'Failed to load notifications',
+            status: 'error',
+            duration: 3000,
+            isClosable: true,
+          });
+        }
       } finally {
         setIsLoading(false);
       }
@@ -79,8 +93,8 @@ const NotificationComponent = () => {
     // TODO: Re-implement socket.io properly for real-time notifications
     console.log('Socket.io temporarily disabled - using polling only');
     
-    // Poll for new notifications every 10 seconds instead of 30
-    const pollingInterval = setInterval(fetchNotifications, 10000);
+    // Poll for new notifications every 2 minutes instead of 10 seconds to reduce server load
+    const pollingInterval = setInterval(fetchNotifications, 120000); // 2 minutes
     
     return () => {
       console.log('Notification component cleanup. User:', session?.user?.name);

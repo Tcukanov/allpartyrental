@@ -99,7 +99,7 @@ Example: $100 Service
 - `/[location]/[service]` - Browse services by location and category
 - `/admin/*` - Admin dashboard routes
 - `/provider/*` - Provider dashboard routes
-  - `/provider/settings/payments` - PayPal onboarding & payment settings
+  - `/provider/dashboard/paypal` - PayPal marketplace integration & settings
 - `/client/*` - Client dashboard routes
 
 ## Database Schema
@@ -108,8 +108,11 @@ Key models include:
 - `User` - Base user model with authentication
 - `Provider` - Provider profile information + PayPal marketplace data
   - `paypalMerchantId` - Provider's PayPal merchant ID
-  - `paypalOnboardingComplete` - Whether provider completed PayPal setup
-  - `paypalStatus` - Current onboarding status (NOT_STARTED, IN_PROGRESS, COMPLETED)
+  - `paypalOnboardingId` - PayPal partner referral tracking ID
+  - `paypalTrackingId` - PayPal onboarding tracking ID
+  - `paypalOnboardingStatus` - Current onboarding status (NOT_STARTED, PENDING, COMPLETED, FAILED)
+  - `paypalCanReceivePayments` - Whether provider can receive marketplace payments
+  - `paypalStatusIssues` - Array of status validation issues
 - `Service` - Service listings
 - `ServiceCategory` - Categories for services
 - `ServiceAddon` - Add-ons for services
@@ -128,13 +131,14 @@ Key models include:
 - `/api/categories/*` - Category management endpoints
 - `/api/admin/*` - Admin-only endpoints
 - `/api/provider/*` - Provider-only endpoints
-  - `/api/provider/paypal-status` - Get provider PayPal connection status
-  - `/api/provider/paypal-onboard` - Start PayPal onboarding process
 - `/api/client/*` - Client-only endpoints
 - `/api/payments/*` - Payment processing endpoints
   - `/api/payments/create` - Create marketplace or regular payment orders
   - `/api/payments/capture` - Capture payments with automatic splitting
 - `/api/transactions/*` - Transaction processing endpoints
+- `/api/paypal/*` - PayPal marketplace integration endpoints
+  - `/api/paypal/onboard-seller` - Create PayPal partner referrals for provider onboarding
+  - `/api/paypal/callback` - Handle PayPal onboarding completion callbacks
 
 ## Payment Flow
 
@@ -183,9 +187,9 @@ The UI is built with Chakra UI and follows these design patterns:
 - Client components for interactive UI elements
 - Consistent filter UI pattern across service listing pages
 - **PayPal Components**:
-  - `PayPalCreditCardForm` - Embedded credit card payment form
-  - `PayPalOnboarding` - Provider onboarding flow
-  - `PayPalConnectButton` - Payment connection interface
+  - `PayPalCreditCardForm` - Embedded credit card payment form with partner attribution
+  - **PayPal Settings Page** (`/provider/dashboard/paypal`) - Complete provider PayPal management interface
+  - PayPal provider navigation integrated in dashboard sidebar
 
 ## Code Organization
 

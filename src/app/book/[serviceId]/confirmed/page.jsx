@@ -39,6 +39,7 @@ export default function BookingConfirmedPage({ params }) {
 
   const { serviceId } = use(params);
   const orderId = searchParams.get('orderId');
+  const transactionId = searchParams.get('transactionId');
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -49,8 +50,21 @@ export default function BookingConfirmedPage({ params }) {
       }
 
       try {
-        // Check if this is a simulated payment
-        if (orderId.startsWith('simulated-order-')) {
+        // If we have a transaction ID, this is a real booking - fetch from database
+        if (transactionId) {
+          console.log('Fetching real booking data for transaction:', transactionId);
+          
+          const response = await fetch(`/api/bookings/order/${orderId}`);
+          const data = await response.json();
+          
+          if (data.success && data.data) {
+            setBooking(data.data);
+          } else {
+            throw new Error(data.error || 'Booking not found');
+          }
+        }
+        // Check if this is a simulated payment (legacy)
+        else if (orderId.startsWith('simulated-order-')) {
           // For simulated payments, try to get data from sessionStorage
           const storedBooking = sessionStorage.getItem('pendingBooking');
           if (storedBooking) {
@@ -78,7 +92,7 @@ export default function BookingConfirmedPage({ params }) {
             setBooking(null);
           }
         } else {
-          // For real payments, fetch from API
+          // For real payments without transactionId (fallback), fetch from API
           const response = await fetch(`/api/bookings/order/${orderId}`);
           const data = await response.json();
           
@@ -109,7 +123,7 @@ export default function BookingConfirmedPage({ params }) {
     };
 
     fetchBookingDetails();
-  }, [orderId, router, toast]);
+  }, [orderId, transactionId, router, toast]);
 
   if (isLoading) {
     return (

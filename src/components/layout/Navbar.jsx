@@ -59,11 +59,7 @@ export default function Navbar() {
   ];
 
   const providerItems = [
-    { label: 'My Services', href: '/provider/services' },
-    { label: 'Requests', href: '/provider/requests' },
-    { label: 'Calendar', href: '/provider/calendar' },
-    { label: 'My Profile', href: '/provider/profile' },
-    // { label: 'Advertising', href: '/provider/advertising' },
+    // Provider pages now use ProviderLayout - no need for navigation items here
   ];
 
   const adminItems = [
@@ -110,6 +106,16 @@ export default function Navbar() {
                 <></>
               )}
               
+              {isProvider && (
+                <Button 
+                  colorScheme="brand" 
+                  variant="solid" 
+                  onClick={() => router.push('/provider/dashboard')}
+                >
+                  Provider Dashboard
+                </Button>
+              )}
+              
               <Menu>
                 <MenuButton as={Button} rounded="full" variant="link" cursor="pointer" minW={0}>
                   <Avatar size="sm" src={session?.user?.image || undefined} name={session?.user?.name || 'User'} />
@@ -121,11 +127,11 @@ export default function Navbar() {
                     </MenuItem>
                   ))}
                   
-                  {isProvider && providerItems.map((item) => (
-                    <MenuItem key={item.href} as={Link} href={item.href}>
-                      {item.label}
+                  {isProvider && (
+                    <MenuItem as={Link} href="/provider/dashboard">
+                      Provider Dashboard
                     </MenuItem>
-                  ))}
+                  )}
                   
                   {isAdmin && adminItems.map((item) => (
                     <MenuItem key={item.href} as={Link} href={item.href}>
@@ -189,13 +195,13 @@ export default function Navbar() {
                     </Link>
                   ))}
                   
-                  {isProvider && providerItems.map((item) => (
-                    <Link key={item.href} href={item.href} passHref onClick={onClose}>
+                  {isProvider && (
+                    <Link href="/provider/dashboard" passHref onClick={onClose}>
                       <Text px={2} py={1} rounded="md" _hover={{ bg: 'gray.100' }}>
-                        {item.label}
+                        Provider Dashboard
                       </Text>
                     </Link>
-                  ))}
+                  )}
                   
                   {isAdmin && adminItems.map((item) => (
                     <Link key={item.href} href={item.href} passHref onClick={onClose}>

@@ -44,12 +44,13 @@ import {
   FiSettings,
   FiUser,
   FiLogOut,
-  FiBarChart3,
+  FiBarChart,
   FiMessageSquare,
   FiStar,
   FiCreditCard,
   FiFileText,
-  FiShield
+  FiShield,
+  FiMenu
 } from 'react-icons/fi';
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
@@ -59,12 +60,13 @@ const ProviderLayout = ({ children }) => {
   const { data: session } = useSession();
   const pathname = usePathname();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const sidebarBg = useColorModeValue('gray.50', 'gray.900');
 
-  // Navigation items
+  // Navigation items - only include pages that actually exist
   const navigationItems = [
     {
       label: 'Dashboard',
@@ -73,73 +75,31 @@ const ProviderLayout = ({ children }) => {
       description: 'Overview & analytics'
     },
     {
-      label: 'Calendar',
-      href: '/provider/dashboard/calendar',
-      icon: FiCalendar,
-      description: 'Schedule & availability'
-    },
-    {
-      label: 'Services',
-      href: '/provider/dashboard/services',
+      label: 'My Services',
+      href: '/provider/services',
       icon: FiPackage,
       description: 'Manage your services'
     },
     {
-      label: 'Bookings',
-      href: '/provider/dashboard/bookings',
+      label: 'Requests',
+      href: '/provider/requests',
       icon: FiUsers,
-      description: 'Customer bookings'
+      description: 'Client booking requests'
     },
     {
-      label: 'Payments',
-      href: '/provider/dashboard/payments',
-      icon: FiDollarSign,
-      description: 'Earnings & transactions'
-    },
-    {
-      label: 'Messages',
-      href: '/provider/dashboard/messages',
-      icon: FiMessageSquare,
-      description: 'Customer communications'
-    },
-    {
-      label: 'Reviews',
-      href: '/provider/dashboard/reviews',
-      icon: FiStar,
-      description: 'Customer feedback'
-    },
-    {
-      label: 'Analytics',
-      href: '/provider/dashboard/analytics',
-      icon: FiBarChart3,
-      description: 'Business insights'
+      label: 'Calendar',
+      href: '/provider/calendar',
+      icon: FiCalendar,
+      description: 'Schedule & availability'
     }
   ];
 
   const settingsItems = [
     {
-      label: 'Profile',
-      href: '/provider/dashboard/profile',
-      icon: FiUser,
-      description: 'Business profile'
-    },
-    {
-      label: 'Account Settings',
-      href: '/provider/dashboard/settings',
-      icon: FiSettings,
-      description: 'Account preferences'
-    },
-    {
       label: 'Payment Settings',
-      href: '/provider/dashboard/payment-settings',
+      href: '/provider/dashboard/paypal',
       icon: FiCreditCard,
-      description: 'Payment configuration'
-    },
-    {
-      label: 'Security',
-      href: '/provider/dashboard/security',
-      icon: FiShield,
-      description: 'Security settings'
+      description: 'PayPal & payment setup'
     }
   ];
 
@@ -271,14 +231,15 @@ const ProviderLayout = ({ children }) => {
         position="fixed"
         left={0}
         top={0}
-        w="280px"
+        w={sidebarCollapsed ? "80px" : "280px"}
         h="100vh"
         bg={sidebarBg}
         borderRight="1px"
         borderColor={borderColor}
         zIndex={1000}
+        transition="width 0.3s ease"
       >
-        <SidebarContent />
+        <SidebarContent isCollapsed={sidebarCollapsed} />
       </Box>
 
       {/* Mobile Drawer */}
@@ -293,7 +254,7 @@ const ProviderLayout = ({ children }) => {
       </Drawer>
 
       {/* Main Content */}
-      <Box ml={{ base: 0, lg: '280px' }}>
+      <Box ml={{ base: 0, lg: sidebarCollapsed ? '80px' : '280px' }} transition="margin-left 0.3s ease">
         {/* Top Header */}
         <Flex
           bg={bgColor}
@@ -308,13 +269,24 @@ const ProviderLayout = ({ children }) => {
           zIndex={999}
         >
           {/* Mobile Menu Button */}
-          <IconButton
-            display={{ base: 'block', lg: 'none' }}
-            onClick={onOpen}
-            variant="outline"
-            aria-label="Open menu"
-            icon={<HamburgerIcon />}
-          />
+          <HStack spacing={3}>
+            <IconButton
+              display={{ base: 'block', lg: 'none' }}
+              onClick={onOpen}
+              variant="outline"
+              aria-label="Open menu"
+              icon={<HamburgerIcon />}
+            />
+            
+            {/* Desktop Sidebar Toggle */}
+            <IconButton
+              display={{ base: 'none', lg: 'block' }}
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              variant="ghost"
+              aria-label="Toggle sidebar"
+              icon={<Icon as={FiMenu} />}
+            />
+          </HStack>
 
           {/* Desktop Title */}
           <Box display={{ base: 'none', lg: 'block' }}>
@@ -357,11 +329,14 @@ const ProviderLayout = ({ children }) => {
                 </HStack>
               </MenuButton>
               <MenuList>
-                <MenuItem as={Link} href="/provider/dashboard/profile" icon={<Icon as={FiUser} />}>
-                  Profile
+                <MenuItem as={Link} href="/provider/cabinet" icon={<Icon as={FiUser} />}>
+                  Profile & Cabinet
                 </MenuItem>
-                <MenuItem as={Link} href="/provider/dashboard/settings" icon={<Icon as={FiSettings} />}>
-                  Settings
+                <MenuItem as={Link} href="/provider/dashboard/payments" icon={<Icon as={FiDollarSign} />}>
+                  Payments
+                </MenuItem>
+                <MenuItem as={Link} href="/provider/dashboard/paypal" icon={<Icon as={FiCreditCard} />}>
+                  PayPal Settings
                 </MenuItem>
                 <MenuDivider />
                 <MenuItem 

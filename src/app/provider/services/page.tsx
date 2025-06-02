@@ -31,6 +31,7 @@ import {
   Image
 } from '@chakra-ui/react';
 import { AddIcon, EditIcon, DeleteIcon } from '@chakra-ui/icons';
+import ProviderLayout from '../components/ProviderLayout';
 
 interface Service {
   id: string;
@@ -188,128 +189,130 @@ export default function ProviderServicesPage() {
   }
 
   return (
-    <Container maxW="container.xl" py={8}>
-      <Flex justifyContent="space-between" alignItems="center" mb={6}>
-        <Heading as="h1" size="xl">My Services</Heading>
-        <Button 
-          leftIcon={<AddIcon />} 
-          colorScheme="brand" 
-          onClick={handleAddService}
-        >
-          Add New Service
-        </Button>
-      </Flex>
-
-      <Box mb={6} p={4} bg="blue.50" color="blue.800" borderRadius="md">
-        <Text fontWeight="medium">Service Approval Process</Text>
-        <Text fontSize="sm">
-          All new services require admin approval before they become visible to clients. 
-          Services with <Badge colorScheme="orange" size="sm">Pending Approval</Badge> status are under review. 
-          Once approved, the status will change to <Badge colorScheme="green" size="sm">Active</Badge>.
-        </Text>
-      </Box>
-
-      {error && (
-        <Box mb={6} p={4} bg="red.100" color="red.800" borderRadius="md">
-          <Text>{error}</Text>
-        </Box>
-      )}
-
-      {services.length === 0 ? (
-        <Box p={8} textAlign="center" bg="gray.50" borderRadius="md">
-          <Text fontSize="lg" mb={4}>You don't have any services yet</Text>
+    <ProviderLayout>
+      <Container maxW="container.xl" py={8}>
+        <Flex justifyContent="space-between" alignItems="center" mb={6}>
+          <Heading as="h1" size="xl">My Services</Heading>
           <Button 
+            leftIcon={<AddIcon />} 
             colorScheme="brand" 
             onClick={handleAddService}
           >
-            Create Your First Service
+            Add New Service
           </Button>
-        </Box>
-      ) : (
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-          {services.map((service) => (
-            <Card key={service.id} boxShadow="md" height="100%">
-              {service.photos && service.photos.length > 0 ? (
-                <Image 
-                  src={service.photos[0]} 
-                  alt={service.name}
-                  height="200px"
-                  width="100%"
-                  objectFit="cover"
-                />
-              ) : (
-                <Box 
-                  height="200px"
-                  width="100%"
-                  bg="gray.100" 
-                  display="flex" 
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <Text color="gray.500">No image</Text>
-                </Box>
-              )}
-              <CardBody>
-                <Stack spacing={3}>
-                  <Heading size="md">{service.name}</Heading>
-                  <Text color="gray.500" fontSize="sm">
-                    Category: {typeof service.category === 'string' ? service.category : service.category?.name || 'Uncategorized'}
-                  </Text>
-                  <Text noOfLines={3}>{service.description}</Text>
-                  <Text fontWeight="bold">
-                    ${Number(service.price).toFixed(2)}
-                  </Text>
-                  <HStack>
-                    {getStatusBadge(service.status)}
-                    <Text fontSize="sm" color="gray.500">
-                      Created: {new Date(service.createdAt).toLocaleDateString()}
-                    </Text>
-                  </HStack>
-                </Stack>
-              </CardBody>
-              <CardFooter pt={0}>
-                <HStack spacing={2}>
-                  <IconButton
-                    aria-label="Edit service"
-                    icon={<EditIcon />}
-                    onClick={() => handleEditService(service.id)}
-                    size="sm"
-                    variant="ghost"
-                  />
-                  <IconButton
-                    aria-label="Delete service"
-                    icon={<DeleteIcon />}
-                    onClick={() => confirmDeleteService(service.id)}
-                    size="sm"
-                    variant="ghost"
-                    colorScheme="red"
-                  />
-                </HStack>
-              </CardFooter>
-            </Card>
-          ))}
-        </SimpleGrid>
-      )}
+        </Flex>
 
-      {/* Delete Confirmation Modal */}
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Confirm Deletion</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            Are you sure you want to delete this service? This action cannot be undone.
-          </ModalBody>
-          <ModalFooter>
-            <Button mr={3} onClick={onClose}>
-              Cancel
+        <Box mb={6} p={4} bg="blue.50" color="blue.800" borderRadius="md">
+          <Text fontWeight="medium">Service Approval Process</Text>
+          <Text fontSize="sm">
+            All new services require admin approval before they become visible to clients. 
+            Services with <Badge colorScheme="orange" size="sm">Pending Approval</Badge> status are under review. 
+            Once approved, the status will change to <Badge colorScheme="green" size="sm">Active</Badge>.
+          </Text>
+        </Box>
+
+        {error && (
+          <Box mb={6} p={4} bg="red.100" color="red.800" borderRadius="md">
+            <Text>{error}</Text>
+          </Box>
+        )}
+
+        {services.length === 0 ? (
+          <Box p={8} textAlign="center" bg="gray.50" borderRadius="md">
+            <Text fontSize="lg" mb={4}>You don't have any services yet</Text>
+            <Button 
+              colorScheme="brand" 
+              onClick={handleAddService}
+            >
+              Create Your First Service
             </Button>
-            <Button colorScheme="red" onClick={handleDeleteService}>
-              Delete
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </Container>
+          </Box>
+        ) : (
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+            {services.map((service) => (
+              <Card key={service.id} boxShadow="md" height="100%">
+                {service.photos && service.photos.length > 0 ? (
+                  <Image 
+                    src={service.photos[0]} 
+                    alt={service.name}
+                    height="200px"
+                    width="100%"
+                    objectFit="cover"
+                  />
+                ) : (
+                  <Box 
+                    height="200px"
+                    width="100%"
+                    bg="gray.100" 
+                    display="flex" 
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Text color="gray.500">No image</Text>
+                  </Box>
+                )}
+                <CardBody>
+                  <Stack spacing={3}>
+                    <Heading size="md">{service.name}</Heading>
+                    <Text color="gray.500" fontSize="sm">
+                      Category: {typeof service.category === 'string' ? service.category : service.category?.name || 'Uncategorized'}
+                    </Text>
+                    <Text noOfLines={3}>{service.description}</Text>
+                    <Text fontWeight="bold">
+                      ${Number(service.price).toFixed(2)}
+                    </Text>
+                    <HStack>
+                      {getStatusBadge(service.status)}
+                      <Text fontSize="sm" color="gray.500">
+                        Created: {new Date(service.createdAt).toLocaleDateString()}
+                      </Text>
+                    </HStack>
+                  </Stack>
+                </CardBody>
+                <CardFooter pt={0}>
+                  <HStack spacing={2}>
+                    <IconButton
+                      aria-label="Edit service"
+                      icon={<EditIcon />}
+                      onClick={() => handleEditService(service.id)}
+                      size="sm"
+                      variant="ghost"
+                    />
+                    <IconButton
+                      aria-label="Delete service"
+                      icon={<DeleteIcon />}
+                      onClick={() => confirmDeleteService(service.id)}
+                      size="sm"
+                      variant="ghost"
+                      colorScheme="red"
+                    />
+                  </HStack>
+                </CardFooter>
+              </Card>
+            ))}
+          </SimpleGrid>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        <Modal isOpen={isOpen} onClose={onClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Confirm Deletion</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              Are you sure you want to delete this service? This action cannot be undone.
+            </ModalBody>
+            <ModalFooter>
+              <Button mr={3} onClick={onClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="red" onClick={handleDeleteService}>
+                Delete
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      </Container>
+    </ProviderLayout>
   );
 } 

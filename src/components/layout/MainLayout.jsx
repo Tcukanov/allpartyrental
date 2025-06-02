@@ -73,6 +73,9 @@ export default function MainLayout({ children }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   
+  // Check if current route is a provider route
+  const isProviderRoute = pathname.startsWith('/provider');
+  
   // Handle route change
   useEffect(() => {
     setIsLoading(true);
@@ -97,6 +100,11 @@ export default function MainLayout({ children }) {
     await signOut({ redirect: false });
     router.push('/');
   };
+  
+  // If this is a provider route, don't render the main navbar since ProviderLayout handles it
+  if (isProviderRoute) {
+    return <Box>{children}</Box>;
+  }
   
   return (
     <Box>

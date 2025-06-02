@@ -1,6 +1,6 @@
 // Auth module for NextAuth.js configuration
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { compare } from "bcrypt";
 import { prisma } from "@/lib/prisma";
 
@@ -29,7 +29,10 @@ export const authOptions = {
         // You would typically validate against your database here
         // This is a simplified version
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email }
+          where: { email: credentials.email },
+          include: {
+            provider: true // Include provider data
+          }
         });
         
         if (!user) {
@@ -46,6 +49,8 @@ export const authOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
+          role: user.role,
+          provider: user.provider
         };
       }
     })
@@ -55,6 +60,8 @@ export const authOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        token.role = user.role;
+        token.provider = user.provider;
       }
       return token;
     },
@@ -62,6 +69,8 @@ export const authOptions = {
       if (token) {
         session.user.id = token.id;
         session.user.email = token.email;
+        session.user.role = token.role;
+        session.user.provider = token.provider;
       }
       return session;
     }

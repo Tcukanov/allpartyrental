@@ -34,11 +34,6 @@ const SettingsLayout = ({ children }) => {
       icon: FiSettings
     },
     { 
-      name: 'Payments',
-      path: '/provider/settings/payments',
-      icon: FiCreditCard
-    },
-    { 
       name: 'Profile',
       path: '/provider/settings/profile',
       icon: FiUser
@@ -47,11 +42,6 @@ const SettingsLayout = ({ children }) => {
       name: 'Security',
       path: '/provider/settings/security',
       icon: FiShield
-    },
-    {
-      name: 'Payment Dashboard',
-      path: '/provider/payments/dashboard',
-      icon: FiCreditCard
     }
   ];
 

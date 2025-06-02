@@ -19,6 +19,7 @@ model User {
   verificationToken    String?
   verificationTokenExp DateTime?
   password             String?
+  
   accounts             Account[]
   advertisements       Advertisement[]
   calendar             Calendar[]
@@ -67,12 +68,20 @@ model Provider {
   verificationLevel     Int      @default(0)
   website               String?
   stripeAccountId       String?
-  paypalMerchantId      String?
-  paypalEmail           String?
-  paypalOnboardingComplete Boolean @default(false)
-  accountType           String?
-  paypalStatus          String?
-  paypalEnvironment     String?
+  
+  // PayPal Integration Fields
+  paypalMerchantId          String?
+  paypalEmail               String?
+  paypalOnboardingComplete  Boolean @default(false)
+  paypalOnboardingId        String?
+  paypalTrackingId          String?
+  paypalOnboardingStatus    String?  // NOT_STARTED, PENDING, COMPLETED, FAILED
+  paypalCanReceivePayments  Boolean?
+  paypalStatusIssues        String?  // JSON string of issues array
+  accountType               String?
+  paypalStatus              String?
+  paypalEnvironment         String?
+  
   user                  User     @relation(fields: [userId], references: [id])
 }
 
@@ -375,8 +384,6 @@ model BlockedDate {
 
   @@index([providerId, date])
 }
-
-
 
 enum UserRole {
   CLIENT

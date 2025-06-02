@@ -33,6 +33,7 @@ import { ChatIcon, CalendarIcon } from '@chakra-ui/icons';
 import { formatDistanceToNow } from 'date-fns';
 import { OfferStatus, TransactionStatus } from '@prisma/client';
 import { getOfferStatusConfig, getTransactionStatusConfig, offerRequiresAction, transactionRequiresAction } from '@/utils/statusConfig';
+import ProviderLayout from '../components/ProviderLayout';
 
 interface Offer {
   id: string;
@@ -149,15 +150,45 @@ export default function ProviderRequestsPage() {
       
       if (data.success) {
         console.log('Fetched offers successfully:', data.data?.length || 0, 'offers');
+        console.log('Full API response:', JSON.stringify(data, null, 2));
+        
         // Log detailed status of each offer for debugging
         if (data.data && data.data.length > 0) {
           console.log('Offer statuses:', data.data.map(offer => ({
             id: offer.id,
             status: offer.status,
-            transactionStatus: offer.transaction?.status || 'NONE'
+            transactionStatus: offer.transaction?.status || 'NONE',
+            clientName: offer.client?.name,
+            serviceName: offer.service?.name
           })));
+          
+          // Check for missing required fields
+          const invalidOffers = data.data.filter(offer => 
+            !offer.client || !offer.client.name || 
+            !offer.service || !offer.service.name ||
+            !offer.partyService || !offer.partyService.party || !offer.partyService.party.name
+          );
+          
+          if (invalidOffers.length > 0) {
+            console.error('Found offers with missing required fields:', invalidOffers.map(offer => ({
+              id: offer.id,
+              hasClient: !!offer.client,
+              clientName: offer.client?.name,
+              hasService: !!offer.service,
+              serviceName: offer.service?.name,
+              hasPartyService: !!offer.partyService,
+              hasParty: !!offer.partyService?.party,
+              partyName: offer.partyService?.party?.name
+            })));
+          }
+          
+          console.log('Setting offers state with:', data.data.length, 'offers');
+          setOffers(data.data);
+          console.log('Offers state set. Current offers length should be:', data.data.length);
+        } else {
+          console.log('No offers in response data');
+          setOffers([]);
         }
-        setOffers(data.data || []);
       } else {
         throw new Error(data.error?.message || 'Failed to fetch offers');
       }
@@ -416,119 +447,142 @@ export default function ProviderRequestsPage() {
   }
 
   return (
-    <Container maxW="container.xl" py={8}>
-      <VStack spacing={8} align="stretch">
-        <Heading as="h1" size="xl">Service Requests</Heading>
-        
-        {offers.length === 0 ? (
-          <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
-            <Text>No service requests found.</Text>
-          </Box>
-        ) : (
-          <Table variant="simple">
-            <Thead>
-              <Tr>
-                <Th>Client</Th>
-                <Th>Service</Th>
-                <Th>Party</Th>
-                <Th>Price</Th>
-                <Th width="180px">Status</Th>
-                <Th>Date</Th>
-                <Th>Actions</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {offers.map((offer) => (
-                <Tr key={offer.id}>
-                  <Td>{offer.client.name}</Td>
-                  <Td>{offer.service.name}</Td>
-                  <Td>
-                    <Button 
-                      size="sm"
-                      colorScheme="blue"
-                      variant="solid"
-                      rightIcon={<Icon as={CalendarIcon} />}
-                      onClick={() => router.push(`/provider/party/${offer.partyService.party.id}`)}
-                    >
-                      {offer.partyService.party.name}
-                    </Button>
-                  </Td>
-                  <Td>${offer.price}</Td>
-                  <Td>{getStatusBadge(offer)}</Td>
-                  <Td>{formatDistanceToNow(new Date(offer.createdAt), { addSuffix: true })}</Td>
-                  <Td>
-                    <Flex gap={2}>
-                      {/* Show approve and reject buttons only for pending offers */}
-                      {offer.status === 'PENDING' && (
-                        <>
-                          <Button
-                            size="sm"
-                            colorScheme="green"
-                            onClick={() => confirmAction(offer.id, 'approve')}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            colorScheme="red"
-                            onClick={() => confirmAction(offer.id, 'reject')}
-                          >
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                      {/* Show chat button for all offers except REJECTED and CANCELLED */}
-                      {offer.status !== 'REJECTED' && offer.status !== 'CANCELLED' && (
-                        <Button
-                          size="sm"
-                          colorScheme="blue"
-                          leftIcon={<Icon as={ChatIcon} />}
-                          onClick={() => handleCreateChat(offer)}
-                        >
-                          Chat
-                        </Button>
-                      )}
-                    </Flex>
-                  </Td>
+    <ProviderLayout>
+      <Container maxW="container.xl" py={8}>
+        <VStack spacing={8} align="stretch">
+          <Heading as="h1" size="xl">Service Requests</Heading>
+          
+          {/* Debug info */}
+          {process.env.NODE_ENV === 'development' && (
+            <Box p={4} bg="gray.100" borderRadius="md">
+              <Text fontSize="sm">
+                Debug: offers.length = {offers.length}, loading = {loading.toString()}, error = {error || 'none'}
+              </Text>
+              {offers.length > 0 && (
+                <Text fontSize="sm" mt={2}>
+                  First offer: {JSON.stringify({
+                    id: offers[0]?.id,
+                    status: offers[0]?.status,
+                    clientName: offers[0]?.client?.name
+                  })}
+                </Text>
+              )}
+            </Box>
+          )}
+          
+          {offers.length === 0 ? (
+            <Box p={6} textAlign="center" borderWidth="1px" borderRadius="md">
+              <Text>No service requests found.</Text>
+              <Text fontSize="sm" color="gray.500" mt={2}>
+                Debug: API returned {offers.length} offers. Loading: {loading.toString()}
+              </Text>
+            </Box>
+          ) : (
+            <Table variant="simple">
+              <Thead>
+                <Tr>
+                  <Th>Client</Th>
+                  <Th>Service</Th>
+                  <Th>Party</Th>
+                  <Th>Price</Th>
+                  <Th width="180px">Status</Th>
+                  <Th>Date</Th>
+                  <Th>Actions</Th>
                 </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        )}
-      </VStack>
+              </Thead>
+              <Tbody>
+                {offers.map((offer) => (
+                  <Tr key={offer.id}>
+                    <Td>{offer.client.name}</Td>
+                    <Td>{offer.service.name}</Td>
+                    <Td>
+                      <Button 
+                        size="sm"
+                        colorScheme="blue"
+                        variant="solid"
+                        rightIcon={<Icon as={CalendarIcon} />}
+                        onClick={() => router.push(`/provider/party/${offer.partyService.party.id}`)}
+                      >
+                        {offer.partyService.party.name}
+                      </Button>
+                    </Td>
+                    <Td>${offer.price}</Td>
+                    <Td>{getStatusBadge(offer)}</Td>
+                    <Td>{formatDistanceToNow(new Date(offer.createdAt), { addSuffix: true })}</Td>
+                    <Td>
+                      <Flex gap={2}>
+                        {/* Show approve and reject buttons only for pending offers */}
+                        {offer.status === 'PENDING' && (
+                          <>
+                            <Button
+                              size="sm"
+                              colorScheme="green"
+                              onClick={() => confirmAction(offer.id, 'approve')}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              colorScheme="red"
+                              onClick={() => confirmAction(offer.id, 'reject')}
+                            >
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                        {/* Show chat button for all offers except REJECTED and CANCELLED */}
+                        {offer.status !== 'REJECTED' && offer.status !== 'CANCELLED' && (
+                          <Button
+                            size="sm"
+                            colorScheme="blue"
+                            leftIcon={<Icon as={ChatIcon} />}
+                            onClick={() => handleCreateChat(offer)}
+                          >
+                            Chat
+                          </Button>
+                        )}
+                      </Flex>
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          )}
+        </VStack>
 
-      <AlertDialog 
-        isOpen={isOpen} 
-        onClose={onClose}
-        leastDestructiveRef={cancelRef}
-      >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              {actionType === 'approve' ? 'Approve Offer' : 'Reject Offer'}
-            </AlertDialogHeader>
-            <AlertDialogBody>
-              Are you sure you want to {actionType} this offer?
-            </AlertDialogBody>
-            <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose}>Cancel</Button>
-              <Button
-                colorScheme={actionType === 'approve' ? 'green' : 'red'}
-                onClick={() => {
-                  if (actionType === 'approve' && selectedOffer) {
-                    handleApprove(selectedOffer);
-                  } else if (actionType === 'reject' && selectedOffer) {
-                    handleReject(selectedOffer);
-                  }
-                }}
-                ml={3}
-              >
-                {actionType === 'approve' ? 'Approve' : 'Reject'}
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
-    </Container>
+        <AlertDialog 
+          isOpen={isOpen} 
+          onClose={onClose}
+          leastDestructiveRef={cancelRef}
+        >
+          <AlertDialogOverlay>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                {actionType === 'approve' ? 'Approve Offer' : 'Reject Offer'}
+              </AlertDialogHeader>
+              <AlertDialogBody>
+                Are you sure you want to {actionType} this offer?
+              </AlertDialogBody>
+              <AlertDialogFooter>
+                <Button ref={cancelRef} onClick={onClose}>Cancel</Button>
+                <Button
+                  colorScheme={actionType === 'approve' ? 'green' : 'red'}
+                  onClick={() => {
+                    if (actionType === 'approve' && selectedOffer) {
+                      handleApprove(selectedOffer);
+                    } else if (actionType === 'reject' && selectedOffer) {
+                      handleReject(selectedOffer);
+                    }
+                  }}
+                  ml={3}
+                >
+                  {actionType === 'approve' ? 'Approve' : 'Reject'}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogOverlay>
+        </AlertDialog>
+      </Container>
+    </ProviderLayout>
   );
 } 

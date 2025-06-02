@@ -76,6 +76,7 @@ const PayPalCreditCardForm = ({
 
       const script = document.createElement('script');
       script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&components=buttons,card-fields&intent=capture`;
+      script.setAttribute('data-partner-attribution-id', 'NYCKIDSPARTYENT_SP_PPCP');
       script.async = true;
       
       script.onload = () => {

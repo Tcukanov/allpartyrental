@@ -41,6 +41,7 @@ import { useSession } from 'next-auth/react';
 import { FaComment, FaEye, FaBuilding, FaIdCard, FaPlus, FaTrash, FaMoneyBillWave, FaPaypal } from 'react-icons/fa';
 import { BsChatDots, BsFillGeoAltFill } from 'react-icons/bs';
 import NextLink from 'next/link';
+import ProviderLayout from '../components/ProviderLayout';
 
 // Mock data for service provider dashboard
 const mockServices = [
@@ -333,6 +334,11 @@ export default function ProviderCabinetPage() {
     if (sessionStatus !== 'authenticated') return;
     
     const checkNewMessages = () => {
+      // Double-check session is still valid before making API call
+      if (sessionStatus !== 'authenticated' || !session?.user?.id) {
+        console.log('Skipping message check - no valid session');
+        return;
+      }
       fetchChats();
       console.log('Checking for new messages...');
     };
@@ -340,8 +346,8 @@ export default function ProviderCabinetPage() {
     // Initial check
     checkNewMessages();
     
-    // Set up interval
-    const interval = setInterval(checkNewMessages, 60000); // Check every minute
+    // Set up interval - check every 5 minutes instead of 1 minute to reduce server load
+    const interval = setInterval(checkNewMessages, 300000); // Check every 5 minutes
     
     return () => clearInterval(interval);
   }, [sessionStatus]);
@@ -1556,6 +1562,7 @@ export default function ProviderCabinetPage() {
   };
 
   return (
+    <ProviderLayout>
       <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
         <Flex justify="space-between" align="center" mb={2}>
@@ -2190,5 +2197,6 @@ export default function ProviderCabinetPage() {
         </SimpleGrid>
       </Box>
     </Container>
+    </ProviderLayout>
   );
 }

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`Provider requests check: Session user ID=${session.user.id}, email=${session.user.email}`);
 
-    // Check if user is a provider
+    // Check if user is a provider - Find by email first, then use that user's ID
     const user = await prisma.user.findUnique({
       where: { email: session.user.email as string },
       select: { id: true, role: true, provider: true }
@@ -47,28 +47,21 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
 
-    // Build the where clause for offers - use session.user.id to maintain consistency
+    // Build the where clause for offers - use the actual user.id from database
     const where: any = {
-      providerId: session.user.id
+      providerId: user.id  // Use user.id instead of session.user.id
     };
 
     if (status) {
       where.status = status;
     }
 
-    console.log(`Looking for offers with provider ID: ${session.user.id}`);
+    console.log(`Looking for offers with provider ID: ${user.id} (was session ID: ${session.user.id})`);
     
-    // Debug to check if there are any offers at all for this user regardless of providerId
-    const allUserOffers = await prisma.offer.findMany({
-      where: { 
-        OR: [
-          { providerId: session.user.id },
-          { providerId: user.id }
-        ]
-      },
-      select: { id: true, providerId: true }
-    });
-    console.log(`Found ${allUserOffers.length} total offers for this user:`, allUserOffers);
+    // Check if there's a mismatch between session and database IDs
+    if (session.user.id !== user.id) {
+      console.warn(`ID mismatch detected! Session ID: ${session.user.id}, Database ID: ${user.id}`);
+    }
 
     // Get offers with related data
     const offers = await prisma.offer.findMany({

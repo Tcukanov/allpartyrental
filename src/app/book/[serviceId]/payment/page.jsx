@@ -924,29 +924,58 @@ export default function PaymentPage({ params }) {
                             setIsProcessingPayment(true);
                             
                             try {
-                              // Simulate payment processing with visual feedback
-                              await new Promise(resolve => setTimeout(resolve, 2000));
+                              // Create real booking in database instead of simulating
+                              console.log('Creating real booking...');
                               
+                              const response = await fetch('/api/payments/create', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  serviceId: bookingData.serviceId,
+                                  bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
+                                  hours: bookingData.bookingDetails.duration || 4,
+                                  address: `${bookingData.bookingDetails.address}, ${bookingData.bookingDetails.city} ${bookingData.bookingDetails.zipCode}`,
+                                  comments: bookingData.bookingDetails.specialRequests || '',
+                                  contactPhone: bookingData.bookingDetails.contactPhone,
+                                  guestCount: bookingData.bookingDetails.guestCount,
+                                  paymentMethod: 'direct_booking'
+                                }),
+                              });
+
+                              if (!response.ok) {
+                                throw new Error(`Payment creation failed: ${response.status}`);
+                              }
+
+                              const data = await response.json();
+                              console.log('Payment order created:', data);
+                              
+                              if (!data.success) {
+                                throw new Error(data.error || 'Failed to create booking');
+                              }
+
                               // Clear booking data from sessionStorage
                               sessionStorage.removeItem('pendingBooking');
                               
                               // Show success message
                               toast({
-                                title: 'Payment Successful! 🎉',
+                                title: 'Booking Created Successfully! 🎉',
                                 description: 'Your booking has been submitted to the provider for confirmation.',
                                 status: 'success',
                                 duration: 5000,
                                 isClosable: true,
                               });
 
-                              // Redirect to confirmation page
-                              router.push(`/book/${serviceId}/confirmed?orderId=simulated-order-${Date.now()}`);
+                              // Redirect to confirmation page with the real transaction ID
+                              router.push(`/book/${serviceId}/confirmed?orderId=${data.orderId}&transactionId=${data.transactionId}`);
                               
                             } catch (error) {
+                              console.error('Payment error:', error);
                               setIsProcessingPayment(false);
                               toast({
-                                title: 'Payment Failed',
-                                description: 'Please check your card details and try again.',
+                                title: 'Booking Failed',
+                                description: error.message || 'Please try again or contact support.',
                                 status: 'error',
                                 duration: 5000,
                                 isClosable: true,

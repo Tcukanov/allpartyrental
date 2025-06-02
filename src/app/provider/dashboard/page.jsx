@@ -204,7 +204,7 @@ export default function ProviderDashboard() {
               <HStack spacing={3}>
                 <Button
                   as={Link}
-                  href="/provider/dashboard/services/create"
+                  href="/provider/services/create"
                   leftIcon={<AddIcon />}
                   colorScheme="blue"
                   size="lg"
@@ -213,7 +213,7 @@ export default function ProviderDashboard() {
                 </Button>
                 <Button
                   as={Link}
-                  href="/provider/dashboard/calendar"
+                  href="/provider/calendar"
                   leftIcon={<CalendarIcon />}
                   variant="outline"
                   size="lg"
@@ -365,7 +365,7 @@ export default function ProviderDashboard() {
                       <Heading size="md">Upcoming Events</Heading>
                       <Button
                         as={Link}
-                        href="/provider/dashboard/calendar"
+                        href="/provider/calendar"
                         size="sm"
                         variant="ghost"
                         rightIcon={<CalendarIcon />}
@@ -426,7 +426,7 @@ export default function ProviderDashboard() {
                     <SimpleGrid columns={2} spacing={3}>
                       <Button
                         as={Link}
-                        href="/provider/dashboard/services/create"
+                        href="/provider/services"
                         leftIcon={<AddIcon />}
                         colorScheme="blue"
                         variant="outline"
@@ -441,8 +441,7 @@ export default function ProviderDashboard() {
                       </Button>
                       
                       <Button
-                        as={Link}
-                        href="/provider/dashboard/profile"
+                        isDisabled
                         leftIcon={<EditIcon />}
                         colorScheme="green"
                         variant="outline"
@@ -451,6 +450,7 @@ export default function ProviderDashboard() {
                         py={3}
                         flexDirection="column"
                         spacing={2}
+                        title="Profile page coming soon"
                       >
                         <Icon as={EditIcon} boxSize={4} />
                         <Text fontSize="xs">Edit Profile</Text>
@@ -474,7 +474,7 @@ export default function ProviderDashboard() {
                       
                       <Button
                         as={Link}
-                        href="/provider/dashboard/settings"
+                        href="/provider/dashboard/paypal"
                         leftIcon={<SettingsIcon />}
                         colorScheme="gray"
                         variant="outline"
@@ -485,7 +485,7 @@ export default function ProviderDashboard() {
                         spacing={2}
                       >
                         <Icon as={SettingsIcon} boxSize={4} />
-                        <Text fontSize="xs">Settings</Text>
+                        <Text fontSize="xs">PayPal Settings</Text>
                       </Button>
                     </SimpleGrid>
                   </CardBody>

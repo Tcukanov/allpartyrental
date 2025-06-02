@@ -216,9 +216,20 @@ export default function ClientTransactionsPage() {
     
     // Set up auto-refresh every 30 seconds
     const intervalId = setInterval(() => {
-      console.log('Auto-refreshing transactions...');
-      fetchTransactions();
-    }, 30000); // 30 seconds
+      // Check if session is still valid before making API call
+      const checkSession = async () => {
+        const currentSession = await getSession();
+        if (!currentSession || !currentSession.user?.id) {
+          console.log('Skipping transaction refresh - no valid session');
+          clearInterval(intervalId);
+          return;
+        }
+        console.log('Auto-refreshing transactions...');
+        fetchTransactions();
+      };
+      
+      checkSession();
+    }, 600000); // 10 minutes instead of 30 seconds to reduce server load
     
     // Clean up interval on component unmount
     return () => clearInterval(intervalId);

@@ -194,8 +194,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     console.log('Fetching provider profile...');
     const session = await getServerSession(authOptions);
     
-    if (!session || session.user.role !== "PROVIDER") {
-      console.log('Unauthorized: Session or provider role missing', session);
+    if (!session || !session.user) {
+      console.log('Unauthorized: Session missing', session);
       return NextResponse.json({ 
         success: false, 
         error: { message: "Unauthorized" } 
@@ -203,46 +203,57 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
     
     // Find the real user from the database
-    const user = await getUserBySessionOrEmail(session);
+    let user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: {
+        provider: true,
+        profile: true
+      }
+    });
     
     if (!user) {
-      console.error('User not found in database with ID or email');
+      console.error('User not found in database with ID');
       return NextResponse.json({ 
         success: false, 
         error: { message: "User not found in database. Please log out and log in again." } 
       }, { status: 404 });
     }
-    
-    const userId = user.id; // Use the real user ID from database
-    console.log('Fetching profile for user:', userId);
-    
-    const profile = await prisma.profile.findUnique({
-      where: {
-        userId: userId
-      }
-    });
-    
-    if (!profile) {
-      console.log('No profile found, returning empty profile');
-      return NextResponse.json({ 
-        success: true, 
+
+    // If user has PROVIDER role but no provider record, create one
+    if (user.role === 'PROVIDER' && !user.provider) {
+      console.log('Creating provider record for user:', user.id);
+      const newProvider = await prisma.provider.create({
         data: {
-          userId: userId,
-          avatar: null,
-          phone: null,
-          address: null,
-          website: null,
-          googleBusinessUrl: null,
-          socialLinks: {},
-          isProStatus: false
+          userId: user.id,
+          businessName: user.name || 'Business Name',
+          bio: '',
+          isVerified: false
+        }
+      });
+      
+      // Refetch user with the new provider record
+      user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: {
+          provider: true,
+          profile: true
         }
       });
     }
     
-    console.log('Profile found:', profile);
+    console.log('Fetching profile for user:', user.id);
+    console.log('Profile found:', user.profile);
+    
     return NextResponse.json({ 
       success: true, 
-      data: profile
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      },
+      provider: user.provider,
+      profile: user.profile
     });
   } catch (error: any) {
     console.error("Error fetching profile:", error);

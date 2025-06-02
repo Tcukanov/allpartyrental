@@ -2,8 +2,9 @@
 
 import { useCallback, useState, useEffect } from 'react';
 import SettingsLayout from '@/components/provider/SettingsLayout';
-import { Box, Heading, Text, Divider, Stack } from '@chakra-ui/react';
-import PayPalConnectButton from '@/components/provider/PayPalConnectButton';
+import { Box, Heading, Text, Divider, Stack, Button, Link } from '@chakra-ui/react';
+import NextLink from 'next/link';
+import { FiCreditCard } from 'react-icons/fi';
 
 export default function ProviderSettingsPage() {
   const [activePaymentProvider, setActivePaymentProvider] = useState('paypal');
@@ -27,10 +28,6 @@ export default function ProviderSettingsPage() {
     fetchActivePaymentProvider();
   }, []);
 
-  const handlePaymentSuccess = useCallback(() => {
-    console.log('PayPal onboarding initiated');
-  }, []);
-
   return (
     <SettingsLayout>
       <Box p={5} shadow="md" borderWidth="1px" borderRadius="md">
@@ -41,10 +38,18 @@ export default function ProviderSettingsPage() {
           <Box>
             <Heading size="md" mb={2}>Payment Settings</Heading>
             <Text mb={4}>
-              Connect your PayPal account to receive payments for your services.
+              Manage your PayPal account settings to receive payments for your services.
             </Text>
             
-            <PayPalConnectButton onSuccess={handlePaymentSuccess} />
+            <Link as={NextLink} href="/provider/dashboard/paypal">
+              <Button 
+                leftIcon={<FiCreditCard />} 
+                colorScheme="blue" 
+                size="md"
+              >
+                Manage PayPal Settings
+              </Button>
+            </Link>
           </Box>
         </Stack>
       </Box>
