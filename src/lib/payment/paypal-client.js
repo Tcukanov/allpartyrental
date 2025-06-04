@@ -5,13 +5,14 @@
 
 class PayPalClient {
   constructor() {
-    this.clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
     this.environment = process.env.PAYPAL_MODE || 'sandbox';
     
     // Use the correct environment variable names based on mode
     if (this.environment === 'sandbox') {
+      this.clientId = process.env.PAYPAL_SANDBOX_CLIENT_ID;
       this.clientSecret = process.env.PAYPAL_SANDBOX_CLIENT_SECRET;
     } else {
+      this.clientId = process.env.PAYPAL_LIVE_CLIENT_ID;
       this.clientSecret = process.env.PAYPAL_LIVE_CLIENT_SECRET;
     }
     
@@ -249,6 +250,18 @@ class PayPalClient {
   async createPartnerReferral(sellerData) {
     const token = await this.getAccessToken();
     
+    // For development, completely skip custom URLs to avoid PayPal validation errors
+    // PayPal doesn't accept localhost URLs in partner referrals
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    
+    console.log('🔍 Environment check:', {
+      baseUrl,
+      isDevelopment,
+      nodeEnv: process.env.NODE_ENV,
+      willSkipCustomUrls: isDevelopment
+    });
+    
     const referralData = {
       operations: [{
         operation: "API_INTEGRATION",
@@ -267,14 +280,23 @@ class PayPalClient {
         type: "SHARE_DATA_CONSENT",
         granted: true
       }],
-      partner_config_override: {
-        partner_logo_url: `${process.env.NEXTAUTH_URL}/logo.png`,
-        return_url: sellerData.returnUrl || `${process.env.NEXTAUTH_URL}/provider/dashboard/paypal/callback`,
-        return_url_description: "Return to AllPartyRent Dashboard",
-        action_renewal_url: sellerData.returnUrl || `${process.env.NEXTAUTH_URL}/provider/dashboard/paypal/callback`
-      },
       tracking_id: sellerData.trackingId || `SELLER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     };
+
+    // Only add partner_config_override for production environments
+    // Skip for development to avoid PayPal localhost URL validation errors
+    if (!isDevelopment && baseUrl.startsWith('https://')) {
+      referralData.partner_config_override = {
+        return_url: `${baseUrl}/api/paypal/callback`,
+        return_url_description: "Return to AllPartyRent Dashboard",
+        action_renewal_url: `${baseUrl}/api/paypal/callback`
+      };
+      console.log('🌐 Production environment - using custom callback URLs');
+    } else {
+      // For development, completely skip custom URLs
+      // PayPal will use their default flow and we'll handle completion via manual sync
+      console.log('🔧 Development environment - skipping custom URLs to avoid PayPal validation errors');
+    }
 
     // Add seller information if provided
     if (sellerData.email) {

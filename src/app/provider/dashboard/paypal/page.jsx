@@ -105,6 +105,7 @@ export default function PayPalSettingsPage() {
           setPaypalStatus({
             isConnected: false,
             merchantId: null,
+            email: null,
             onboardingStatus: 'NOT_STARTED',
             canReceivePayments: false,
             issues: []
@@ -113,6 +114,7 @@ export default function PayPalSettingsPage() {
           setPaypalStatus({
             isConnected: !!provider.paypalMerchantId,
             merchantId: provider.paypalMerchantId,
+            email: provider.paypalEmail,
             onboardingStatus: provider.paypalOnboardingStatus || 'NOT_STARTED',
             canReceivePayments: provider.paypalCanReceivePayments || false,
             issues: provider.paypalStatusIssues ? JSON.parse(provider.paypalStatusIssues) : []
@@ -187,6 +189,17 @@ export default function PayPalSettingsPage() {
       }
 
       if (data.success && data.data.onboardingUrl) {
+        // Check if manual sync is required (localhost development)
+        if (data.data.instructions?.requiresManualSync) {
+          toast({
+            title: 'Development Mode Instructions',
+            description: data.data.instructions.message,
+            status: 'info',
+            duration: 10000,
+            isClosable: true,
+          });
+        }
+        
         // Redirect to PayPal onboarding
         window.location.href = data.data.onboardingUrl;
       } else {
@@ -232,6 +245,7 @@ export default function PayPalSettingsPage() {
         ...prev,
         isConnected: false,
         merchantId: null,
+        email: null,
         onboardingStatus: 'NOT_STARTED',
         canReceivePayments: false,
         issues: []
@@ -269,6 +283,8 @@ export default function PayPalSettingsPage() {
         // Update local state with refreshed data
         setPaypalStatus(prev => ({
           ...prev,
+          merchantId: data.data.merchantId,
+          email: data.data.email,
           canReceivePayments: data.data.canReceivePayments,
           onboardingStatus: data.data.onboardingStatus,
           issues: data.data.issues
@@ -351,11 +367,26 @@ export default function PayPalSettingsPage() {
                 </HStack>
 
                 {paypalStatus.isConnected && (
-                  <Box>
-                    <Text fontSize="sm" color="gray.600">
-                      Merchant ID: {paypalStatus.merchantId}
-                    </Text>
-                  </Box>
+                  <VStack spacing={2} align="stretch">
+                    <HStack justify="space-between">
+                      <Text fontSize="sm" color="gray.600" fontWeight="medium">
+                        Merchant ID:
+                      </Text>
+                      <Text fontSize="sm" fontFamily="mono" color="gray.800">
+                        {paypalStatus.merchantId}
+                      </Text>
+                    </HStack>
+                    {paypalStatus.email && (
+                      <HStack justify="space-between">
+                        <Text fontSize="sm" color="gray.600" fontWeight="medium">
+                          PayPal Email:
+                        </Text>
+                        <Text fontSize="sm" color="gray.800">
+                          {paypalStatus.email}
+                        </Text>
+                      </HStack>
+                    )}
+                  </VStack>
                 )}
 
                 {/* Status Issues */}
@@ -373,17 +404,53 @@ export default function PayPalSettingsPage() {
                   </VStack>
                 )}
 
+                {/* Pending Onboarding Instructions */}
+                {!paypalStatus.isConnected && paypalStatus.onboardingStatus === 'PENDING' && (
+                  <Alert status="info">
+                    <AlertIcon />
+                    <Box>
+                      <AlertTitle>Onboarding Completed!</AlertTitle>
+                      <AlertDescription>
+                        You've successfully completed PayPal onboarding. Click "Refresh Status" below to sync your connection and enable payments.
+                      </AlertDescription>
+                    </Box>
+                  </Alert>
+                )}
+
                 {/* Action Buttons */}
                 <HStack spacing={4}>
                   {!paypalStatus.isConnected ? (
-                    <Button
-                      colorScheme="blue"
-                      size="lg"
-                      onClick={onOpen}
-                      isLoading={isLoading}
-                    >
-                      Connect PayPal Account
-                    </Button>
+                    <>
+                      {paypalStatus.onboardingStatus === 'PENDING' ? (
+                        <>
+                          <Button
+                            colorScheme="green"
+                            size="lg"
+                            onClick={handleRefreshStatus}
+                            isLoading={isLoading}
+                            loadingText="Syncing..."
+                          >
+                            Refresh Status
+                          </Button>
+                          <Button
+                            colorScheme="blue"
+                            variant="outline"
+                            onClick={onOpen}
+                          >
+                            Start New Onboarding
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          colorScheme="blue"
+                          size="lg"
+                          onClick={onOpen}
+                          isLoading={isLoading}
+                        >
+                          Connect PayPal Account
+                        </Button>
+                      )}
+                    </>
                   ) : (
                     <>
                       <Button

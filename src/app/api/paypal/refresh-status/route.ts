@@ -2,168 +2,138 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth-options";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
+import { PayPalClient } from "@/lib/payment/paypal-client";
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session || session.user?.role !== 'PROVIDER') {
+    if (!session?.user || session.user.role !== 'PROVIDER') {
       return NextResponse.json({ 
-        success: false, 
-        error: { message: "Unauthorized" } 
+        error: 'Unauthorized' 
       }, { status: 401 });
     }
 
-    // Find the provider record
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { provider: true }
+    // Get provider record
+    const provider = await prisma.provider.findUnique({
+      where: { userId: session.user.id }
     });
 
-    if (!user?.provider) {
+    if (!provider) {
       return NextResponse.json({ 
-        success: false, 
-        error: { message: "Provider record not found" } 
+        error: 'Provider record not found' 
       }, { status: 404 });
     }
 
-    const provider = user.provider;
+    const paypalClient = new PayPalClient();
+    let updateData: any = {};
+    let statusMessage = 'PayPal status refreshed';
 
-    // If no PayPal merchant ID, can't refresh status
-    if (!provider.paypalMerchantId) {
-      return NextResponse.json({ 
-        success: false, 
-        error: { message: "PayPal account not connected" } 
-      }, { status: 400 });
-    }
-
-    try {
-      // Get PayPal access token
-      const clientId = process.env.PAYPAL_CLIENT_ID!;
-      const clientSecret = process.env.PAYPAL_CLIENT_SECRET!;
-      const baseURL = process.env.PAYPAL_ENVIRONMENT === 'production' 
-        ? 'https://api.paypal.com' 
-        : 'https://api.sandbox.paypal.com';
-
-      // Get access token
-      const tokenResponse = await fetch(`${baseURL}/v1/oauth2/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
-        },
-        body: 'grant_type=client_credentials'
-      });
-
-      if (!tokenResponse.ok) {
-        throw new Error('Failed to get PayPal access token');
-      }
-
-      const tokenData = await tokenResponse.json();
-      const accessToken = tokenData.access_token;
-
-      // Check merchant status
-      const merchantResponse = await fetch(`${baseURL}/v1/customer/partners/${clientId}/merchant-integrations/${provider.paypalMerchantId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-
-      if (!merchantResponse.ok) {
-        console.error('Failed to fetch merchant status:', merchantResponse.status, await merchantResponse.text());
-        throw new Error('Failed to fetch merchant status from PayPal');
-      }
-
-      const merchantData = await merchantResponse.json();
-      console.log('PayPal merchant status:', merchantData);
-
-      // Check if merchant can receive payments
-      const canReceivePayments = merchantData.payments_receivable || false;
-      const onboardingStatus = merchantData.primary_email_confirmed ? 'COMPLETED' : 'PENDING';
-      const issues = [];
-
-      // Check for common issues
-      if (!merchantData.primary_email_confirmed) {
-        issues.push({ 
-          message: "Email address not confirmed. Please check your PayPal account and confirm your email." 
-        });
-      }
-
-      if (!merchantData.legal_name) {
-        issues.push({ 
-          message: "Business information incomplete. Please complete your PayPal business profile." 
-        });
-      }
-
-      // Update provider record with latest status
-      const updatedProvider = await prisma.provider.update({
-        where: { id: provider.id },
-        data: {
-          paypalCanReceivePayments: canReceivePayments,
-          paypalOnboardingStatus: onboardingStatus,
-          paypalStatusIssues: JSON.stringify(issues)
-        }
-      });
-
-      return NextResponse.json({ 
-        success: true, 
-        data: {
-          canReceivePayments,
-          onboardingStatus,
-          issues,
-          merchantData: {
+    // If we have a merchant ID, verify status with PayPal
+    if (provider.paypalMerchantId) {
+      try {
+        const statusCheck = await paypalClient.checkSellerStatus(provider.paypalMerchantId);
+        
+        updateData = {
+          paypalCanReceivePayments: statusCheck.canReceivePayments,
+          paypalStatusIssues: statusCheck.issues.length > 0 ? JSON.stringify(statusCheck.issues) : null,
+          paypalOnboardingStatus: statusCheck.canReceivePayments ? 'COMPLETED' : 'PENDING'
+        };
+        
+        statusMessage = statusCheck.canReceivePayments 
+          ? 'PayPal account verified and ready to receive payments'
+          : 'PayPal account found but has issues preventing payments';
+          
+      } catch (error) {
+        console.error('Failed to check PayPal status:', error);
+        
+        return NextResponse.json({
+          success: false,
+          error: 'Unable to verify PayPal status. Please try again later or contact support.',
+          data: {
             merchantId: provider.paypalMerchantId,
-            emailConfirmed: merchantData.primary_email_confirmed,
-            legalName: merchantData.legal_name,
-            paymentsReceivable: merchantData.payments_receivable
-          }
-        }
-      });
-
-    } catch (paypalError: any) {
-      console.error('PayPal API error:', paypalError);
-      
-      // If we can't reach PayPal, assume sandbox account is ready
-      if (provider.paypalMerchantId?.includes('SANDBOX')) {
-        const updatedProvider = await prisma.provider.update({
-          where: { id: provider.id },
-          data: {
-            paypalCanReceivePayments: true,
-            paypalOnboardingStatus: 'COMPLETED',
-            paypalStatusIssues: JSON.stringify([])
-          }
-        });
-
-        return NextResponse.json({ 
-          success: true, 
-          data: {
-            canReceivePayments: true,
-            onboardingStatus: 'COMPLETED',
-            issues: [],
-            merchantData: {
-              merchantId: provider.paypalMerchantId,
-              emailConfirmed: true,
-              legalName: 'Sandbox Account',
-              paymentsReceivable: true
-            },
-            note: 'Sandbox account enabled for testing'
+            email: provider.paypalEmail,
+            canReceivePayments: provider.paypalCanReceivePayments || false,
+            onboardingStatus: provider.paypalOnboardingStatus || 'UNKNOWN',
+            issues: ['Unable to verify status with PayPal API']
           }
         });
       }
-
-      throw paypalError;
+    } 
+    // For development: Allow manual connection to known sandbox account
+    else if (process.env.NODE_ENV === 'development') {
+      // Check if we can connect to the known sandbox merchant ID
+      const knownSandboxMerchantId = 'SANDBOX-BUS-27378152';
+      const knownSandboxEmail = 'sb-rvbjg42194005@business.example.com';
+      
+      try {
+        console.log('Development mode: Attempting to connect to known sandbox account...');
+        const statusCheck = await paypalClient.checkSellerStatus(knownSandboxMerchantId);
+        
+        // If successful, connect to this account
+        updateData = {
+          paypalMerchantId: knownSandboxMerchantId,
+          paypalEmail: knownSandboxEmail,
+          paypalCanReceivePayments: statusCheck.canReceivePayments,
+          paypalStatusIssues: statusCheck.issues.length > 0 ? JSON.stringify(statusCheck.issues) : null,
+          paypalOnboardingStatus: 'COMPLETED'
+        };
+        
+        statusMessage = 'Connected to development sandbox account';
+        
+      } catch (error) {
+        console.log('Could not connect to known sandbox account:', error.message);
+        
+        return NextResponse.json({
+          success: false,
+          error: 'No PayPal connection found. Please complete PayPal onboarding or contact support for development environment setup.',
+          data: {
+            merchantId: null,
+            email: null,
+            canReceivePayments: false,
+            onboardingStatus: 'NOT_STARTED',
+            issues: ['PayPal onboarding required']
+          }
+        });
+      }
+    }
+    // Production: Require proper onboarding
+    else {
+      return NextResponse.json({
+        success: false,
+        error: 'No PayPal merchant ID found. Please complete PayPal onboarding first.',
+        data: {
+          merchantId: null,
+          email: null,
+          canReceivePayments: false,
+          onboardingStatus: 'NOT_STARTED',
+          issues: []
+        }
+      });
     }
 
-  } catch (error: any) {
+    // Update provider with refreshed status
+    await prisma.provider.update({
+      where: { userId: session.user.id },
+      data: updateData
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: statusMessage,
+      data: {
+        merchantId: updateData.paypalMerchantId || provider.paypalMerchantId,
+        email: updateData.paypalEmail || provider.paypalEmail,
+        canReceivePayments: updateData.paypalCanReceivePayments,
+        onboardingStatus: updateData.paypalOnboardingStatus,
+        issues: updateData.paypalStatusIssues ? JSON.parse(updateData.paypalStatusIssues) : []
+      }
+    });
+
+  } catch (error) {
     console.error('Error refreshing PayPal status:', error);
     return NextResponse.json({ 
-      success: false, 
-      error: { 
-        message: "Failed to refresh PayPal status",
-        details: error.message
-      } 
+      error: 'Failed to refresh PayPal status' 
     }, { status: 500 });
   }
 } 

@@ -87,6 +87,12 @@ const ProviderLayout = ({ children }) => {
       description: 'Client booking requests'
     },
     {
+      label: 'Transactions',
+      href: '/provider/dashboard/payments',
+      icon: FiDollarSign,
+      description: 'Payment history & earnings'
+    },
+    {
       label: 'Calendar',
       href: '/provider/calendar',
       icon: FiCalendar,

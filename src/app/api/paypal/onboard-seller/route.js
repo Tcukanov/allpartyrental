@@ -28,14 +28,22 @@ export async function POST(req) {
 
     const paypalClient = new PayPalClient();
     
+    // Check if we're in localhost environment
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+    
     // Create PayPal partner referral
     const sellerData = {
       email: email,
       firstName: firstName,
       lastName: lastName,
-      returnUrl: `${process.env.NEXTAUTH_URL}/provider/dashboard/paypal/callback`,
       trackingId: `PROVIDER-${session.user.id}-${Date.now()}`
     };
+
+    // Only add return URL for non-localhost environments
+    if (!isLocalhost) {
+      sellerData.returnUrl = `${baseUrl}/api/paypal/callback`;
+    }
 
     const referral = await paypalClient.createPartnerReferral(sellerData);
 
@@ -56,14 +64,24 @@ export async function POST(req) {
       throw new Error('No action URL received from PayPal');
     }
 
-    return NextResponse.json({
+    // For localhost development, provide additional instructions
+    const response = {
       success: true,
       data: {
         onboardingUrl: actionUrl,
         referralId: referral.partner_referral_id,
         trackingId: sellerData.trackingId
       }
-    });
+    };
+
+    if (isLocalhost) {
+      response.data.instructions = {
+        message: "For localhost development: Complete the PayPal onboarding process. After completion, return to the PayPal settings page and click 'Refresh Status' to sync your connection.",
+        requiresManualSync: true
+      };
+    }
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('PayPal seller onboarding error:', error);

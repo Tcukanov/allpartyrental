@@ -140,22 +140,52 @@ export async function POST(request: Request) {
 
     const data = await request.json();
     
+    // Extract filterValues and addons from the data
+    const { filterValues, addons, ...serviceData } = data;
+    
+    // Convert empty cityId to null to match existing data pattern
+    if (serviceData.cityId === '' || !serviceData.cityId) {
+      serviceData.cityId = null;
+    }
+    
+    // Prepare metadata if filterValues exist
+    let metadata = null;
+    if (filterValues && Object.keys(filterValues).length > 0) {
+      metadata = JSON.stringify({ filterValues });
+    }
+    
+    // Prepare addons for nested creation
+    const addonData = addons && addons.length > 0 ? {
+      addons: {
+        create: addons.map((addon: any) => ({
+          title: addon.title,
+          description: addon.description || null,
+          price: parseFloat(addon.price),
+          thumbnail: addon.thumbnail || null,
+        }))
+      }
+    } : {};
+    
     const service = await prisma.service.create({
       data: {
-        ...data,
-        providerId: session.user.id
+        ...serviceData,
+        metadata, // Store filterValues in metadata as JSON
+        providerId: session.user.id,
+        ...addonData // Include addons if any
       },
       include: {
+        provider: true,
         category: true,
-        city: true
+        city: true,
+        addons: true,
       }
     });
 
-    return NextResponse.json(service);
+    return NextResponse.json({ success: true, data: service });
   } catch (error) {
     console.error('Error creating service:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to create service' },
       { status: 500 }
     );
   }
