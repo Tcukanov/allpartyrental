@@ -373,9 +373,13 @@ class PayPalClientFixed {
    * Get merchant status
    */
   async getMerchantStatus(merchantId) {
+    console.log('🔍 getMerchantStatus called with merchantId:', merchantId);
     const token = await this.getAccessToken();
     
-    const response = await fetch(`${this.baseURL}/v1/customer/partners/${merchantId}`, {
+    const url = `${this.baseURL}/v1/customer/partners/${merchantId}`;
+    console.log('🔍 Making merchant status request to:', url);
+    
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -384,17 +388,32 @@ class PayPalClientFixed {
       }
     });
 
+    console.log('🔍 Merchant status response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
     if (!response.ok) {
-      throw new Error(`Failed to get merchant status: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ Merchant status check failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText
+      });
+      throw new Error(`Failed to get merchant status: ${response.status} - ${errorText}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log('✅ Merchant status retrieved:', result);
+    return result;
   }
 
   /**
    * Check seller status and return validation results
    */
   async checkSellerStatus(merchantId) {
+    console.log('🔍 checkSellerStatus called with merchantId:', merchantId);
     try {
       const status = await this.getMerchantStatus(merchantId);
       
@@ -421,12 +440,24 @@ class PayPalClientFixed {
         });
       }
       
+      console.log('✅ Seller status check completed:', {
+        canReceivePayments: issues.length === 0,
+        issuesCount: issues.length,
+        issues: issues.map(i => i.type)
+      });
+      
       return {
         canReceivePayments: issues.length === 0,
         issues,
         status
       };
     } catch (error) {
+      console.error('❌ checkSellerStatus error:', {
+        message: error.message,
+        stack: error.stack,
+        merchantId
+      });
+      
       return {
         canReceivePayments: false,
         issues: [{
