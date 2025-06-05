@@ -48,68 +48,70 @@ export default function ProviderServicesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { isOpen, onOpen, onClose } = useDisclosure();
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
+  const [paypalStatus, setPaypalStatus] = useState<{
+    isConnected: boolean;
+    canReceivePayments: boolean;
+    merchantId?: string;
+  } | null>(null);
 
-  // Check if user is authenticated and a provider
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-    } else if (status === 'authenticated') {
-      if (session?.user?.role !== 'PROVIDER') {
-        router.push('/');
-        toast({
-          title: 'Access Denied',
-          description: 'Only service providers can access this page',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-      } else {
-        fetchServices();
-      }
+    if (status === 'loading') return;
+
+    if (!session || session.user.role !== 'PROVIDER') {
+      router.push('/');
+      return;
     }
-  }, [session, status, router, toast]);
+
+    fetchServices();
+    fetchPaypalStatus();
+  }, [session, status, router]);
 
   const fetchServices = async () => {
     try {
-      setLoading(true);
       const response = await fetch('/api/provider/services');
+      const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
-      
-      const responseData = await response.json();
-      
-      // Handle both response formats
-      let servicesData;
-      if (responseData.success && Array.isArray(responseData.data)) {
-        // New format
-        servicesData = responseData.data;
-      } else if (Array.isArray(responseData)) {
-        // Old format
-        servicesData = responseData;
+      if (data.success) {
+        setServices(data.data);
       } else {
-        throw new Error('Invalid response format');
+        throw new Error(data.error?.message || 'Failed to fetch services');
       }
-      
-      setServices(servicesData || []);
     } catch (err) {
       console.error('Error fetching services:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       toast({
         title: 'Error',
-        description: 'Failed to load services',
+        description: err instanceof Error ? err.message : 'Failed to load services',
         status: 'error',
         duration: 3000,
         isClosable: true,
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPaypalStatus = async () => {
+    try {
+      const response = await fetch('/api/provider/profile');
+      if (response.ok) {
+        const data = await response.json();
+        const provider = data.provider;
+        
+        if (provider) {
+          setPaypalStatus({
+            isConnected: !!provider.paypalMerchantId,
+            canReceivePayments: provider.paypalCanReceivePayments || false,
+            merchantId: provider.paypalMerchantId
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching PayPal status:', error);
     }
   };
 
@@ -211,9 +213,30 @@ export default function ProviderServicesPage() {
           </Text>
         </Box>
 
-        {error && (
-          <Box mb={6} p={4} bg="red.100" color="red.800" borderRadius="md">
-            <Text>{error}</Text>
+        {/* PayPal Connection Warning */}
+        {paypalStatus && !paypalStatus.canReceivePayments && (
+          <Box mb={6} p={4} bg="orange.50" borderColor="orange.200" borderWidth="1px" borderRadius="md">
+            <Flex align="center" justify="space-between" direction={{ base: 'column', md: 'row' }} gap={4}>
+              <Box>
+                <Heading size="sm" color="orange.800" mb={1}>
+                  PayPal Connection Required
+                </Heading>
+                <Text color="orange.700" fontSize="sm">
+                  {paypalStatus.isConnected
+                    ? 'Your PayPal account is connected but payments are not enabled. Complete the setup to activate services.'
+                    : 'Connect your PayPal account to create and activate services. This ensures you can receive payments from customers.'
+                  }
+                </Text>
+              </Box>
+              <Button
+                colorScheme="orange"
+                size="sm"
+                onClick={() => router.push('/provider/dashboard/paypal')}
+                flexShrink={0}
+              >
+                {paypalStatus.isConnected ? 'Complete Setup' : 'Connect PayPal'}
+              </Button>
+            </Flex>
           </Box>
         )}
 

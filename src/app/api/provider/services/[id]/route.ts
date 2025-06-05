@@ -124,6 +124,57 @@ export async function PUT(
 
     const requestData = await request.json();
     
+    // PAYPAL CONNECTION REQUIREMENT: Check if trying to set status to ACTIVE
+    if (requestData.status === 'ACTIVE') {
+      console.log('📊 Provider attempting to activate service - checking PayPal connection');
+      
+      // Get provider record to check PayPal status
+      const provider = await prisma.provider.findUnique({
+        where: { userId: session.user.id },
+        select: {
+          id: true,
+          paypalCanReceivePayments: true,
+          paypalMerchantId: true,
+          paypalOnboardingStatus: true
+        }
+      });
+
+      if (!provider) {
+        return NextResponse.json({
+          success: false,
+          error: {
+            code: 'PROVIDER_NOT_FOUND',
+            message: 'Provider record not found'
+          }
+        }, { status: 400 });
+      }
+
+      console.log('📊 PayPal connection status for service activation:', {
+        providerId: provider.id,
+        paypalCanReceivePayments: provider.paypalCanReceivePayments,
+        paypalMerchantId: provider.paypalMerchantId,
+        paypalOnboardingStatus: provider.paypalOnboardingStatus
+      });
+
+      if (!provider.paypalCanReceivePayments || !provider.paypalMerchantId) {
+        console.log('❌ Provider cannot activate service - PayPal not connected');
+        return NextResponse.json({
+          success: false,
+          error: {
+            code: 'PAYPAL_CONNECTION_REQUIRED',
+            message: 'PayPal connection required to activate services',
+            details: 'You must connect your PayPal account before activating services. This ensures you can receive payments from customers.',
+            action: {
+              text: 'Connect PayPal Account',
+              url: '/provider/dashboard/paypal'
+            }
+          }
+        }, { status: 400 });
+      }
+
+      console.log('✅ Provider PayPal connection verified - proceeding with service activation');
+    }
+    
     // Prepare metadata with filterValues if they exist
     let metadata = null;
     if (requestData.filterValues) {

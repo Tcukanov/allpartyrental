@@ -35,8 +35,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import ProviderLayout from '../../components/ProviderLayout';
 
 export default function PayPalSettingsPage() {
-  console.log('🏁 PayPal Settings Page Component Loaded');
-  
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,19 +48,6 @@ export default function PayPalSettingsPage() {
     lastName: '',
     email: ''
   });
-
-  // Test function to verify button clicking works
-  const testButtonClick = () => {
-    console.log('🧪 Test button was clicked - JS is working!');
-    console.log('📊 Current paypalStatus:', paypalStatus);
-    console.log('📊 Button rendering conditions:', {
-      isConnected: paypalStatus?.isConnected,
-      onboardingStatus: paypalStatus?.onboardingStatus,
-      canReceivePayments: paypalStatus?.canReceivePayments,
-      merchantId: paypalStatus?.merchantId
-    });
-    alert('Button click test successful!');
-  };
 
   // Check for callback status
   useEffect(() => {
@@ -468,14 +453,6 @@ export default function PayPalSettingsPage() {
 
                 {/* Action Buttons */}
                 <HStack spacing={4}>
-                  {/* TEMPORARY TEST BUTTONS */}
-                  <Button colorScheme="purple" onClick={testButtonClick}>
-                    🧪 Test Click
-                  </Button>
-                  <Button colorScheme="orange" onClick={handleRefreshStatus}>
-                    🧪 Direct Refresh Test
-                  </Button>
-                  
                   {!paypalStatus.isConnected ? (
                     <>
                       {paypalStatus.onboardingStatus === 'PENDING' ? (

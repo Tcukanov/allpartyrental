@@ -57,6 +57,7 @@ async function cleanDatabase() {
   await prisma.partyService.deleteMany();
   await prisma.party.deleteMany();
   await prisma.service.deleteMany();
+  await prisma.$executeRaw`DELETE FROM "ProviderCity"`; // Delete ProviderCity before Provider and City
   await prisma.provider.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.advertisement.deleteMany();

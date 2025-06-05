@@ -140,14 +140,38 @@ export async function GET() {
           businessName: session.user.name || 'Business Name',
           bio: `Professional services provider`,
           isVerified: false,
-          paypalCanReceivePayments: true,  // Enable payments for auto-created providers
-          paypalMerchantId: `auto-merchant-${session.user.id}`,  // Temporary merchant ID
-          paypalEmail: session.user.email || 'temp@example.com',
-          paypalOnboardingStatus: 'COMPLETED',  // Set as completed for development
+          paypalCanReceivePayments: false,  // Start with payments disabled
+          paypalOnboardingStatus: 'NOT_STARTED',  // Start with onboarding not started
           paypalEnvironment: 'sandbox'
         }
       });
     }
+
+    // PAYPAL CONNECTION REQUIREMENT: Check if provider can receive payments
+    console.log('📊 Checking PayPal connection status:', {
+      providerId: provider.id,
+      paypalCanReceivePayments: provider.paypalCanReceivePayments,
+      paypalMerchantId: provider.paypalMerchantId,
+      paypalOnboardingStatus: provider.paypalOnboardingStatus
+    });
+
+    if (!provider.paypalCanReceivePayments || !provider.paypalMerchantId) {
+      console.log('❌ Provider cannot create services - PayPal not connected');
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: 'PAYPAL_CONNECTION_REQUIRED',
+          message: 'PayPal connection required to create services',
+          details: 'You must connect your PayPal account before creating services. This ensures you can receive payments from customers.',
+          action: {
+            text: 'Connect PayPal Account',
+            url: '/provider/dashboard/paypal'
+          }
+        }
+      }, { status: 400 });
+    }
+
+    console.log('✅ Provider PayPal connection verified - proceeding with service creation');
 
     const services = await prisma.service.findMany({
       where: {
@@ -222,15 +246,39 @@ export async function POST(request: Request) {
           businessName: session.user.name || 'Business Name',
           bio: `Professional services provider`,
           isVerified: false,
-          paypalCanReceivePayments: true,  // Enable payments for auto-created providers
-          paypalMerchantId: `auto-merchant-${session.user.id}`,  // Temporary merchant ID
-          paypalEmail: session.user.email || 'temp@example.com',
-          paypalOnboardingStatus: 'COMPLETED',  // Set as completed for development
+          paypalCanReceivePayments: false,  // Start with payments disabled
+          paypalOnboardingStatus: 'NOT_STARTED',  // Start with onboarding not started
           paypalEnvironment: 'sandbox'
         }
       });
     }
-    
+
+    // PAYPAL CONNECTION REQUIREMENT: Check if provider can receive payments
+    console.log('📊 Checking PayPal connection status:', {
+      providerId: provider.id,
+      paypalCanReceivePayments: provider.paypalCanReceivePayments,
+      paypalMerchantId: provider.paypalMerchantId,
+      paypalOnboardingStatus: provider.paypalOnboardingStatus
+    });
+
+    if (!provider.paypalCanReceivePayments || !provider.paypalMerchantId) {
+      console.log('❌ Provider cannot create services - PayPal not connected');
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: 'PAYPAL_CONNECTION_REQUIRED',
+          message: 'PayPal connection required to create services',
+          details: 'You must connect your PayPal account before creating services. This ensures you can receive payments from customers.',
+          action: {
+            text: 'Connect PayPal Account',
+            url: '/provider/dashboard/paypal'
+          }
+        }
+      }, { status: 400 });
+    }
+
+    console.log('✅ Provider PayPal connection verified - proceeding with service creation');
+
     const providerId = provider.id;  // Use Provider ID, not User ID
     const data = await request.json();
     

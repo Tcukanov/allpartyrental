@@ -450,7 +450,7 @@ export default function CreateServicePage() {
       };
       
       // Submit the data
-      const response = await fetch('/api/services', {
+      const response = await fetch('/api/provider/services', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -461,7 +461,29 @@ export default function CreateServicePage() {
       const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create service');
+        // Handle PayPal connection requirement specifically
+        if (result.error?.code === 'PAYPAL_CONNECTION_REQUIRED') {
+          toast({
+            title: 'PayPal Connection Required',
+            description: result.error.details,
+            status: 'warning',
+            duration: 8000,
+            isClosable: true,
+            action: (
+              <Button
+                size="sm"
+                colorScheme="blue"
+                ml={3}
+                onClick={() => router.push('/provider/dashboard/paypal')}
+              >
+                Connect PayPal
+              </Button>
+            )
+          });
+          return;
+        }
+        
+        throw new Error(result.error?.message || result.error || 'Failed to create service');
       }
       
       // Show success message
