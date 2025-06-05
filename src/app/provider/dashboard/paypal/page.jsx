@@ -54,6 +54,13 @@ export default function PayPalSettingsPage() {
   // Test function to verify button clicking works
   const testButtonClick = () => {
     console.log('🧪 Test button was clicked - JS is working!');
+    console.log('📊 Current paypalStatus:', paypalStatus);
+    console.log('📊 Button rendering conditions:', {
+      isConnected: paypalStatus?.isConnected,
+      onboardingStatus: paypalStatus?.onboardingStatus,
+      canReceivePayments: paypalStatus?.canReceivePayments,
+      merchantId: paypalStatus?.merchantId
+    });
     alert('Button click test successful!');
   };
 
@@ -461,9 +468,12 @@ export default function PayPalSettingsPage() {
 
                 {/* Action Buttons */}
                 <HStack spacing={4}>
-                  {/* TEMPORARY TEST BUTTON */}
+                  {/* TEMPORARY TEST BUTTONS */}
                   <Button colorScheme="purple" onClick={testButtonClick}>
                     🧪 Test Click
+                  </Button>
+                  <Button colorScheme="orange" onClick={handleRefreshStatus}>
+                    🧪 Direct Refresh Test
                   </Button>
                   
                   {!paypalStatus.isConnected ? (
