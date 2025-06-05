@@ -35,6 +35,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import ProviderLayout from '../../components/ProviderLayout';
 
 export default function PayPalSettingsPage() {
+  console.log('🏁 PayPal Settings Page Component Loaded');
+  
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,6 +50,12 @@ export default function PayPalSettingsPage() {
     lastName: '',
     email: ''
   });
+
+  // Test function to verify button clicking works
+  const testButtonClick = () => {
+    console.log('🧪 Test button was clicked - JS is working!');
+    alert('Button click test successful!');
+  };
 
   // Check for callback status
   useEffect(() => {
@@ -263,9 +271,12 @@ export default function PayPalSettingsPage() {
   };
 
   const handleRefreshStatus = async () => {
+    console.log('🔄 Refresh Status button clicked');
     setIsLoading(true);
     
     try {
+      console.log('📡 Making API request to /api/paypal/refresh-status');
+      
       const response = await fetch('/api/paypal/refresh-status', {
         method: 'POST',
         headers: {
@@ -273,9 +284,17 @@ export default function PayPalSettingsPage() {
         },
       });
 
+      console.log('📡 API response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
       const data = await response.json();
+      console.log('📡 API response data:', data);
 
       if (data.success) {
+        console.log('✅ Refresh successful, showing toast');
         toast({
           title: 'Status Updated',
           description: data.message,
@@ -284,14 +303,16 @@ export default function PayPalSettingsPage() {
           isClosable: true,
         });
         
+        console.log('🔄 Reloading page');
         // Refresh the page to show updated status
         window.location.reload();
       } else {
+        console.log('❌ Refresh failed:', data.error);
         throw new Error(data.error?.message || 'Failed to refresh status');
       }
       
     } catch (error) {
-      console.error('Refresh status error:', error);
+      console.error('💥 Refresh status error:', error);
       toast({
         title: 'Refresh Failed',
         description: error.message || 'Failed to refresh PayPal status.',
@@ -300,6 +321,7 @@ export default function PayPalSettingsPage() {
         isClosable: true,
       });
     } finally {
+      console.log('🏁 Setting loading to false');
       setIsLoading(false);
     }
   };
@@ -439,6 +461,11 @@ export default function PayPalSettingsPage() {
 
                 {/* Action Buttons */}
                 <HStack spacing={4}>
+                  {/* TEMPORARY TEST BUTTON */}
+                  <Button colorScheme="purple" onClick={testButtonClick}>
+                    🧪 Test Click
+                  </Button>
+                  
                   {!paypalStatus.isConnected ? (
                     <>
                       {paypalStatus.onboardingStatus === 'PENDING' ? (
