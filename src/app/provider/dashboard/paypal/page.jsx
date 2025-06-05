@@ -275,41 +275,19 @@ export default function PayPalSettingsPage() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Failed to refresh status');
-      }
-
       if (data.success) {
-        // Update local state with refreshed data
-        setPaypalStatus(prev => ({
-          ...prev,
-          merchantId: data.data.merchantId,
-          email: data.data.email,
-          canReceivePayments: data.data.canReceivePayments,
-          onboardingStatus: data.data.onboardingStatus,
-          issues: data.data.issues
-        }));
-
-        if (data.data.canReceivePayments) {
-          toast({
-            title: 'Payment Processing Enabled!',
-            description: 'Your PayPal account is now ready to receive payments.',
-            status: 'success',
-            duration: 5000,
-            isClosable: true,
-          });
-        } else {
-          toast({
-            title: 'Status Updated',
-            description: 'PayPal status refreshed. Please complete any required actions.',
-            status: 'info',
-            duration: 5000,
-            isClosable: true,
-          });
-        }
-
-        // Refresh the full provider data
-        await fetchProviderData();
+        toast({
+          title: 'Status Updated',
+          description: data.message,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        
+        // Refresh the page to show updated status
+        window.location.reload();
+      } else {
+        throw new Error(data.error?.message || 'Failed to refresh status');
       }
       
     } catch (error) {
@@ -317,6 +295,48 @@ export default function PayPalSettingsPage() {
       toast({
         title: 'Refresh Failed',
         description: error.message || 'Failed to refresh PayPal status.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetConnection = async () => {
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch('/api/paypal/reset-provider', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: 'Connection Reset',
+          description: data.message,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        
+        // Refresh the page to show updated status
+        window.location.reload();
+      } else {
+        throw new Error(data.error || 'Failed to reset connection');
+      }
+      
+    } catch (error) {
+      console.error('Reset connection error:', error);
+      toast({
+        title: 'Reset Failed',
+        description: error.message || 'Failed to reset PayPal connection.',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -472,6 +492,15 @@ export default function PayPalSettingsPage() {
                         onClick={onOpen}
                       >
                         Reconnect Account
+                      </Button>
+                      <Button
+                        colorScheme="red"
+                        variant="outline"
+                        onClick={handleResetConnection}
+                        isLoading={isLoading}
+                        loadingText="Resetting..."
+                      >
+                        Reset Connection
                       </Button>
                     </>
                   )}
