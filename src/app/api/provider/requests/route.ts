@@ -21,7 +21,15 @@ export async function GET(request: NextRequest) {
     // Check if user is a provider - Find by email first, then use that user's ID
     const user = await prisma.user.findUnique({
       where: { email: session.user.email as string },
-      select: { id: true, role: true, provider: true }
+      select: { 
+        id: true, 
+        role: true, 
+        provider: {
+          select: {
+            id: true
+          }
+        }
+      }
     });
 
     if (!user) {
@@ -40,6 +48,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!user.provider) {
+      console.error(`Provider record not found for user: ${user.id}`);
+      return NextResponse.json(
+        { success: false, error: { code: 'NOT_FOUND', message: 'Provider record not found' } },
+        { status: 404 }
+      );
+    }
+
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -47,22 +63,17 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
 
-    // Build the where clause for offers - use the actual user.id from database
+    // Build the where clause for offers - use the Provider ID, not User ID
     const where: any = {
-      providerId: user.id  // Use user.id instead of session.user.id
+      providerId: user.provider.id  // Use provider.id instead of user.id
     };
 
     if (status) {
       where.status = status;
     }
 
-    console.log(`Looking for offers with provider ID: ${user.id} (was session ID: ${session.user.id})`);
+    console.log(`Looking for offers with provider ID: ${user.provider.id} (user ID: ${user.id})`);
     
-    // Check if there's a mismatch between session and database IDs
-    if (session.user.id !== user.id) {
-      console.warn(`ID mismatch detected! Session ID: ${session.user.id}, Database ID: ${user.id}`);
-    }
-
     // Get offers with related data
     const offers = await prisma.offer.findMany({
       where,
