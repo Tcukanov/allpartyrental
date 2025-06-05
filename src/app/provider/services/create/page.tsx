@@ -465,20 +465,10 @@ export default function CreateServicePage() {
         if (result.error?.code === 'PAYPAL_CONNECTION_REQUIRED') {
           toast({
             title: 'PayPal Connection Required',
-            description: result.error.details,
+            description: `${result.error.details} Go to Provider Dashboard > PayPal to connect your account.`,
             status: 'warning',
             duration: 8000,
             isClosable: true,
-            action: (
-              <Button
-                size="sm"
-                colorScheme="blue"
-                ml={3}
-                onClick={() => router.push('/provider/dashboard/paypal')}
-              >
-                Connect PayPal
-              </Button>
-            )
           });
           return;
         }
