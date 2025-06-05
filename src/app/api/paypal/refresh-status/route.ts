@@ -5,21 +5,41 @@ import { prisma } from "@/lib/prisma/client";
 import { PayPalClientFixed } from "@/lib/payment/paypal-client";
 
 export async function POST(request: Request) {
+  console.log('🔄 PayPal refresh status endpoint hit');
+  
   try {
     const session = await getServerSession(authOptions);
     
+    console.log('👤 Session check:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+      userRole: session?.user?.role
+    });
+    
     if (!session?.user || session.user.role !== 'PROVIDER') {
+      console.log('❌ Unauthorized refresh status request');
       return NextResponse.json({ 
         error: 'Unauthorized' 
       }, { status: 401 });
     }
 
+    console.log('🔍 Getting provider record for user:', session.user.id);
+    
     // Get or create provider record
     let provider = await prisma.provider.findUnique({
       where: { userId: session.user.id }
     });
 
+    console.log('👨‍💼 Provider record:', {
+      found: !!provider,
+      providerId: provider?.id,
+      paypalMerchantId: provider?.paypalMerchantId,
+      paypalCanReceivePayments: provider?.paypalCanReceivePayments,
+      paypalOnboardingStatus: provider?.paypalOnboardingStatus
+    });
+
     if (!provider) {
+      console.log('🆕 Creating new provider record');
       // Auto-create provider record if it doesn't exist
       provider = await prisma.provider.create({
         data: {
@@ -27,6 +47,7 @@ export async function POST(request: Request) {
           businessName: session.user.name || 'Business'
         }
       });
+      console.log('✅ Provider record created:', provider.id);
     }
 
     const paypalClient = new PayPalClientFixed();
@@ -38,11 +59,17 @@ export async function POST(request: Request) {
       
       // Check if this is an auto-generated merchant ID (development mode)
       const isDevelopment = process.env.NODE_ENV !== 'production';
-      const isAutoMerchantId = provider.paypalMerchantId?.startsWith('auto-merchant-');
+      const isAutoMerchantId = provider.paypalMerchantId?.startsWith('auto-merchant-') || provider.paypalMerchantId?.startsWith('SANDBOX-DEV-');
+      
+      console.log('🔧 Environment check:', {
+        isDevelopment,
+        isAutoMerchantId,
+        merchantIdFormat: provider.paypalMerchantId?.substring(0, 15) + '...'
+      });
       
       if (isDevelopment && isAutoMerchantId) {
-        // For auto-generated merchant IDs in development, enable payments automatically
         console.log('🔧 Development mode - enabling auto-merchant for payments');
+        // For auto-generated merchant IDs in development, enable payments automatically
         updateData = {
           paypalCanReceivePayments: true,
           paypalOnboardingStatus: 'COMPLETED',
@@ -50,9 +77,16 @@ export async function POST(request: Request) {
         };
         statusMessage = 'Development sandbox account ready - payments enabled!';
       } else {
+        console.log('🔗 Calling PayPal API to check merchant status');
         // Try to verify with real PayPal API
         try {
           const statusCheck = await paypalClient.checkSellerStatus(provider.paypalMerchantId);
+          
+          console.log('📊 PayPal status check result:', {
+            canReceivePayments: statusCheck.canReceivePayments,
+            issuesCount: statusCheck.issues?.length || 0,
+            hasError: !!statusCheck.error
+          });
 
           if (statusCheck.canReceivePayments) {
             updateData = {
@@ -62,6 +96,7 @@ export async function POST(request: Request) {
             };
             statusMessage = 'PayPal connection verified - ready to receive payments!';
           } else {
+            console.log('❌ PayPal account has issues:', statusCheck.issues);
             updateData = {
               paypalCanReceivePayments: false,
               paypalOnboardingStatus: 'ISSUES',
@@ -70,16 +105,35 @@ export async function POST(request: Request) {
             statusMessage = 'PayPal account has issues that prevent receiving payments';
           }
         } catch (error) {
-          console.error('Error checking PayPal merchant status:', error);
-          updateData = {
-            paypalCanReceivePayments: false,
-            paypalOnboardingStatus: 'ERROR',
-            paypalStatusIssues: JSON.stringify([{ 
-              type: 'CONNECTION_ERROR', 
-              message: 'Failed to verify PayPal account status' 
-            }])
-          };
-          statusMessage = 'Failed to verify PayPal account status';
+          console.error('❌ Error checking PayPal merchant status:', {
+            message: error.message,
+            stack: error.stack,
+            merchantId: provider.paypalMerchantId
+          });
+          
+          // For sandbox accounts, if the status check fails, enable payments anyway
+          if (process.env.PAYPAL_MODE === 'sandbox') {
+            console.log('🔧 Sandbox mode - enabling payments despite API error');
+            updateData = {
+              paypalCanReceivePayments: true,
+              paypalOnboardingStatus: 'COMPLETED',
+              paypalStatusIssues: JSON.stringify([{ 
+                type: 'API_CHECK_FAILED_SANDBOX_ENABLED', 
+                message: 'PayPal API check failed but sandbox payments enabled for testing' 
+              }])
+            };
+            statusMessage = 'Sandbox payments enabled for testing (API check failed)';
+          } else {
+            updateData = {
+              paypalCanReceivePayments: false,
+              paypalOnboardingStatus: 'ERROR',
+              paypalStatusIssues: JSON.stringify([{ 
+                type: 'CONNECTION_ERROR', 
+                message: 'Failed to verify PayPal account status' 
+              }])
+            };
+            statusMessage = 'Failed to verify PayPal account status';
+          }
         }
       }
     } else {
@@ -145,12 +199,16 @@ export async function POST(request: Request) {
     }
 
     // Update provider with refreshed status
+    console.log('💾 Updating provider with data:', updateData);
+    
     const updatedProvider = await prisma.provider.update({
       where: { userId: session.user.id },
       data: updateData
     });
 
-    return NextResponse.json({
+    console.log('✅ Provider updated successfully');
+
+    const responseData = {
       success: true,
       message: statusMessage,
       data: {
@@ -160,7 +218,11 @@ export async function POST(request: Request) {
         onboardingStatus: updateData.paypalOnboardingStatus,
         issues: updateData.paypalStatusIssues ? JSON.parse(updateData.paypalStatusIssues) : []
       }
-    });
+    };
+
+    console.log('📤 Sending response:', responseData);
+
+    return NextResponse.json(responseData);
 
   } catch (error) {
     console.error('Error refreshing PayPal status:', error);
