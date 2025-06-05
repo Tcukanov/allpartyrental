@@ -327,17 +327,55 @@ export class PaymentService {
     });
 
     if (!offer) {
-      // Get service to get provider ID
+      // Get service to get provider ID and city
       const service = await this.prisma.service.findUnique({
-        where: { id: serviceId }
+        where: { id: serviceId },
+        include: {
+          provider: true
+        }
       });
 
-      // Create new offer
+      if (!service) {
+        throw new Error('Service not found');
+      }
+
+      // For direct bookings, we need to create a party first
+      const party = await this.prisma.party.create({
+        data: {
+          name: `Direct Booking - ${service.name}`,
+          date: new Date(bookingDate),
+          startTime: new Date(bookingDate).toTimeString().substring(0, 5),
+          duration: hours,
+          guestCount: 1,
+          status: 'PUBLISHED',
+          clientId: clientId,
+          cityId: service.cityId,
+          address: bookingData.address || 'Address to be provided',
+          comments: bookingData.comments || '',
+          contactPhone: bookingData.contactPhone || ''
+        }
+      });
+
+      // Create party service
+      const partyService = await this.prisma.partyService.create({
+        data: {
+          partyId: party.id,
+          serviceId: serviceId,
+          specificOptions: {
+            hours: hours,
+            addons: addons,
+            notes: bookingData.comments || ''
+          }
+        }
+      });
+
+      // Create new offer with required partyServiceId
       offer = await this.prisma.offer.create({
         data: {
           providerId: service.providerId,
           clientId,
           serviceId,
+          partyServiceId: partyService.id,
           price: service.price * hours,
           description: `Booking for ${hours} hours on ${new Date(bookingDate).toLocaleDateString()}`,
           status: 'PENDING'
