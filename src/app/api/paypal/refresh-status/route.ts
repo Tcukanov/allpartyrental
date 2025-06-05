@@ -85,16 +85,26 @@ export async function POST(request: Request) {
     } else {
       // No merchant ID - check if in development mode for sandbox connection
       const isDevelopment = process.env.NODE_ENV !== 'production';
+      const isLocalhost = process.env.NEXTAUTH_URL?.includes('localhost');
       
-      if (isDevelopment) {
+      console.log('🔧 No merchant ID found, checking environment:', {
+        isDevelopment,
+        isLocalhost,
+        nodeEnv: process.env.NODE_ENV,
+        nextAuthUrl: process.env.NEXTAUTH_URL,
+        paypalOnboardingStatus: (provider as any).paypalOnboardingStatus,
+        paypalOnboardingId: (provider as any).paypalOnboardingId
+      });
+      
+      if (isDevelopment || isLocalhost) {
         // Development mode: Check if onboarding was completed and manually connect
-        const knownSandboxMerchantId = 'SANDBOX-BUS-27378152';
-        const knownSandboxEmail = session.user.email || 'sb-rvbjg42194005@business.example.com';
+        const knownSandboxMerchantId = 'SANDBOX-DEV-' + session.user.id;
+        const knownSandboxEmail = session.user.email || 'sandbox@example.com';
         
         console.log('🔧 Development mode - attempting to connect to sandbox account');
         
         // For development, assume successful connection after onboarding
-        if ((provider as any).paypalOnboardingStatus === 'PENDING') {
+        if ((provider as any).paypalOnboardingStatus === 'PENDING' || (provider as any).paypalOnboardingId) {
           updateData = {
             paypalMerchantId: knownSandboxMerchantId,
             paypalEmail: knownSandboxEmail,
@@ -103,18 +113,32 @@ export async function POST(request: Request) {
             paypalStatusIssues: null,
             paypalOnboardingComplete: true
           };
-          statusMessage = `Successfully connected to sandbox PayPal account`;
+          statusMessage = `Successfully connected to sandbox PayPal account (Development Mode)`;
+          
+          console.log('✅ Development sandbox connection established:', updateData);
         } else {
+          console.log('❌ No onboarding record found');
           return NextResponse.json({
             error: { 
-              message: 'No PayPal merchant ID found. Please complete PayPal onboarding first.' 
+              message: 'No PayPal onboarding found. Please start the PayPal connection process first.',
+              debug: {
+                hasOnboardingId: !!(provider as any).paypalOnboardingId,
+                onboardingStatus: (provider as any).paypalOnboardingStatus,
+                suggestion: 'Click "Connect PayPal" to start the onboarding process'
+              }
             }
           }, { status: 400 });
         }
       } else {
+        console.log('❌ Production mode - no merchant ID found');
         return NextResponse.json({
           error: { 
-            message: 'No PayPal merchant ID found. Please complete PayPal onboarding first.' 
+            message: 'No PayPal merchant ID found. Please complete PayPal onboarding first.',
+            debug: {
+              hasOnboardingId: !!(provider as any).paypalOnboardingId,
+              onboardingStatus: (provider as any).paypalOnboardingStatus,
+              suggestion: 'The PayPal callback may not have completed successfully. Try the onboarding process again.'
+            }
           }
         }, { status: 400 });
       }
