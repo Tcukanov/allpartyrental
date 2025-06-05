@@ -155,6 +155,10 @@ export default function SignInPage() {
         }
       }
       
+      // Get user session to check role after successful login
+      const response = await fetch('/api/auth/session');
+      const session = await response.json();
+      
       toast({
         title: 'Success',
         description: 'You have been signed in successfully!',
@@ -163,7 +167,12 @@ export default function SignInPage() {
         isClosable: true,
       });
       
-      router.push(callbackUrl);
+      // Role-based redirect
+      if (session?.user?.role === 'PROVIDER') {
+        router.push('/provider/dashboard');
+      } else {
+        router.push(callbackUrl);
+      }
     } catch (error) {
       console.error('Sign in error:', error);
       toast({

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { PayPalClientFixed } from '@/lib/payment/paypal-client';
 import { authOptions } from '@/lib/auth';
-import { PayPalClient } from '@/lib/payment/paypal-client';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(req) {
@@ -17,7 +17,7 @@ export async function GET(req) {
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
-      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/auth/signin`);
+      return NextResponse.redirect(`https://party-vendors.com/auth/signin`);
     }
 
     console.log('PayPal callback received:', {
@@ -43,7 +43,7 @@ export async function GET(req) {
     // If onboarding was successful, check seller status
     if (permissionsGranted === 'true' && merchantIdInPayPal) {
       try {
-        const paypalClient = new PayPalClient();
+        const paypalClient = new PayPalClientFixed();
         const statusCheck = await paypalClient.checkSellerStatus(merchantIdInPayPal);
         
         // Update status based on seller validation
@@ -61,15 +61,15 @@ export async function GET(req) {
 
     // Redirect back to provider dashboard with status
     const redirectUrl = permissionsGranted === 'true' 
-      ? `${process.env.NEXTAUTH_URL}/provider/dashboard/paypal?status=success`
-      : `${process.env.NEXTAUTH_URL}/provider/dashboard/paypal?status=failed`;
+      ? `https://party-vendors.com/provider/dashboard/paypal?status=success`
+      : `https://party-vendors.com/provider/dashboard/paypal?status=failed`;
 
     return NextResponse.redirect(redirectUrl);
 
   } catch (error) {
     console.error('PayPal callback error:', error);
     return NextResponse.redirect(
-      `${process.env.NEXTAUTH_URL}/provider/dashboard/paypal?status=error&message=${encodeURIComponent(error.message)}`
+      `https://party-vendors.com/provider/dashboard/paypal?status=error&message=${encodeURIComponent(error.message)}`
     );
   }
 } 

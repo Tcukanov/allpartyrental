@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
 // Reserved paths that should not be used as dynamic route parameters
 const RESERVED_PATHS = [
@@ -17,8 +18,41 @@ const RESERVED_PATHS = [
   'assets',
 ];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  
+  // Get the token to check user role
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET 
+  });
+
+  // Handle role-based redirects for authenticated users
+  if (token) {
+    // If provider is trying to access root or non-provider pages, redirect to dashboard
+    if (token.role === 'PROVIDER') {
+      // Allow access to provider routes
+      if (pathname.startsWith('/provider/')) {
+        return NextResponse.next();
+      }
+      
+      // Allow access to API routes, auth routes, and other system routes
+      if (pathname.startsWith('/api/') || 
+          pathname.startsWith('/auth/') || 
+          pathname.startsWith('/_next/')) {
+        return NextResponse.next();
+      }
+      
+      // Redirect providers from root or other pages to their dashboard
+      if (pathname === '/' || 
+          (!pathname.startsWith('/provider/') && 
+           !pathname.startsWith('/api/') && 
+           !pathname.startsWith('/auth/') && 
+           !pathname.startsWith('/_next/'))) {
+        return NextResponse.redirect(new URL('/provider/dashboard', request.url));
+      }
+    }
+  }
   
   // Skip all application routes that start with reserved prefixes
   // These are legitimate application routes, not dynamic routes

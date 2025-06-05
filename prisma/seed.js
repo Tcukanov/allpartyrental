@@ -24,9 +24,13 @@ async function main() {
   console.log('Creating users...');
   const users = await createUsers();
 
+  // Create provider records for provider users
+  console.log('Creating provider records...');
+  const providers = await createProviders(users.providers);
+
   // Create services offered by providers
   console.log('Creating services...');
-  await createServices(users.providers, categories, cities);
+  await createServices(providers, categories, cities);
 
   // Create parties for clients
   console.log('Creating parties...');
@@ -34,11 +38,11 @@ async function main() {
 
   // Link services to parties and create offers
   console.log('Creating party services and offers...');
-  await createPartyServicesAndOffers(parties, users.providers);
+  await createPartyServicesAndOffers(parties, providers);
 
   // Create some completed parties with transactions
   console.log('Creating completed parties with transactions...');
-  await createCompletedParties(users.clients, users.providers, categories, cities);
+  await createCompletedParties(users.clients, providers, categories, cities);
 
   console.log('Seed completed successfully!');
 }
@@ -53,6 +57,7 @@ async function cleanDatabase() {
   await prisma.partyService.deleteMany();
   await prisma.party.deleteMany();
   await prisma.service.deleteMany();
+  await prisma.provider.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.advertisement.deleteMany();
   await prisma.calendar.deleteMany();
@@ -257,6 +262,24 @@ async function createUsers() {
     clients,
     providers,
   };
+}
+
+async function createProviders(providerUsers) {
+  return Promise.all(
+    providerUsers.map(user => 
+      prisma.provider.create({
+        data: {
+          userId: user.id,
+          businessName: user.name,
+          bio: `Professional ${user.name} providing high-quality party services`,
+          isVerified: true,
+          paypalCanReceivePayments: false,
+          paypalOnboardingStatus: 'NOT_STARTED',
+          paypalEnvironment: 'sandbox'
+        }
+      })
+    )
+  );
 }
 
 async function createServices(providers, categories, cities) {
@@ -561,8 +584,16 @@ async function createCompletedParties(clients, providers, categories, cities) {
           offerId: offer.id,
           amount: service.price,
           status: 'COMPLETED',
-          paymentIntentId: `pi_${Math.random().toString(36).substring(2, 15)}`,
-          paymentMethodId: `pm_${Math.random().toString(36).substring(2, 15)}`,
+          paypalOrderId: `ORDER_${Math.random().toString(36).substring(2, 15).toUpperCase()}`,
+          paypalCaptureId: `CAPTURE_${Math.random().toString(36).substring(2, 15).toUpperCase()}`,
+          paypalTransactionId: `TXN_${Math.random().toString(36).substring(2, 15).toUpperCase()}`,
+          paypalPayerId: `PAYER_${Math.random().toString(36).substring(2, 15).toUpperCase()}`,
+          paypalStatus: 'COMPLETED',
+          clientFeePercent: 5.0,
+          providerFeePercent: 95.0,
+          termsAccepted: true,
+          termsAcceptedAt: new Date(),
+          termsType: 'STANDARD'
         },
       });
     }

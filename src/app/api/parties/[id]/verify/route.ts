@@ -128,9 +128,9 @@ export async function POST(
       const services = party.partyServices;
       
       for (const partyService of services) {
-        const providers = await prisma.user.findMany({
+        // Find providers that offer services in this category and city
+        const providers = await prisma.provider.findMany({
           where: {
-            role: 'PROVIDER',
             services: {
               some: {
                 categoryId: partyService.service?.categoryId,
@@ -138,15 +138,24 @@ export async function POST(
               },
             },
           },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
         });
 
+        // Create notifications for providers
         for (const provider of providers) {
           await prisma.notification.create({
             data: {
-              userId: provider.id,
+              userId: provider.user.id,
               type: 'NEW_OFFER',
-              title: 'New Party Request',
-              content: `A new party request has been published that matches your services: ${party.name}`,
+              title: 'Party Verified',
+              content: `Party "${party.name}" has been verified and is now available for offers.`,
             },
           });
         }

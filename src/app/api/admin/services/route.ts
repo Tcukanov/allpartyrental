@@ -63,12 +63,7 @@ export async function GET(request: NextRequest) {
     const services = await prisma.service.findMany({
       where,
       include: {
-        provider: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        provider: true,
         category: {
           select: {
             id: true,
@@ -181,12 +176,7 @@ export async function POST(request: NextRequest) {
         maxRentalHours
       },
       include: {
-        provider: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        provider: true,
         category: {
           select: {
             id: true,

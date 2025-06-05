@@ -48,19 +48,14 @@ export async function GET(
         provider: {
           select: {
             id: true,
-            name: true,
-            email: true,
-            profile: {
+            user: {
               select: {
-                avatar: true,
-                phone: true,
-                website: true,
-                isProStatus: true,
-                googleBusinessUrl: true,
-                googleBusinessRating: true,
-              },
-            },
-          },
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
         },
         category: true,
         city: true,

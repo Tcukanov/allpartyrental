@@ -3,7 +3,7 @@
  * Supports automatic commission splitting between platform and providers
  */
 
-class PayPalClient {
+class PayPalClientFixed {
   constructor() {
     this.environment = process.env.PAYPAL_MODE || 'sandbox';
     
@@ -248,18 +248,17 @@ class PayPalClient {
    * Create partner referral for seller onboarding
    */
   async createPartnerReferral(sellerData) {
+    console.log('🔥 UPDATED PayPal Client - THIS SHOULD APPEAR IN LOGS! 🔥');
     const token = await this.getAccessToken();
     
-    // For development, completely skip custom URLs to avoid PayPal validation errors
-    // PayPal doesn't accept localhost URLs in partner referrals
+    // Use the real domain instead of localhost
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://party-vendors.com';
     const isDevelopment = process.env.NODE_ENV !== 'production';
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     
     console.log('🔍 Environment check:', {
       baseUrl,
       isDevelopment,
-      nodeEnv: process.env.NODE_ENV,
-      willSkipCustomUrls: isDevelopment
+      nodeEnv: process.env.NODE_ENV
     });
     
     const referralData = {
@@ -283,20 +282,13 @@ class PayPalClient {
       tracking_id: sellerData.trackingId || `SELLER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     };
 
-    // Only add partner_config_override for production environments
-    // Skip for development to avoid PayPal localhost URL validation errors
-    if (!isDevelopment && baseUrl.startsWith('https://')) {
-      referralData.partner_config_override = {
-        return_url: `${baseUrl}/api/paypal/callback`,
-        return_url_description: "Return to AllPartyRent Dashboard",
-        action_renewal_url: `${baseUrl}/api/paypal/callback`
-      };
-      console.log('🌐 Production environment - using custom callback URLs');
-    } else {
-      // For development, completely skip custom URLs
-      // PayPal will use their default flow and we'll handle completion via manual sync
-      console.log('🔧 Development environment - skipping custom URLs to avoid PayPal validation errors');
-    }
+    // Always include partner_config_override with the real domain
+    referralData.partner_config_override = {
+      return_url: `${baseUrl}/api/paypal/callback`,
+      return_url_description: "Return to AllPartyRent Dashboard",
+      action_renewal_url: `${baseUrl}/api/paypal/callback`
+    };
+    console.log('🌐 Using real domain callback URLs:', baseUrl);
 
     // Add seller information if provided
     if (sellerData.email) {
@@ -405,4 +397,4 @@ class PayPalClient {
   }
 }
 
-export { PayPalClient }; 
+export { PayPalClientFixed }; 

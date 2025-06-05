@@ -63,10 +63,15 @@ export async function GET() {
             provider: {
               select: {
                 id: true,
-                name: true,
-                profile: {
+                user: {
                   select: {
-                    avatar: true
+                    id: true,
+                    name: true,
+                    profile: {
+                      select: {
+                        avatar: true
+                      }
+                    }
                   }
                 }
               }
@@ -103,7 +108,7 @@ export async function GET() {
           clientId: chat.offer?.clientId,
           providerId: chat.offer?.providerId,
           clientName: chat.offer?.client?.name,
-          providerName: chat.offer?.provider?.name,
+          providerName: chat.offer?.provider?.user?.name,
           messagesCount: chat.messages?.length || 0
         });
       });
@@ -161,10 +166,15 @@ export async function POST(request: Request) {
             provider: {
               select: {
                 id: true,
-                name: true,
-                profile: {
+                user: {
                   select: {
-                    avatar: true
+                    id: true,
+                    name: true,
+                    profile: {
+                      select: {
+                        avatar: true
+                      }
+                    }
                   }
                 }
               }
@@ -200,10 +210,15 @@ export async function POST(request: Request) {
             provider: {
               select: {
                 id: true,
-                name: true,
-                profile: {
+                user: {
                   select: {
-                    avatar: true
+                    id: true,
+                    name: true,
+                    profile: {
+                      select: {
+                        avatar: true
+                      }
+                    }
                   }
                 }
               }

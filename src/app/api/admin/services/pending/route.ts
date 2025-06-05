@@ -34,14 +34,16 @@ export async function GET(request: NextRequest) {
         provider: {
           select: {
             id: true,
-            name: true,
-            email: true,
-            profile: {
+            businessName: true,
+            phone: true,
+            isVerified: true,
+            user: {
               select: {
-                phone: true,
-                avatar: true,
-              },
-            },
+                id: true,
+                name: true,
+                email: true,
+              }
+            }
           },
         },
         category: true,

@@ -72,7 +72,7 @@ export async function POST(
       data: {
         partyId: offer.partyService.partyId,
         offerId: offer.id,
-        amount: offer.price,
+        amount: offer.price.toNumber(),
         status: 'PENDING',
       },
     });

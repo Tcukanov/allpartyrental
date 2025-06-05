@@ -233,27 +233,36 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
             ]
           }
         ]
-      },
-      include: {
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            profile: {
-              select: {
-                address: true,
-                isProStatus: true
-              }
-            }
-          }
-        }
       }
     });
 
-    // Convert Decimal objects to numbers to avoid serialization issues
-    const serializedServices = services.map(service => ({
-      ...service,
-      price: service.price ? Number(service.price) : 0,
+    // Convert Decimal objects to numbers and prepare data for client component
+    const serializedServices = await Promise.all(services.map(async service => {
+      // Get provider info for each service
+      const provider = await prisma.provider.findUnique({
+        where: { id: service.providerId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+      
+      return {
+        ...service,
+        price: service.price ? Number(service.price) : 0,
+        provider: {
+          id: provider?.id || '',
+          name: provider?.user?.name || 'Unknown Provider',
+          profile: {
+            address: null,
+            isProStatus: false
+          }
+        }
+      };
     }));
 
     // Now pass the data to the client component
@@ -285,9 +294,8 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
 async function getProviderIdsWithCity(cityId: string): Promise<string[]> {
   try {
     const providersWithCity = await prisma.$queryRaw`
-      SELECT p."userId" as "providerId"
+      SELECT pc."providerId"
       FROM "ProviderCity" pc
-      JOIN "Provider" p ON pc."providerId" = p.id
       WHERE pc."cityId" = ${cityId}
     `;
     

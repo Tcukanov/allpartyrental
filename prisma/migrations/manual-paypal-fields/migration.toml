@@ -1,3 +1,0 @@
-# Prisma Migration File
-migration_name = "add_paypal_fields_to_provider"
-created_at = "2023-10-10T12:00:00.000Z" 

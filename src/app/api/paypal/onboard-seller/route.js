@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { PayPalClient } from '@/lib/payment/paypal-client';
+import { PayPalClientFixed } from '@/lib/payment/paypal-client';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(req) {
+  console.log('🚀 PayPal onboard-seller route called - UPDATED VERSION');
   try {
     const session = await getServerSession(authOptions);
     
@@ -26,7 +27,7 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    const paypalClient = new PayPalClient();
+    const paypalClient = new PayPalClientFixed();
     
     // Check if we're in localhost environment
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';

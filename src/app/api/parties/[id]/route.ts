@@ -50,22 +50,30 @@ export async function GET(
                 provider: {
                   select: {
                     id: true,
-                    name: true,
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                      }
+                    }
                   },
                 },
               },
             },
             offers: {
-              include: {
+              select: {
+                id: true,
+                providerId: true,
+                status: true,
                 provider: {
                   select: {
                     id: true,
-                    name: true,
-                    profile: {
+                    user: {
                       select: {
-                        avatar: true,
-                      },
-                    },
+                        id: true,
+                        name: true,
+                      }
+                    }
                   },
                 },
               },
@@ -90,8 +98,8 @@ export async function GET(
     // 2. The provider has made an offer for any service in this party
     const isProvider = session.user.role === 'PROVIDER' && (
       party.status === 'PUBLISHED' || 
-      party.partyServices.some(ps => 
-        ps.offers.some(offer => offer.providerId === session.user.id)
+      (party as any).partyServices?.some((ps: any) => 
+        ps.offers?.some((offer: any) => offer.providerId === session.user.id)
       )
     );
     const isAdmin = session.user.role === 'ADMIN';
@@ -104,15 +112,15 @@ export async function GET(
     }
     
     // Add the client's profile address to the top-level client object for easier access
-    if (party.client && party.client.profile) {
-      console.log('Debug - Client profile in API response:', party.client.profile);
+    if ((party as any).client && (party as any).client.profile) {
+      console.log('Debug - Client profile in API response:', (party as any).client.profile);
       
       // Try to find address in partyServices.specificOptions if profile address is not available
-      let address = party.client.profile.address || (party.client as any).address;
+      let address = (party as any).client.profile.address || (party as any).client.address;
       
       if (!address) {
         // Look for address in partyServices specificOptions
-        for (const partyService of party.partyServices) {
+        for (const partyService of (party as any).partyServices || []) {
           if (partyService.specificOptions && typeof partyService.specificOptions === 'object') {
             try {
               const options = partyService.specificOptions as any;
@@ -131,7 +139,7 @@ export async function GET(
       const responseData = {
         ...party,
         client: {
-          ...party.client,
+          ...(party as any).client,
           // Use type assertion to avoid TypeScript errors
           address: address
         }

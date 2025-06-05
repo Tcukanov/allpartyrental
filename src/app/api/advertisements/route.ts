@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { type, startDate, endDate } = body;
+    const { packageId, packageName, price, duration, startDate, endDate } = body;
 
     // Validate input
-    if (!type || !startDate || !endDate) {
+    if (!packageId || !packageName || !price || !duration || !startDate || !endDate) {
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing required fields' } },
         { status: 400 }
@@ -76,7 +76,10 @@ export async function POST(request: NextRequest) {
     const advertisement = await prisma.advertisement.create({
       data: {
         userId: session.user.id as string,
-        type,
+        packageId,
+        packageName,
+        price,
+        duration,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         isActive: true,
@@ -92,7 +95,7 @@ export async function POST(request: NextRequest) {
         paymentIntent: {
           id: 'mock_payment_intent_id',
           clientSecret: 'mock_client_secret',
-          amount: type === 'HOMEPAGE' ? 5000 : 2000, // $50 or $20
+          amount: price,
           currency: 'usd',
         },
       },

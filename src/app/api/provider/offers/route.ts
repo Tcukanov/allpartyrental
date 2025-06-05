@@ -93,8 +93,13 @@ export async function POST(request: NextRequest) {
         provider: {
           select: {
             id: true,
-            name: true,
-            profile: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profile: true,
+              },
+            },
           },
         },
         service: true,

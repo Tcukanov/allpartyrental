@@ -24,8 +24,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get provider's user ID
-    const userId = session.user.id;
+    // Get or create the provider record for this user
+    let provider = await prisma.provider.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!provider) {
+      // Auto-create Provider record for users with PROVIDER role who don't have one
+      console.log(`Auto-creating Provider record for user: ${session.user.name} (${session.user.id})`);
+      
+      provider = await prisma.provider.create({
+        data: {
+          userId: session.user.id,
+          businessName: session.user.name || 'Business Name',
+          bio: `Professional services provider`,
+          isVerified: false,
+          paypalOnboardingStatus: 'NOT_STARTED',
+          paypalEnvironment: 'sandbox'
+        }
+      });
+    }
 
     // First try to fetch transactions via the Offer relation
     try {
@@ -33,7 +51,7 @@ export async function GET(request: NextRequest) {
       const transactions = await prisma.transaction.findMany({
         where: {
           offer: {
-            providerId: userId
+            providerId: provider.id
           }
         },
         include: {
@@ -61,14 +79,13 @@ export async function GET(request: NextRequest) {
           updatedAt: transaction.updatedAt,
           escrowEndTime: transaction.escrowEndTime,
           reviewDeadline: transaction.reviewDeadline,
-          paymentIntentId: transaction.paymentIntentId,
+          paypalOrderId: transaction.paypalOrderId,
+          paypalCaptureId: transaction.paypalCaptureId,
+          paypalTransactionId: transaction.paypalTransactionId,
           offerId: transaction.offerId,
           partyId: transaction.partyId,
-          // Add client info from the offer relation
           client: transaction.offer?.client ?? null,
-          // Add service info from the offer relation
           service: transaction.offer?.service ?? null,
-          // Add other needed fields from the relations
           party: transaction.party ?? null
         };
       });

@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     // 4. Finally create the Transaction
     const transaction = await prisma.transaction.create({
       data: {
-        amount: new Prisma.Decimal(service.price),
+        amount: service.price.toNumber(),
         status: "PENDING", // Valid TransactionStatus enum value
         clientFeePercent: 5.0,
         providerFeePercent: 10.0,

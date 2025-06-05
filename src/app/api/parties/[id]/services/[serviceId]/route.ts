@@ -38,10 +38,15 @@ export async function GET(
             provider: {
               select: {
                 id: true,
-                name: true,
-                profile: {
+                user: {
                   select: {
-                    avatar: true,
+                    id: true,
+                    name: true,
+                    profile: {
+                      select: {
+                        avatar: true,
+                      },
+                    },
                   },
                 },
               },

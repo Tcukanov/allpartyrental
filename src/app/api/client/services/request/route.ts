@@ -67,7 +67,6 @@ export async function POST(request: NextRequest) {
         data: {
           userId: providerId,
           businessName: provider.name || 'Business Name',
-          verificationLevel: 0,
           isVerified: false
         }
       });

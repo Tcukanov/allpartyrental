@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/auth-options';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { authOptions } from '@/lib/auth';
+import { PaymentService } from '@/lib/payment/payment-service';
 
 /**
  * Create payment order for a booking
@@ -13,220 +11,116 @@ export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ 
-        success: false, 
-        error: 'Unauthorized' 
+        error: 'Authentication required. Please log in to continue.',
+        code: 'UNAUTHORIZED' 
       }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { 
-      serviceId, 
-      bookingDate, 
-      hours, 
-      address, 
-      comments, 
-      contactPhone, 
-      guestCount 
-    } = body;
+    const { serviceId, bookingDate, hours, addons = [] } = await request.json();
 
-    if (!serviceId || !bookingDate) {
+    // Validate required fields
+    if (!serviceId || !bookingDate || !hours) {
       return NextResponse.json({ 
-        success: false, 
-        error: 'Missing required fields' 
+        error: 'Missing required fields: serviceId, bookingDate, hours',
+        code: 'MISSING_FIELDS',
+        details: {
+          serviceId: !serviceId ? 'Service ID is required' : null,
+          bookingDate: !bookingDate ? 'Booking date is required' : null,
+          hours: !hours ? 'Hours is required' : null
+        }
       }, { status: 400 });
     }
 
-    console.log('Creating payment order for:', { 
-      serviceId, 
-      bookingDate, 
-      hours, 
-      userId: session.user.id 
+    console.log('Creating payment order for:', {
+      serviceId,
+      bookingDate,
+      hours,
+      userId: session.user.id
     });
 
-    // Get service details
+    // Get service information
+    const { prisma } = require('@/lib/prisma');
     const service = await prisma.service.findUnique({
       where: { id: serviceId },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        status: true,
-        providerId: true
+      include: {
+        provider: true,
+        category: true
       }
     });
 
     if (!service) {
       return NextResponse.json({ 
-        success: false, 
-        error: 'Service not found' 
+        error: `Service with ID '${serviceId}' not found. The service may have been removed or is no longer available.`,
+        code: 'SERVICE_NOT_FOUND' 
       }, { status: 404 });
     }
 
-    // Parse the service price
-    const servicePrice = parseFloat(service.price);
-    if (isNaN(servicePrice) || servicePrice <= 0) {
+    console.log(`Service price: $${service.price} for service: ${service.name}`);
+
+    // Check if provider has PayPal connected
+    if (!service.provider.paypalCanReceivePayments || !service.provider.paypalMerchantId) {
       return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid service price' 
+        error: `Payment setup incomplete for this service provider. The provider "${service.provider.businessName || 'this provider'}" needs to complete their PayPal marketplace setup before accepting payments.`,
+        code: 'PROVIDER_PAYMENT_NOT_CONFIGURED',
+        details: {
+          canReceivePayments: service.provider.paypalCanReceivePayments,
+          hasMerchantId: !!service.provider.paypalMerchantId,
+          onboardingStatus: service.provider.paypalOnboardingStatus
+        }
       }, { status: 400 });
     }
 
-    console.log(`Service price: $${servicePrice} for service: ${service.name}`);
-
-    // Get default city for the party
-    const defaultCity = await prisma.city.findFirst({
-      where: { isDefault: true }
+    // Create payment order using PayPal marketplace
+    const paymentService = new PaymentService();
+    const result = await paymentService.createPaymentOrder({
+      serviceId,
+      userId: session.user.id,
+      bookingDate,
+      hours,
+      addons
     });
 
-    if (!defaultCity) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'System configuration error' 
-      }, { status: 500 });
-    }
-
-    // Create minimal party for this booking
-    const party = await prisma.party.create({
-      data: {
-        name: `Direct booking for ${service.name}`,
-        clientId: session.user.id,
-        cityId: defaultCity.id,
-        date: new Date(bookingDate),
-        startTime: "12:00",
-        duration: hours || 4,
-        guestCount: guestCount || 1,
-        status: "DRAFT"
-      }
-    });
-
-    // Create party service
-    const partyService = await prisma.partyService.create({
-      data: {
-        partyId: party.id,
-        serviceId: serviceId,
-        specificOptions: {
-          bookingDate: bookingDate,
-          hours: hours,
-          address: address || '',
-          comments: comments || '',
-          contactPhone: contactPhone || ''
-        }
-      }
-    });
-
-    // Create offer
-    const offer = await prisma.offer.create({
-      data: {
-        clientId: session.user.id,
-        serviceId: serviceId,
-        providerId: service.providerId,
-        partyServiceId: partyService.id,
-        price: servicePrice,
-        description: `Direct booking for ${service.name}`,
-        status: 'PENDING'
-      }
-    });
-
-    // Create transaction
-    const transaction = await prisma.transaction.create({
-      data: {
-        partyId: party.id,
-        offerId: offer.id,
-        amount: servicePrice,
-        status: 'PENDING',
-        termsAccepted: true,
-        termsAcceptedAt: new Date(),
-        termsType: 'direct_booking'
-      }
-    });
-
-    console.log(`Created transaction: ${transaction.id}`);
-
-    // Create PayPal order using environment variables
-    const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-    const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
-    const PAYPAL_BASE_URL = process.env.PAYPAL_BASE_URL || 'https://api-m.sandbox.paypal.com';
-
-    if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'PayPal configuration missing' 
-      }, { status: 500 });
-    }
-
-    // Get PayPal access token
-    const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
-    
-    const tokenResponse = await fetch(`${PAYPAL_BASE_URL}/v1/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: 'grant_type=client_credentials'
-    });
-
-    if (!tokenResponse.ok) {
-      throw new Error(`Failed to get PayPal token: ${tokenResponse.status}`);
-    }
-
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-
-    // Create PayPal order
-    const orderData = {
-      intent: 'CAPTURE',
-      purchase_units: [{
-        amount: {
-          currency_code: 'USD',
-          value: servicePrice.toFixed(2)
-        },
-        description: `Booking for ${service.name}`,
-        custom_id: transaction.id
-      }]
-    };
-
-    const orderResponse = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(orderData)
-    });
-
-    if (!orderResponse.ok) {
-      const errorText = await orderResponse.text();
-      console.error('PayPal order creation failed:', errorText);
-      throw new Error(`Failed to create PayPal order: ${orderResponse.status}`);
-    }
-
-    const orderResult = await orderResponse.json();
-    console.log('PayPal order created:', orderResult.id);
-
-    // Update transaction with PayPal order ID
-    await prisma.transaction.update({
-      where: { id: transaction.id },
-      data: { paymentIntentId: orderResult.id }
-    });
+    console.log(`Created transaction: ${result.transactionId}`);
+    console.log(`PayPal order created: ${result.orderId}`);
 
     return NextResponse.json({
       success: true,
-      orderId: orderResult.id,
-      transactionId: transaction.id,
-      amount: servicePrice
+      orderId: result.orderId,
+      transactionId: result.transactionId,
+      approvalUrl: result.approvalUrl,
+      total: result.total,
+      currency: result.currency
     });
 
   } catch (error) {
-    console.error('Error creating payment order:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to create payment order',
-      details: error.message
+    console.error('Payment creation error:', error);
+    
+    // Handle specific error types
+    if (error.code === 'P2025') {
+      return NextResponse.json({ 
+        error: 'Database record not found. The service or related data may have been deleted.',
+        code: 'DATABASE_RECORD_NOT_FOUND',
+        details: error.message
+      }, { status: 404 });
+    }
+    
+    if (error.code === 'P2002') {
+      return NextResponse.json({ 
+        error: 'Duplicate transaction detected. Please try again.',
+        code: 'DUPLICATE_TRANSACTION',
+        details: error.message
+      }, { status: 409 });
+    }
+    
+    return NextResponse.json({ 
+      error: error.message || 'Failed to create payment order',
+      code: 'PAYMENT_CREATION_FAILED',
+      details: {
+        errorType: error.constructor.name,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      }
     }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 } 

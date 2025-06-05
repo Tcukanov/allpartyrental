@@ -54,13 +54,7 @@ export async function PUT(
       include: {
         category: true,
         city: true,
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
+        provider: true
       }
     });
 
@@ -90,13 +84,7 @@ export async function PUT(
       include: {
         category: true,
         city: true,
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
+        provider: true
       }
     });
 

@@ -45,9 +45,8 @@ export async function GET(request: NextRequest) {
         
         // Get providers who serve this city from ProviderCity table
         const providersWithCity = await prisma.$queryRaw`
-          SELECT p."userId" as "providerId"
+          SELECT pc."providerId"
           FROM "ProviderCity" pc
-          JOIN "Provider" p ON pc."providerId" = p.id
           WHERE pc."cityId" = ${cityId}
         `;
         
@@ -245,11 +244,10 @@ export async function GET(request: NextRequest) {
           provider: {
             select: {
               id: true,
-              name: true,
-              profile: {
+              user: {
                 select: {
-                  address: true,
-                  isProStatus: true
+                  id: true,
+                  name: true
                 }
               }
             }

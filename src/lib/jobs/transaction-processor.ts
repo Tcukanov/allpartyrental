@@ -2,7 +2,7 @@
 
 import { Prisma, Transaction } from '@prisma/client';
 import { prisma } from '@/lib/prisma/client';
-import { paymentService } from '@/lib/payment/service';
+import { paymentService } from '@/lib/payment/payment-service';
 import { logger } from '@/lib/logger';
 import { getFeeSettings } from '@/lib/payment/fee-settings';
 
@@ -53,13 +53,12 @@ export async function processReviewDeadlines(): Promise<ProcessingResult> {
           logger.debug(`Processing expired review for transaction: ${transaction.id}`);
           
           // If there's a payment intent, cancel it to issue a refund
-          if (transaction.paymentIntentId) {
+          if ((transaction as any).paymentIntentId) {
             try {
-              await paymentService.cancelPaymentIntent(transaction.paymentIntentId);
+              await paymentService.refundPayment(transaction.id, 'Transaction expired');
               logger.info(`Refunded payment for expired transaction: ${transaction.id}`);
-            } catch (error: any) {
+            } catch (error) {
               logger.error(`Failed to refund payment for transaction ${transaction.id}:`, error);
-              throw error;
             }
           }
           
@@ -160,22 +159,10 @@ export async function processEscrowReleases(): Promise<ProcessingResult> {
           logger.debug(`Processing escrow release for transaction: ${transaction.id}`);
           
           // If there's a payment intent, release the funds to the provider
-          if (transaction.paymentIntentId) {
+          if ((transaction as any).paymentIntentId) {
             try {
-              // Get current fee settings or use the transaction's stored values
-              const { providerFeePercent } = 
-                await getFeeSettings().catch(() => ({ 
-                  providerFeePercent: transaction.providerFeePercent 
-                }));
-              
-              // Release funds with the provider fee percentage - uses the params object format
-              await paymentService.releaseFundsToProvider({
-                paymentIntentId: transaction.paymentIntentId,
-                providerId: transaction.offer.provider.id,
-                transferGroup: null,
-                amount: Number(transaction.amount),
-                providerFeePercent
-              });
+              // Release funds using the existing releaseFunds method
+              await paymentService.releaseFunds(transaction.id);
               logger.info(`Released funds to provider for transaction: ${transaction.id}`);
             } catch (error: any) {
               logger.error(`Failed to release funds for transaction ${transaction.id}:`, error);

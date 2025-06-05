@@ -95,7 +95,6 @@ export async function POST(req: NextRequest) {
           userId: service.providerId,
           businessName: serviceProvider.name || 'Service Provider',
           isVerified: false,
-          verificationLevel: 0
         }
       });
     }

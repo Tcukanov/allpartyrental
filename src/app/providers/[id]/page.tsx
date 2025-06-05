@@ -64,28 +64,61 @@ export default async function ProviderProfilePage(props: { params: Promise<{ id:
   const { id } = params;
   
   try {
-    // Get provider details
-    const provider = await prisma.user.findUnique({
-      where: { id },
-      include: {
-        profile: true,
-        services: {
-          where: {
-            status: 'ACTIVE'
-          },
-          include: {
-            category: true,
-            city: true
-          }
-        }
-      }
-    });
+    // Get provider data using raw SQL to avoid TypeScript issues
+    const providerResult = await prisma.$queryRaw`
+      SELECT 
+        u.id as user_id,
+        u.name as user_name,
+        u.email as user_email,
+        u."createdAt" as user_created_at,
+        pr.id as provider_id,
+        pr."businessName" as business_name,
+        pr.bio as provider_bio,
+        pr."isVerified" as is_verified,
+        pr.phone as provider_phone,
+        pr.website as provider_website,
+        p.id as profile_id,
+        p.avatar as profile_avatar,
+        p.phone as profile_phone,
+        p.address as profile_address,
+        p.website as profile_website,
+        p."socialLinks" as social_links,
+        p."isProStatus" as is_pro_status,
+        p."googleBusinessRating" as google_business_rating,
+        p."googleBusinessReviews" as google_business_reviews,
+        p."googleBusinessUrl" as google_business_url,
+        p.description as profile_description,
+        p."contactPerson" as contact_person
+      FROM "User" u
+      LEFT JOIN "Provider" pr ON u.id = pr."userId"
+      LEFT JOIN "Profile" p ON u.id = p."userId"
+      WHERE u.id = ${params.id}
+      LIMIT 1
+    `;
+
+    const provider = providerResult[0] as any;
 
     if (!provider) {
-      return (
-        <div>Provider not found</div>
-      );
+      notFound();
     }
+
+    // Get active services for this provider using raw SQL
+    const servicesResult = await prisma.$queryRaw`
+      SELECT 
+        s.*,
+        sc.name as category_name,
+        sc.slug as category_slug,
+        c.name as city_name,
+        c.slug as city_slug
+      FROM "Service" s
+      LEFT JOIN "ServiceCategory" sc ON s."categoryId" = sc.id
+      LEFT JOIN "City" c ON s."cityId" = c.id
+      LEFT JOIN "Provider" pr ON s."providerId" = pr.id
+      WHERE pr."userId" = ${params.id} AND s.status = 'ACTIVE'
+      ORDER BY s."createdAt" DESC
+    `;
+
+    const services = servicesResult as any[];
 
     return (
       <Container maxW="container.xl" py={8}>
@@ -124,7 +157,7 @@ export default async function ProviderProfilePage(props: { params: Promise<{ id:
               {/* Services Tab */}
               <TabPanel>
                 <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-                  {provider.services.map((service) => (
+                  {services.map((service) => (
                     <Card key={service.id} overflow="hidden">
                       <Image
                         src={Array.isArray(service.photos) && service.photos.length > 0 ? service.photos[0] : ''}
@@ -147,7 +180,7 @@ export default async function ProviderProfilePage(props: { params: Promise<{ id:
                         <VStack align="stretch" spacing={4}>
                           <Box>
                             <Heading size="md">{service.name}</Heading>
-                            <Text color="gray.600">{service.category.name}</Text>
+                            <Text color="gray.600">{service.category_name}</Text>
                           </Box>
 
                           <Box>

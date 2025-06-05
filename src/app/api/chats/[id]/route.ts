@@ -53,9 +53,14 @@ export async function GET(
             provider: {
               select: {
                 id: true,
-                name: true,
-                email: true,
-                profile: true
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    profile: true
+                  }
+                }
               }
             },
             client: {

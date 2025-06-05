@@ -32,18 +32,7 @@ export async function GET(
     const service = await prisma.service.findUnique({
       where: { id },
       include: {
-        provider: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            profile: {
-              select: {
-                avatar: true,
-              },
-            },
-          },
-        },
+        provider: true,
         category: true,
         city: true,
         addons: true,
@@ -117,12 +106,7 @@ export async function PATCH(
       where: { id },
       data: body,
       include: {
-        provider: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        provider: true,
         category: true,
         city: true,
       },

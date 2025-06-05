@@ -27,11 +27,9 @@ model User {
   sentMessages         Message[]       @relation("SentMessages")
   notifications        Notification[]
   receivedOffers       Offer[]         @relation("ClientOffers")
-  offers               Offer[]         @relation("ProviderOffers")
   clientParties        Party[]         @relation("ClientParties")
   profile              Profile?
   provider             Provider?
-  services             Service[]
   sessions             Session[]
 }
 
@@ -55,34 +53,36 @@ model Profile {
 }
 
 model Provider {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  businessName          String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  availability          Json?
-  bio                   String?
-  isVerified            Boolean  @default(false)
-  phone                 String?
-  vatNumber             String?
-  verificationLevel     Int      @default(0)
-  website               String?
-  stripeAccountId       String?
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  businessName         String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  availability         Json?
+  bio                  String?
+  isVerified           Boolean  @default(false)
+  phone                String?
+  vatNumber            String?
+  verificationLevel    VerificationLevel @default(NONE)
+  website              String?
   
-  // PayPal Integration Fields
-  paypalMerchantId          String?
-  paypalEmail               String?
-  paypalOnboardingComplete  Boolean @default(false)
-  paypalOnboardingId        String?
-  paypalTrackingId          String?
-  paypalOnboardingStatus    String?  // NOT_STARTED, PENDING, COMPLETED, FAILED
-  paypalCanReceivePayments  Boolean?
-  paypalStatusIssues        String?  // JSON string of issues array
-  accountType               String?
-  paypalStatus              String?
-  paypalEnvironment         String?
-  
-  user                  User     @relation(fields: [userId], references: [id])
+  // PayPal Marketplace Fields
+  paypalMerchantId            String?
+  paypalEmail                 String?
+  paypalOnboardingComplete    Boolean   @default(false)
+  paypalOnboardingId          String?
+  paypalTrackingId            String?
+  paypalOnboardingStatus      String?   @default("NOT_STARTED")
+  paypalCanReceivePayments    Boolean   @default(false)
+  paypalStatusIssues          String?
+  accountType                 String?
+  paypalStatus               String?
+  paypalEnvironment          String?   @default("sandbox")
+
+  // Relations
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services     Service[]
+  offers       Offer[]
 }
 
 model Calendar {
@@ -157,7 +157,7 @@ model Service {
   partyServices       PartyService[]
   category            ServiceCategory @relation(fields: [categoryId], references: [id])
   city                City?           @relation(fields: [cityId], references: [id])
-  provider            User            @relation(fields: [providerId], references: [id])
+  provider            Provider        @relation(fields: [providerId], references: [id])
   addons              ServiceAddon[]
 }
 
@@ -219,32 +219,41 @@ model Offer {
   chat           Chat?
   client         User         @relation("ClientOffers", fields: [clientId], references: [id])
   partyService   PartyService @relation(fields: [partyServiceId], references: [id])
-  provider       User         @relation("ProviderOffers", fields: [providerId], references: [id])
+  provider       Provider     @relation(fields: [providerId], references: [id])
   service        Service      @relation(fields: [serviceId], references: [id])
   transaction    Transaction?
 }
 
 model Transaction {
-  id                 String            @id @default(cuid())
-  partyId            String
-  offerId            String            @unique
-  amount             Decimal
-  status             TransactionStatus @default(PENDING)
-  paymentIntentId    String?
-  paymentMethodId    String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  clientFeePercent   Float             @default(5.0)
+  id               String            @id @default(cuid())
+  partyId          String?
+  offerId          String            @unique
+  amount           Float
+  status           TransactionStatus @default(PENDING)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  
+  // PayPal Marketplace Fields
+  paypalOrderId          String?    // PayPal Order ID
+  paypalCaptureId        String?    // PayPal Capture ID
+  paypalTransactionId    String?    // PayPal Transaction ID
+  paypalPayerId          String?    // PayPal Payer ID
+  paypalStatus           String?    // PayPal payment status
+  
+  // Escrow and Terms
+  clientFeePercent   Float?
   escrowEndTime      DateTime?
   escrowStartTime    DateTime?
-  providerFeePercent Float             @default(10.0)
+  providerFeePercent Float?
   reviewDeadline     DateTime?
-  termsAccepted      Boolean?          @default(false)
+  termsAccepted      Boolean?
   termsAcceptedAt    DateTime?
   termsType          String?
-  dispute            Dispute?
-  offer              Offer             @relation(fields: [offerId], references: [id])
-  party              Party             @relation(fields: [partyId], references: [id])
+
+  // Relations
+  party Party? @relation(fields: [partyId], references: [id])
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  dispute Dispute?
 }
 
 model Dispute {
@@ -424,6 +433,8 @@ enum TransactionStatus {
   APPROVED
   DECLINED
   CANCELLED
+  FAILED
+  RELEASED
 }
 
 enum NotificationType {
@@ -444,4 +455,11 @@ enum AdvertisementStatus {
   ACTIVE
   EXPIRED
   CANCELLED
+}
+
+enum VerificationLevel {
+  NONE
+  BASIC
+  VERIFIED
+  PREMIUM
 }

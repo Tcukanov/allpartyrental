@@ -54,12 +54,16 @@ export async function GET(
         provider: {
           select: {
             id: true,
-            name: true,
-            email: true,
-            profile: {
+            user: {
               select: {
-                avatar: true,
-                phone: true,
+                id: true,
+                name: true,
+                email: true,
+                profile: {
+                  select: {
+                    avatar: true,
+                  },
+                },
               },
             },
           },

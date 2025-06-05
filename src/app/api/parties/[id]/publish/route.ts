@@ -84,13 +84,20 @@ export async function GET(
     // This would typically be done with a background job or queue
     // For simplicity, we're doing it synchronously here
     for (const partyService of services) {
-      const providers = await prisma.user.findMany({
+      const providers = await prisma.provider.findMany({
         where: {
-          role: 'PROVIDER',
           services: {
             some: {
               categoryId: partyService.service.categoryId,
               cityId: party.cityId,
+            },
+          },
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
@@ -99,7 +106,7 @@ export async function GET(
       for (const provider of providers) {
         await prisma.notification.create({
           data: {
-            userId: provider.id,
+            userId: provider.user.id,
             type: 'NEW_OFFER',
             title: 'New Party Request',
             content: `A new party request has been published that matches your services: ${party.name}`,

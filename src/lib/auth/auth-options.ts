@@ -76,7 +76,14 @@ export const authOptions: AuthOptions = {
     error: '/auth/error',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
+    },
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id as string;
         token.role = user.role as UserRole;
@@ -89,6 +96,17 @@ export const authOptions: AuthOptions = {
         session.user.role = token.role as UserRole;
       }
       return session;
+    },
+    async signIn({ user, account, profile }) {
+      // Allow the sign in
+      return true;
+    },
+  },
+  events: {
+    async signIn({ user, account, profile, isNewUser }) {
+      // This event fires after successful sign in
+      // We can't redirect from here, but we can log it
+      console.log(`User ${user.email} signed in with role: ${user.role}`);
     },
   },
   session: {

@@ -44,19 +44,20 @@ export async function GET(
             provider: {
               select: {
                 id: true,
-                name: true,
-                email: true,
-                role: true,
-                createdAt: true,
-                provider: {
+                paypalEmail: true,
+                paypalMerchantId: true,
+                paypalOnboardingComplete: true,
+                paypalEnvironment: true,
+                user: {
                   select: {
-                    paypalEmail: true,
-                    paypalMerchantId: true,
-                    paypalOnboardingComplete: true,
-                    paypalEnvironment: true
-                  }
-                }
-              }
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true,
+                    createdAt: true,
+                  },
+                },
+              },
             },
             service: {
               select: {

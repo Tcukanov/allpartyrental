@@ -43,8 +43,13 @@ export async function GET(request: NextRequest) {
             provider: {
               select: {
                 id: true,
-                name: true,
-                email: true
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true
+                  }
+                }
               }
             },
             partyService: {

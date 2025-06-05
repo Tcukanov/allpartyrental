@@ -94,7 +94,12 @@ export async function GET(request: NextRequest) {
         provider: {
           select: {
             id: true,
-            name: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         category: true,

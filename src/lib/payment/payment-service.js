@@ -8,10 +8,10 @@
  * 4. Platform keeps commission
  */
 
-import { prisma } from '@/lib/prisma';
-import { PayPalClient } from './paypal-client.js';
+import { PrismaClient } from '@prisma/client';
+import { PayPalClientFixed } from './paypal-client.js';
 
-const paypalClient = new PayPalClient();
+const paypalClient = new PayPalClientFixed();
 
 /**
  * Fee configuration
@@ -48,303 +48,360 @@ async function getFeeSettings() {
  * Handles automatic commission splitting between platform and providers
  */
 export class PaymentService {
-  
+  constructor() {
+    this.prisma = new PrismaClient();
+  }
+
   /**
-   * Create marketplace payment order for client to pay
-   * Automatically splits payment: Client Fee goes to platform, Provider gets their share
+   * Create PayPal order for marketplace payment
    */
-  async createMarketplacePaymentOrder(transactionId, serviceAmount, providerId, metadata = {}) {
+  async createPaymentOrder(bookingData) {
     try {
-      console.log(`Creating marketplace payment for transaction ${transactionId}, amount: $${serviceAmount}`);
-      
-      // Get current fee settings
-      const { clientFeePercent, providerFeePercent } = await getFeeSettings();
-      
-      // Calculate amounts
-      const clientFee = serviceAmount * (clientFeePercent / 100);
-      const totalClientPays = serviceAmount + clientFee; // What client pays
-      
-      const platformCommission = serviceAmount * (providerFeePercent / 100);
-      const providerReceives = serviceAmount - platformCommission; // What provider gets
-      
-      console.log(`Marketplace Payment Breakdown:`);
-      console.log(`- Service Amount: $${serviceAmount}`);
-      console.log(`- Client Fee (${clientFeePercent}%): $${clientFee}`);
-      console.log(`- Total Client Pays: $${totalClientPays}`);
-      console.log(`- Platform Commission (${providerFeePercent}%): $${platformCommission}`);
-      console.log(`- Provider Receives: $${providerReceives}`);
-      
-      // Get provider's PayPal account info
-      const provider = await prisma.provider.findUnique({
-        where: { id: providerId },
-        select: { 
-          paypalMerchantId: true,
-          paypalOnboardingComplete: true,
-          paypalStatus: true 
+      const { serviceId, userId, bookingDate, hours, addons = [] } = bookingData;
+
+      // Get service with provider information
+      const service = await this.prisma.service.findUnique({
+        where: { id: serviceId },
+        include: {
+          provider: {
+            include: {
+              user: true
+            }
+          },
+          category: true
         }
       });
-      
-      if (!provider) {
-        throw new Error('Provider not found');
+
+      if (!service) {
+        throw new Error('Service not found');
       }
-      
-      // Check if provider has connected PayPal account
-      if (!provider.paypalMerchantId || !provider.paypalOnboardingComplete) {
-        console.log('Provider has not completed PayPal onboarding, using regular payment');
-        return await this.createPaymentOrder(transactionId, serviceAmount, metadata);
+
+      // Check if provider has PayPal connected
+      if (!service.provider.paypalCanReceivePayments) {
+        throw new Error('Provider PayPal account not connected. Payments cannot be processed.');
       }
+
+      // Calculate pricing
+      const basePrice = service.price * hours;
+      const addonTotal = addons.reduce((sum, addon) => sum + addon.price, 0);
+      const subtotal = basePrice + addonTotal;
       
-      // Create marketplace order with automatic splitting
-      const order = await paypalClient.createMarketplaceOrder(
-        totalClientPays,           // Total amount client pays
-        providerReceives,          // Amount provider receives
-        platformCommission + clientFee, // Total platform commission (provider fee + client fee)
-        provider.paypalMerchantId, // Provider's PayPal merchant ID
-        {
-          transactionId,
-          description: `Service booking payment - Transaction ${transactionId}`,
-          paymentMethod: metadata.paymentMethod || 'card_fields'
+      // Platform fees (configurable)
+      const platformFeePercent = 5; // 5% platform fee
+      const platformFee = subtotal * (platformFeePercent / 100);
+      const total = subtotal + platformFee;
+
+      // Create PayPal order with marketplace split
+      const orderData = {
+        intent: 'CAPTURE',
+        purchase_units: [{
+          reference_id: serviceId,
+          description: `${service.name} - ${hours} hours`,
+          amount: {
+            currency_code: 'USD',
+            value: total.toFixed(2),
+            breakdown: {
+              item_total: {
+                currency_code: 'USD',
+                value: subtotal.toFixed(2)
+              },
+              handling: {
+                currency_code: 'USD', 
+                value: platformFee.toFixed(2)
+              }
+            }
+          },
+          payee: {
+            merchant_id: service.provider.paypalMerchantId
+          },
+          payment_instruction: {
+            disbursement_mode: 'DELAYED', // Hold funds in escrow
+            platform_fees: [{
+              amount: {
+                currency_code: 'USD',
+                value: platformFee.toFixed(2)
+              }
+            }]
+          },
+          items: [{
+            name: service.name,
+            description: `${service.category.name} service for ${hours} hours`,
+            unit_amount: {
+              currency_code: 'USD',
+              value: service.price.toFixed(2)
+            },
+            quantity: hours.toString(),
+            category: 'DIGITAL_GOODS'
+          }]
+        }],
+        application_context: {
+          brand_name: 'AllPartyRent',
+          landing_page: 'BILLING',
+          shipping_preference: 'NO_SHIPPING',
+          user_action: 'PAY_NOW',
+          return_url: `${process.env.NEXTAUTH_URL}/payments/success`,
+          cancel_url: `${process.env.NEXTAUTH_URL}/payments/cancel`
         }
-      );
-      
-      // Update transaction with PayPal order info
-      await prisma.transaction.update({
-        where: { id: transactionId },
-        data: {
-          paymentIntentId: order.id,
-          clientFeePercent: clientFeePercent,
-          providerFeePercent: providerFeePercent,
-          status: 'PENDING_PAYMENT'
-        }
-      });
-      
-      return {
-        orderId: order.id,
-        clientPays: totalClientPays,
-        providerReceives: providerReceives,
-        platformCommission: platformCommission + clientFee,
-        isMarketplacePayment: true
       };
+
+      // Create PayPal order
+      const order = await paypalClient.createOrder(orderData);
+
+      // Create database transaction record
+      const offer = await this.getOrCreateOffer(serviceId, userId, bookingData);
       
+      const transaction = await this.prisma.transaction.create({
+        data: {
+          offerId: offer.id,
+          amount: total,
+          status: 'PENDING',
+          paypalOrderId: order.id,
+          paypalStatus: order.status,
+          clientFeePercent: platformFeePercent,
+          providerFeePercent: 100 - platformFeePercent, // Provider gets the rest
+          termsAccepted: false
+        }
+      });
+
+      return {
+        success: true,
+        orderId: order.id,
+        transactionId: transaction.id,
+        approvalUrl: order.links.find(link => link.rel === 'approve')?.href,
+        total: total,
+        currency: 'USD'
+      };
+
     } catch (error) {
-      console.error('Error creating marketplace payment:', error);
+      console.error('Payment order creation failed:', error);
       throw error;
     }
   }
 
   /**
-   * Create payment order for client to pay (fallback for non-marketplace)
-   * Client pays: Service Price + Client Fee
-   */
-  async createPaymentOrder(transactionId, serviceAmount, metadata = {}) {
-    try {
-      console.log(`Creating regular payment for transaction ${transactionId}, amount: $${serviceAmount}`);
-      
-      // Get current fee settings
-      const { clientFeePercent } = await getFeeSettings();
-      
-      // Calculate total amount client pays (service + client fee)
-      const clientFee = serviceAmount * (clientFeePercent / 100);
-      const totalClientPays = serviceAmount + clientFee;
-      
-      console.log(`Service: $${serviceAmount}, Client Fee: $${clientFee}, Total: $${totalClientPays}`);
-      
-      // Create PayPal order for the full amount
-      const order = await paypalClient.createOrder(totalClientPays, 'USD', {
-        transactionId,
-        description: `Service booking payment - Transaction ${transactionId}`,
-        paymentMethod: metadata.paymentMethod || 'card_fields'
-      });
-      
-      // Update transaction with PayPal order info
-      await prisma.transaction.update({
-        where: { id: transactionId },
-        data: {
-          paymentIntentId: order.id,
-          clientFeePercent: clientFeePercent,
-          status: 'PENDING_PAYMENT'
-        }
-      });
-      
-      return {
-        orderId: order.id,
-        clientPays: totalClientPays,
-        isMarketplacePayment: false
-      };
-      
-    } catch (error) {
-      console.error('Error creating payment order:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Capture payment and handle marketplace distribution
+   * Capture PayPal payment after user approval
    */
   async capturePayment(orderId) {
     try {
-      console.log(`Capturing payment for order ${orderId}`);
-      
       // Find transaction by PayPal order ID
-      const transaction = await prisma.transaction.findFirst({
-        where: { paymentIntentId: orderId },
+      const transaction = await this.prisma.transaction.findFirst({
+        where: { paypalOrderId: orderId },
         include: {
           offer: {
             include: {
-              provider: true,
-              client: true,
-              service: true
+              service: {
+                include: {
+                  provider: true
+                }
+              },
+              client: true
             }
           }
         }
       });
-      
+
       if (!transaction) {
-        throw new Error('Transaction not found');
+        throw new Error('Transaction not found for order ID: ' + orderId);
       }
-      
+
       // Capture the PayPal payment
       const captureResult = await paypalClient.captureOrder(orderId);
-      
-      if (captureResult.status !== 'COMPLETED') {
-        throw new Error(`Payment capture failed: ${captureResult.status}`);
-      }
-      
-      // Extract payment details
-      const capture = captureResult.purchase_units[0].payments.captures[0];
-      const amountReceived = parseFloat(capture.amount.value);
-      
-      console.log(`Payment captured: ${capture.id}, Amount: $${amountReceived}`);
-      
-      // Check if this was a marketplace payment
-      const isMarketplacePayment = transaction.offer.provider.paypalMerchantId && 
-                                   transaction.offer.provider.paypalOnboardingComplete;
-      
-      let platformCommission = 0;
-      let providerPayment = 0;
-      
-      if (isMarketplacePayment) {
-        // Marketplace payment - commissions are handled automatically by PayPal
-        const serviceAmount = parseFloat(transaction.amount);
-        const { clientFeePercent, providerFeePercent } = await getFeeSettings();
-        
-        platformCommission = (serviceAmount * (providerFeePercent / 100)) + 
-                           (serviceAmount * (clientFeePercent / 100));
-        providerPayment = serviceAmount - (serviceAmount * (providerFeePercent / 100));
-        
-        console.log(`Marketplace payment - Platform: $${platformCommission}, Provider: $${providerPayment}`);
-      } else {
-        // Regular payment - we need to handle provider payout separately
-        const serviceAmount = parseFloat(transaction.amount);
-        const { clientFeePercent, providerFeePercent } = await getFeeSettings();
-        
-        platformCommission = (serviceAmount * (providerFeePercent / 100)) + 
-                           (serviceAmount * (clientFeePercent / 100));
-        providerPayment = serviceAmount - (serviceAmount * (providerFeePercent / 100));
-        
-        console.log(`Regular payment - will need manual payout to provider: $${providerPayment}`);
-      }
-      
-      // Update transaction status
-      await prisma.transaction.update({
+
+      // Update transaction with capture details
+      const updatedTransaction = await this.prisma.transaction.update({
         where: { id: transaction.id },
         data: {
-          status: 'PAID_PENDING_PROVIDER_ACCEPTANCE',
-          paymentMethodId: capture.id
+          status: 'COMPLETED',
+          paypalCaptureId: captureResult.id,
+          paypalTransactionId: captureResult.purchase_units[0]?.payments?.captures[0]?.id,
+          paypalPayerId: captureResult.payer?.payer_id,
+          paypalStatus: captureResult.status,
+          escrowStartTime: new Date(),
+          escrowEndTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days escrow
         }
       });
-      
-      // Create notification for provider
-      await prisma.notification.create({
-        data: {
-          userId: transaction.offer.provider.id,
-          type: 'PAYMENT',
-          title: 'New Booking Request - Payment Received',
-          content: `You have a new booking request for "${transaction.offer.service.name}" from ${transaction.offer.client.name}. Payment of $${amountReceived.toFixed(2)} has been received. Please review and accept/decline the booking.`,
-          isRead: false
-        }
-      });
-      
+
       return {
         success: true,
-        captureId: capture.id,
-        transactionId: transaction.id,
-        amountReceived: amountReceived,
-        platformCommission: platformCommission,
-        providerPayment: providerPayment,
-        isMarketplacePayment: isMarketplacePayment
+        transaction: updatedTransaction,
+        captureId: captureResult.id,
+        status: captureResult.status
       };
-      
+
     } catch (error) {
-      console.error('Error capturing payment:', error);
+      console.error('Payment capture failed:', error);
+      
+      // Update transaction status to failed
+      if (orderId) {
+        await this.prisma.transaction.updateMany({
+          where: { paypalOrderId: orderId },
+          data: { 
+            status: 'FAILED',
+            paypalStatus: 'FAILED'
+          }
+        });
+      }
+      
       throw error;
     }
   }
 
   /**
-   * Handle provider accepting a booking (release funds in marketplace)
+   * Get or create offer for the booking
    */
-  async handleProviderAcceptance(transactionId) {
+  async getOrCreateOffer(serviceId, clientId, bookingData) {
+    const { bookingDate, hours, addons = [] } = bookingData;
+    
+    // Check if offer already exists for this booking
+    let offer = await this.prisma.offer.findFirst({
+      where: {
+        serviceId,
+        clientId,
+        status: 'PENDING'
+      }
+    });
+
+    if (!offer) {
+      // Get service to get provider ID
+      const service = await this.prisma.service.findUnique({
+        where: { id: serviceId }
+      });
+
+      // Create new offer
+      offer = await this.prisma.offer.create({
+        data: {
+          providerId: service.providerId,
+          clientId,
+          serviceId,
+          price: service.price * hours,
+          description: `Booking for ${hours} hours on ${new Date(bookingDate).toLocaleDateString()}`,
+          status: 'PENDING'
+        }
+      });
+    }
+
+    return offer;
+  }
+
+  /**
+   * Release funds from escrow to provider
+   */
+  async releaseFunds(transactionId) {
     try {
-      const transaction = await prisma.transaction.findUnique({
+      const transaction = await this.prisma.transaction.findUnique({
         where: { id: transactionId },
         include: {
           offer: {
             include: {
-              provider: true,
-              client: true,
-              service: true
+              service: {
+                include: {
+                  provider: true
+                }
+              }
             }
           }
         }
       });
-      
-      if (!transaction) {
-        throw new Error('Transaction not found');
+
+      if (!transaction || !transaction.paypalCaptureId) {
+        throw new Error('Transaction not found or not captured');
       }
-      
-      if (transaction.status !== 'PAID_PENDING_PROVIDER_ACCEPTANCE') {
-        throw new Error('Transaction is not in the correct state for acceptance');
+
+      if (transaction.status !== 'COMPLETED') {
+        throw new Error('Transaction not in completed status');
       }
-      
-      // Update transaction to completed
-      await prisma.transaction.update({
+
+      // Release funds via PayPal
+      await paypalClient.releaseFunds(transaction.paypalCaptureId, {
+        merchant_id: transaction.offer.service.provider.paypalMerchantId
+      });
+
+      // Update transaction status
+      await this.prisma.transaction.update({
         where: { id: transactionId },
         data: {
-          status: 'COMPLETED'
+          status: 'RELEASED',
+          escrowEndTime: new Date()
         }
       });
-      
-      // In marketplace payments, funds are already distributed
-      // For regular payments, we would need to send payout to provider here
-      const isMarketplacePayment = transaction.offer.provider.paypalMerchantId && 
-                                   transaction.offer.provider.paypalOnboardingComplete;
-      
-      if (!isMarketplacePayment) {
-        // TODO: Send payout to provider for non-marketplace payments
-        console.log('TODO: Send payout to provider for non-marketplace payment');
-      }
-      
-      // Create notification for client
-      await prisma.notification.create({
-        data: {
-          userId: transaction.offer.client.id,
-          type: 'PAYMENT',
-          title: 'Booking Confirmed',
-          content: `Your booking for "${transaction.offer.service.name}" has been confirmed by the provider. Service details will be shared with you soon.`,
-          isRead: false
-        }
-      });
-      
-      return {
-        success: true,
-        isMarketplacePayment: isMarketplacePayment
-      };
-      
+
+      return { success: true };
+
     } catch (error) {
-      console.error('Error handling provider acceptance:', error);
+      console.error('Funds release failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Refund payment
+   */
+  async refundPayment(transactionId, reason = 'Requested by customer') {
+    try {
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: transactionId }
+      });
+
+      if (!transaction || !transaction.paypalCaptureId) {
+        throw new Error('Transaction not found or not captured');
+      }
+
+      // Process refund via PayPal
+      const refundResult = await paypalClient.refundCapture(
+        transaction.paypalCaptureId,
+        {
+          amount: {
+            currency_code: 'USD',
+            value: transaction.amount.toString()
+          },
+          note_to_payer: reason
+        }
+      );
+
+      // Update transaction status
+      await this.prisma.transaction.update({
+        where: { id: transactionId },
+        data: {
+          status: 'REFUNDED',
+          paypalStatus: 'REFUNDED'
+        }
+      });
+
+      return {
+        success: true,
+        refundId: refundResult.id,
+        status: refundResult.status
+      };
+
+    } catch (error) {
+      console.error('Refund failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get transaction by PayPal order ID
+   */
+  async getTransactionByOrderId(orderId) {
+    return await this.prisma.transaction.findFirst({
+      where: { paypalOrderId: orderId },
+      include: {
+        offer: {
+          include: {
+            service: {
+              include: {
+                provider: {
+                  include: {
+                    user: true
+                  }
+                }
+              }
+            },
+            client: true
+          }
+        }
+      }
+    });
   }
 }
 

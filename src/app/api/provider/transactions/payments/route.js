@@ -15,10 +15,10 @@ export async function GET(request) {
       );
     }
 
-    // Ensure the user is a provider
+    // Ensure the user is a provider and get/create provider record
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { id: true, role: true, provider: true }
+      select: { id: true, role: true, name: true, provider: true }
     });
 
     if (!user || user.role !== 'PROVIDER') {
@@ -26,6 +26,24 @@ export async function GET(request) {
         { success: false, error: { code: 'FORBIDDEN', message: 'Only providers can access this endpoint' } },
         { status: 403 }
       );
+    }
+
+    // Get or create provider record
+    let provider = user.provider;
+    if (!provider) {
+      console.log(`Auto-creating Provider record for user: ${user.name} (${user.id})`);
+      
+      provider = await prisma.provider.create({
+        data: {
+          userId: user.id,
+          businessName: user.name || 'Business Name',
+          bio: `Professional services provider`,
+          isVerified: false,
+          paypalCanReceivePayments: false,
+          paypalOnboardingStatus: 'NOT_STARTED',
+          paypalEnvironment: 'sandbox'
+        }
+      });
     }
 
     // Get query parameters
@@ -41,16 +59,16 @@ export async function GET(request) {
     const useSandbox = true;
     
     // Get provider's PayPal details
-    const providerPayPalDetails = user.provider ? {
-      paypalEmail: user.provider.paypalEmail,
-      paypalMerchantId: user.provider.paypalMerchantId,
-      paypalEnvironment: user.provider.paypalEnvironment || 'SANDBOX'
+    const providerPayPalDetails = provider ? {
+      paypalEmail: provider.paypalEmail,
+      paypalMerchantId: provider.paypalMerchantId,
+      paypalEnvironment: provider.paypalEnvironment || 'SANDBOX'
     } : null;
 
-    // Build where clause
+    // Build where clause - Use Provider ID, not User ID
     const where = {
       offer: {
-        providerId: session.user.id
+        providerId: provider.id  // Use Provider ID instead of User ID
       }
     };
 

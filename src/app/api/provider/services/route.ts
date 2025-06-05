@@ -125,9 +125,33 @@ export async function GET() {
       );
     }
 
+    // Get or create the provider record for this user
+    let provider = await prisma.provider.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!provider) {
+      // Auto-create Provider record for users with PROVIDER role who don't have one
+      console.log(`Auto-creating Provider record for user: ${session.user.name} (${session.user.id})`);
+      
+      provider = await prisma.provider.create({
+        data: {
+          userId: session.user.id,
+          businessName: session.user.name || 'Business Name',
+          bio: `Professional services provider`,
+          isVerified: false,
+          paypalCanReceivePayments: true,  // Enable payments for auto-created providers
+          paypalMerchantId: `auto-merchant-${session.user.id}`,  // Temporary merchant ID
+          paypalEmail: session.user.email || 'temp@example.com',
+          paypalOnboardingStatus: 'COMPLETED',  // Set as completed for development
+          paypalEnvironment: 'sandbox'
+        }
+      });
+    }
+
     const services = await prisma.service.findMany({
       where: {
-        providerId: session.user.id
+        providerId: provider.id  // Use Provider ID, not User ID
       },
       include: {
         category: true,
@@ -183,7 +207,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const providerId = session.user.id;
+    // Get or create the provider record for this user
+    let provider = await prisma.provider.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!provider) {
+      // Auto-create Provider record for users with PROVIDER role who don't have one
+      console.log(`Auto-creating Provider record for user: ${session.user.name} (${session.user.id})`);
+      
+      provider = await prisma.provider.create({
+        data: {
+          userId: session.user.id,
+          businessName: session.user.name || 'Business Name',
+          bio: `Professional services provider`,
+          isVerified: false,
+          paypalCanReceivePayments: true,  // Enable payments for auto-created providers
+          paypalMerchantId: `auto-merchant-${session.user.id}`,  // Temporary merchant ID
+          paypalEmail: session.user.email || 'temp@example.com',
+          paypalOnboardingStatus: 'COMPLETED',  // Set as completed for development
+          paypalEnvironment: 'sandbox'
+        }
+      });
+    }
+    
+    const providerId = provider.id;  // Use Provider ID, not User ID
     const data = await request.json();
     
     console.log("Received data:", data);
@@ -325,7 +373,7 @@ export async function POST(request: Request) {
     // Create notifications for provider
     await prisma.notification.create({
       data: {
-        userId: providerId,
+        userId: session.user.id,  // Use User ID, not Provider ID
         type: "SYSTEM",
         title: "Service Created",
         content: `Your service "${name}" has been created and is awaiting approval.`
@@ -354,10 +402,70 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Error creating service:', error);
+    
+    // Handle specific Prisma errors
+    if (error.code === 'P2003') {
+      console.error('Foreign key constraint violation:', error.meta);
+      
+      if (error.meta?.field_name?.includes('providerId')) {
+        return NextResponse.json({ 
+          success: false,
+          error: 'Provider account setup incomplete. Unable to create service because provider record is missing or invalid.',
+          code: 'PROVIDER_SETUP_INCOMPLETE',
+          details: {
+            field: error.meta.field_name,
+            suggestion: 'Please refresh the page and try again. If the problem persists, contact support.'
+          }
+        }, { status: 400 });
+      }
+      
+      if (error.meta?.field_name?.includes('categoryId')) {
+        return NextResponse.json({ 
+          success: false,
+          error: 'Invalid category selected. The selected category may no longer exist.',
+          code: 'INVALID_CATEGORY',
+          details: 'Please select a different category and try again.'
+        }, { status: 400 });
+      }
+      
+      if (error.meta?.field_name?.includes('cityId')) {
+        return NextResponse.json({ 
+          success: false,
+          error: 'Invalid city selected. The selected city may no longer exist.',
+          code: 'INVALID_CITY',
+          details: 'Please select a different city and try again.'
+        }, { status: 400 });
+      }
+      
+      return NextResponse.json({ 
+        success: false,
+        error: 'Invalid reference data. One or more selected options are no longer valid.',
+        code: 'FOREIGN_KEY_CONSTRAINT',
+        details: {
+          field: error.meta?.field_name,
+          suggestion: 'Please refresh the page and try again with different selections.'
+        }
+      }, { status: 400 });
+    }
+    
+    if (error.code === 'P2002') {
+      return NextResponse.json({ 
+        success: false,
+        error: 'Duplicate service detected. A service with the same name or details already exists.',
+        code: 'DUPLICATE_SERVICE',
+        details: 'Please modify the service name or details and try again.'
+      }, { status: 409 });
+    }
+    
     return NextResponse.json({ 
       success: false,
-      error: 'Failed to create service',
-      details: error instanceof Error ? error.message : String(error)
+      error: error.message || 'Failed to create service',
+      code: 'SERVICE_CREATION_FAILED',
+      details: {
+        errorType: error.constructor.name,
+        prismaErrorCode: error.code,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      }
     }, { status: 500 });
   }
 } 

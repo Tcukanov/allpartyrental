@@ -52,7 +52,12 @@ export async function PUT(
         provider: {
           select: {
             id: true,
-            name: true,
+            user: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           },
         },
       },
