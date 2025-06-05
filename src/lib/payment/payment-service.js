@@ -331,12 +331,25 @@ export class PaymentService {
       const service = await this.prisma.service.findUnique({
         where: { id: serviceId },
         include: {
-          provider: true
+          provider: true,
+          city: true  // Include city relation if it exists
         }
       });
 
       if (!service) {
         throw new Error('Service not found');
+      }
+
+      // Handle city - get from service or use a default city
+      let cityId = service.cityId;
+      if (!cityId) {
+        // If service doesn't have a city, get the first available city as default
+        const defaultCity = await this.prisma.city.findFirst();
+        if (!defaultCity) {
+          throw new Error('No cities available in the system');
+        }
+        cityId = defaultCity.id;
+        console.log('🏙️ Service has no city, using default city:', defaultCity.name);
       }
 
       // For direct bookings, we need to create a party first
@@ -349,7 +362,7 @@ export class PaymentService {
           guestCount: 1,
           status: 'PUBLISHED',
           clientId: clientId,
-          cityId: service.cityId,
+          cityId: cityId,  // Use the resolved cityId
           address: bookingData.address || 'Address to be provided',
           comments: bookingData.comments || '',
           contactPhone: bookingData.contactPhone || ''
