@@ -56,9 +56,12 @@ export class PaymentService {
    * Create PayPal order for marketplace payment
    */
   async createPaymentOrder(bookingData) {
+    console.log('🏪 PaymentService.createPaymentOrder called with:', bookingData);
+    
     try {
       const { serviceId, userId, bookingDate, hours, addons = [] } = bookingData;
 
+      console.log('🔍 Fetching service with provider information...');
       // Get service with provider information
       const service = await this.prisma.service.findUnique({
         where: { id: serviceId },
@@ -72,15 +75,32 @@ export class PaymentService {
         }
       });
 
+      console.log('🔍 Service fetch result:', {
+        found: !!service,
+        serviceId: service?.id,
+        serviceName: service?.name,
+        providerId: service?.provider?.id,
+        providerHasUser: !!service?.provider?.user,
+        categoryName: service?.category?.name
+      });
+
       if (!service) {
+        console.log('❌ Service not found in PaymentService');
         throw new Error('Service not found');
       }
 
       // Check if provider has PayPal connected
       if (!service.provider.paypalCanReceivePayments) {
+        console.log('❌ Provider cannot receive payments:', {
+          providerId: service.provider.id,
+          canReceivePayments: service.provider.paypalCanReceivePayments,
+          merchantId: service.provider.paypalMerchantId,
+          onboardingStatus: service.provider.paypalOnboardingStatus
+        });
         throw new Error('Provider PayPal account not connected. Payments cannot be processed.');
       }
 
+      console.log('💰 Calculating pricing...');
       // Calculate pricing
       const basePrice = service.price * hours;
       const addonTotal = addons.reduce((sum, addon) => sum + addon.price, 0);
@@ -91,6 +111,16 @@ export class PaymentService {
       const platformFee = subtotal * (platformFeePercent / 100);
       const total = subtotal + platformFee;
 
+      console.log('💰 Pricing breakdown:', {
+        basePrice,
+        addonTotal,
+        subtotal,
+        platformFeePercent,
+        platformFee,
+        total
+      });
+
+      console.log('📋 Creating PayPal order data...');
       // Create PayPal order with marketplace split
       const orderData = {
         intent: 'CAPTURE',
@@ -144,12 +174,29 @@ export class PaymentService {
         }
       };
 
+      console.log('📋 PayPal order data created:', JSON.stringify(orderData, null, 2));
+
+      console.log('🔗 Calling PayPal client to create order...');
       // Create PayPal order
       const order = await paypalClient.createOrder(orderData);
+      
+      console.log('✅ PayPal order created:', {
+        orderId: order.id,
+        status: order.status,
+        linksCount: order.links?.length || 0
+      });
 
+      console.log('🎯 Getting or creating offer...');
       // Create database transaction record
       const offer = await this.getOrCreateOffer(serviceId, userId, bookingData);
       
+      console.log('✅ Offer created/found:', {
+        offerId: offer.id,
+        price: offer.price,
+        status: offer.status
+      });
+      
+      console.log('💾 Creating transaction record...');
       const transaction = await this.prisma.transaction.create({
         data: {
           offerId: offer.id,
@@ -163,17 +210,35 @@ export class PaymentService {
         }
       });
 
-      return {
+      console.log('✅ Transaction created:', {
+        transactionId: transaction.id,
+        amount: transaction.amount,
+        status: transaction.status,
+        paypalOrderId: transaction.paypalOrderId
+      });
+
+      const approvalUrl = order.links.find(link => link.rel === 'approve')?.href;
+      console.log('🔗 Approval URL found:', !!approvalUrl);
+
+      const result = {
         success: true,
         orderId: order.id,
         transactionId: transaction.id,
-        approvalUrl: order.links.find(link => link.rel === 'approve')?.href,
+        approvalUrl: approvalUrl,
         total: total,
         currency: 'USD'
       };
 
+      console.log('✅ PaymentService.createPaymentOrder completed successfully:', result);
+      return result;
+
     } catch (error) {
-      console.error('Payment order creation failed:', error);
+      console.error('💥 Payment order creation failed in PaymentService:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        code: error.code
+      });
       throw error;
     }
   }

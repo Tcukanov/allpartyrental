@@ -32,7 +32,27 @@ class PayPalClientFixed {
    * Get PayPal access token
    */
   async getAccessToken() {
+    console.log('🔐 PayPal getAccessToken called');
+    console.log('🔐 PayPal credentials check:', {
+      hasClientId: !!this.clientId,
+      hasClientSecret: !!this.clientSecret,
+      clientIdLength: this.clientId?.length || 0,
+      clientSecretLength: this.clientSecret?.length || 0,
+      environment: this.environment,
+      baseURL: this.baseURL
+    });
+    
+    if (!this.clientId || !this.clientSecret) {
+      console.error('❌ PayPal credentials missing:', {
+        clientId: this.clientId ? 'SET' : 'MISSING',
+        clientSecret: this.clientSecret ? 'SET' : 'MISSING'
+      });
+      throw new Error('PayPal credentials not configured');
+    }
+    
     const auth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
+    
+    console.log('🔐 Making PayPal token request to:', `${this.baseURL}/v1/oauth2/token`);
     
     const response = await fetch(`${this.baseURL}/v1/oauth2/token`, {
       method: 'POST',
@@ -43,11 +63,24 @@ class PayPalClientFixed {
       body: 'grant_type=client_credentials'
     });
 
+    console.log('🔐 PayPal token response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ PayPal token request failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
       throw new Error(`Failed to get PayPal access token: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('✅ PayPal access token obtained successfully');
     return data.access_token;
   }
 
@@ -142,47 +175,15 @@ class PayPalClientFixed {
   /**
    * Create a regular order (fallback for providers without connected accounts)
    */
-  async createOrder(amount, currency = 'USD', metadata = {}) {
-    const token = await this.getAccessToken();
+  async createOrder(orderData) {
+    console.log('🛒 PayPal createOrder called');
+    console.log('🛒 Order data received:', JSON.stringify(orderData, null, 2));
     
-    const orderData = {
-      intent: 'CAPTURE',
-      purchase_units: [{
-        amount: {
-          currency_code: currency,
-          value: amount.toFixed(2),
-          breakdown: {
-            item_total: {
-              currency_code: currency,
-              value: amount.toFixed(2)
-            }
-          }
-        },
-        items: [{
-          name: metadata.serviceName || 'Party Service Booking',
-          description: metadata.description || 'Party rental service booking payment',
-          quantity: '1',
-          unit_amount: {
-            currency_code: currency,
-            value: amount.toFixed(2)
-          },
-          category: 'DIGITAL_GOODS',
-          sku: metadata.serviceId || `SERVICE-${Date.now()}`
-        }],
-        custom_id: metadata.transactionId || null,
-        invoice_id: metadata.invoiceId || `INV-${Date.now()}`,
-        description: metadata.description || 'Party service booking payment'
-      }],
-      application_context: {
-        brand_name: 'AllPartyRent',
-        landing_page: 'BILLING',
-        shipping_preference: 'NO_SHIPPING',
-        user_action: 'PAY_NOW',
-        return_url: metadata.returnUrl || `${process.env.NEXTAUTH_URL}/payment/success`,
-        cancel_url: metadata.cancelUrl || `${process.env.NEXTAUTH_URL}/payment/cancel`
-      }
-    };
+    const token = await this.getAccessToken();
+    console.log('✅ Access token obtained, proceeding with order creation');
 
+    console.log('🛒 Making PayPal order creation request to:', `${this.baseURL}/v2/checkout/orders`);
+    
     const response = await fetch(`${this.baseURL}/v2/checkout/orders`, {
       method: 'POST',
       headers: {
@@ -193,12 +194,30 @@ class PayPalClientFixed {
       body: JSON.stringify(orderData)
     });
 
+    console.log('🛒 PayPal order creation response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('❌ PayPal order creation failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
       throw new Error(`Failed to create order: ${response.status} - ${errorText}`);
     }
 
-    return await response.json();
+    const order = await response.json();
+    console.log('✅ PayPal order created successfully:', {
+      orderId: order.id,
+      status: order.status,
+      linksCount: order.links?.length || 0
+    });
+    
+    return order;
   }
 
   /**
