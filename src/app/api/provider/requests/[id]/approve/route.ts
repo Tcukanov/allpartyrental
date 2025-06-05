@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 import { NotificationType } from '@prisma/client'; 
 import { offerRequiresAction } from '@/utils/statusConfig';
+import { PaymentService } from '@/lib/payment/payment-service';
 
 export async function POST(
   request: NextRequest,
@@ -115,16 +116,52 @@ export async function POST(
       where: { offerId: id }
     });
 
-    // If there's a transaction, update its status to PROVIDER_REVIEW
+    // If there's a transaction, update its status and auto-capture PayPal payment
     if (existingTransaction) {
-      console.log(`Updating transaction ${existingTransaction.id} to PROVIDER_REVIEW status`);
-      await prisma.transaction.update({
-        where: { id: existingTransaction.id },
-        data: {
-          status: 'PROVIDER_REVIEW',
-          reviewDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+      console.log(`Updating transaction ${existingTransaction.id} to COMPLETED status`);
+      
+      // Auto-capture PayPal payment if it exists
+      if (existingTransaction.paypalOrderId) {
+        console.log(`Auto-capturing PayPal payment for order: ${existingTransaction.paypalOrderId}`);
+        try {
+          const paymentService = new PaymentService();
+          const captureResult = await paymentService.capturePayment(existingTransaction.paypalOrderId);
+          
+          if (captureResult.success) {
+            console.log(`PayPal payment captured successfully: ${captureResult.captureId}`);
+            // Transaction status will be updated by the capturePayment method
+          } else {
+            console.error(`PayPal capture failed for transaction ${existingTransaction.id}`);
+            // Still update transaction to PROVIDER_REVIEW even if PayPal capture fails
+            await prisma.transaction.update({
+              where: { id: existingTransaction.id },
+              data: {
+                status: 'PROVIDER_REVIEW',
+                reviewDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000)
+              }
+            });
+          }
+        } catch (captureError) {
+          console.error(`PayPal capture error for transaction ${existingTransaction.id}:`, captureError);
+          // Still update transaction to PROVIDER_REVIEW even if PayPal capture fails
+          await prisma.transaction.update({
+            where: { id: existingTransaction.id },
+            data: {
+              status: 'PROVIDER_REVIEW',
+              reviewDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            }
+          });
         }
-      });
+      } else {
+        // No PayPal order, just update status
+        await prisma.transaction.update({
+          where: { id: existingTransaction.id },
+          data: {
+            status: 'PROVIDER_REVIEW',
+            reviewDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000)
+          }
+        });
+      }
     } else {
       console.log(`No existing transaction found for offer ${id}`);
     }
