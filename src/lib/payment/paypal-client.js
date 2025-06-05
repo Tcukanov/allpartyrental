@@ -285,8 +285,7 @@ class PayPalClientFixed {
     // Always include partner_config_override with the real domain
     referralData.partner_config_override = {
       return_url: `${baseUrl}/api/paypal/callback`,
-      return_url_description: "Return to AllPartyRent Dashboard",
-      action_renewal_url: `${baseUrl}/api/paypal/callback`
+      return_url_description: "Return to AllPartyRent Dashboard"
     };
     console.log('🌐 Using real domain callback URLs:', baseUrl);
 
