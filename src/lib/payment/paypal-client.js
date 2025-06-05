@@ -301,12 +301,21 @@ class PayPalClientFixed {
       tracking_id: sellerData.trackingId || `SELLER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     };
 
-    // Always include partner_config_override with the real domain
-    referralData.partner_config_override = {
-      return_url: `${baseUrl}/api/paypal/callback`,
-      return_url_description: "Return to AllPartyRent Dashboard"
-    };
-    console.log('🌐 Using real domain callback URLs:', baseUrl);
+    // For sandbox, use simpler configuration
+    if (this.environment === 'sandbox') {
+      console.log('🔧 Using simplified sandbox configuration');
+      referralData.partner_config_override = {
+        return_url: `${baseUrl}/api/paypal/callback`,
+        return_url_description: "Return to AllPartyRent Dashboard"
+      };
+    } else {
+      // Always include partner_config_override with the real domain
+      referralData.partner_config_override = {
+        return_url: `${baseUrl}/api/paypal/callback`,
+        return_url_description: "Return to AllPartyRent Dashboard"
+      };
+    }
+    console.log('🌐 Using callback URLs:', baseUrl);
 
     // Add seller information if provided
     if (sellerData.email) {
@@ -334,6 +343,12 @@ class PayPalClientFixed {
       body: JSON.stringify(referralData)
     });
 
+    console.log('🔗 PayPal partner referral response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Partner referral creation failed:', errorText);
@@ -341,7 +356,16 @@ class PayPalClientFixed {
     }
 
     const result = await response.json();
-    console.log('Created partner referral:', result);
+    console.log('Created partner referral - FULL RESPONSE:', JSON.stringify(result, null, 2));
+    
+    // Log all available links
+    if (result.links) {
+      console.log('🔗 Available PayPal links:');
+      result.links.forEach((link, index) => {
+        console.log(`  ${index + 1}. ${link.rel}: ${link.href}`);
+      });
+    }
+    
     return result;
   }
 
