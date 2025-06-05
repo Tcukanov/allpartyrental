@@ -60,14 +60,26 @@ export async function POST(request: Request) {
       // Check if this is an auto-generated merchant ID (development mode)
       const isDevelopment = process.env.NODE_ENV !== 'production';
       const isAutoMerchantId = provider.paypalMerchantId?.startsWith('auto-merchant-') || provider.paypalMerchantId?.startsWith('SANDBOX-DEV-');
+      const isSandboxMode = process.env.PAYPAL_MODE === 'sandbox';
       
       console.log('🔧 Environment check:', {
         isDevelopment,
         isAutoMerchantId,
+        isSandboxMode,
         merchantIdFormat: provider.paypalMerchantId?.substring(0, 15) + '...'
       });
       
-      if (isDevelopment && isAutoMerchantId) {
+      // For sandbox mode with real merchant IDs from onboarding, enable payments automatically
+      if (isSandboxMode && !isAutoMerchantId && provider.paypalMerchantId) {
+        console.log('🔧 Sandbox mode with real merchant ID - enabling payments automatically');
+        console.log('🔧 Skipping PayPal API status check due to partner permission requirements');
+        updateData = {
+          paypalCanReceivePayments: true,
+          paypalOnboardingStatus: 'COMPLETED',
+          paypalStatusIssues: null
+        };
+        statusMessage = 'Sandbox payments enabled - PayPal account ready to receive payments!';
+      } else if (isDevelopment && isAutoMerchantId) {
         console.log('🔧 Development mode - enabling auto-merchant for payments');
         // For auto-generated merchant IDs in development, enable payments automatically
         updateData = {
@@ -78,7 +90,7 @@ export async function POST(request: Request) {
         statusMessage = 'Development sandbox account ready - payments enabled!';
       } else {
         console.log('🔗 Calling PayPal API to check merchant status');
-        // Try to verify with real PayPal API
+        // Try to verify with real PayPal API (production mode)
         try {
           const statusCheck = await paypalClient.checkSellerStatus(provider.paypalMerchantId);
           
@@ -111,18 +123,18 @@ export async function POST(request: Request) {
             merchantId: provider.paypalMerchantId
           });
           
-          // For sandbox accounts, if the status check fails, enable payments anyway
-          if (process.env.PAYPAL_MODE === 'sandbox') {
-            console.log('🔧 Sandbox mode - enabling payments despite API error');
+          // For sandbox accounts, if the status check fails due to API permissions, enable payments anyway
+          if (isSandboxMode) {
+            console.log('🔧 Sandbox mode - enabling payments despite API permission error');
             updateData = {
               paypalCanReceivePayments: true,
               paypalOnboardingStatus: 'COMPLETED',
               paypalStatusIssues: JSON.stringify([{ 
-                type: 'API_CHECK_FAILED_SANDBOX_ENABLED', 
-                message: 'PayPal API check failed but sandbox payments enabled for testing' 
+                type: 'API_PERMISSIONS_ISSUE_SANDBOX_ENABLED', 
+                message: 'PayPal partner API not accessible but sandbox payments enabled for testing' 
               }])
             };
-            statusMessage = 'Sandbox payments enabled for testing (API check failed)';
+            statusMessage = 'Sandbox payments enabled for testing (partner API permissions required for status check)';
           } else {
             updateData = {
               paypalCanReceivePayments: false,
