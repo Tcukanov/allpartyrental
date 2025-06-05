@@ -363,13 +363,10 @@ export class PaymentService {
           status: 'PUBLISHED',
           clientId: clientId,
           cityId: cityId,  // Use the resolved cityId
-          address: bookingData.address || 'Address to be provided',
-          comments: bookingData.comments || '',
-          contactPhone: bookingData.contactPhone || ''
         }
       });
 
-      // Create party service
+      // Create party service with booking details in specificOptions
       const partyService = await this.prisma.partyService.create({
         data: {
           partyId: party.id,
@@ -377,7 +374,10 @@ export class PaymentService {
           specificOptions: {
             hours: hours,
             addons: addons,
-            notes: bookingData.comments || ''
+            notes: bookingData.comments || '',
+            address: bookingData.address || 'Address to be provided',
+            contactPhone: bookingData.contactPhone || '',
+            bookingType: 'direct_booking'
           }
         }
       });
