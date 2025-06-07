@@ -6,7 +6,7 @@
 class PayPalClientFixed {
   constructor() {
     this.environment = process.env.PAYPAL_MODE || 'sandbox';
-    
+
     // Use the correct environment variable names based on mode
     if (this.environment === 'sandbox') {
       this.clientId = process.env.PAYPAL_SANDBOX_CLIENT_ID;
@@ -15,11 +15,11 @@ class PayPalClientFixed {
       this.clientId = process.env.PAYPAL_LIVE_CLIENT_ID;
       this.clientSecret = process.env.PAYPAL_LIVE_CLIENT_SECRET;
     }
-    
-    this.baseURL = this.environment === 'sandbox' 
+
+    this.baseURL = this.environment === 'sandbox'
       ? 'https://api-m.sandbox.paypal.com'
       : 'https://api-m.paypal.com';
-      
+
     console.log('PayPal Client initialized:', {
       clientId: this.clientId ? this.clientId.substring(0, 10) + '...' : 'MISSING',
       clientSecret: this.clientSecret ? this.clientSecret.substring(0, 10) + '...' : 'MISSING',
@@ -41,7 +41,7 @@ class PayPalClientFixed {
       environment: this.environment,
       baseURL: this.baseURL
     });
-    
+
     if (!this.clientId || !this.clientSecret) {
       console.error('❌ PayPal credentials missing:', {
         clientId: this.clientId ? 'SET' : 'MISSING',
@@ -49,11 +49,11 @@ class PayPalClientFixed {
       });
       throw new Error('PayPal credentials not configured');
     }
-    
+
     const auth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
-    
+
     console.log('🔐 Making PayPal token request to:', `${this.baseURL}/v1/oauth2/token`);
-    
+
     const response = await fetch(`${this.baseURL}/v1/oauth2/token`, {
       method: 'POST',
       headers: {
@@ -94,7 +94,7 @@ class PayPalClientFixed {
    */
   async createMarketplaceOrder(totalAmount, providerAmount, platformCommission, providerPayPalAccountId, metadata = {}) {
     const token = await this.getAccessToken();
-    
+
     const orderData = {
       intent: 'CAPTURE',
       purchase_units: [{
@@ -178,12 +178,12 @@ class PayPalClientFixed {
   async createOrder(orderData) {
     console.log('🛒 PayPal createOrder called');
     console.log('🛒 Order data received:', JSON.stringify(orderData, null, 2));
-    
+
     const token = await this.getAccessToken();
     console.log('✅ Access token obtained, proceeding with order creation');
 
     console.log('🛒 Making PayPal order creation request to:', `${this.baseURL}/v2/checkout/orders`);
-    
+
     const response = await fetch(`${this.baseURL}/v2/checkout/orders`, {
       method: 'POST',
       headers: {
@@ -216,7 +216,7 @@ class PayPalClientFixed {
       status: order.status,
       linksCount: order.links?.length || 0
     });
-    
+
     return order;
   }
 
@@ -225,13 +225,14 @@ class PayPalClientFixed {
    */
   async captureOrder(orderId) {
     const token = await this.getAccessToken();
-    
+
     const response = await fetch(`${this.baseURL}/v2/checkout/orders/${orderId}/capture`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({})
     });
 
     if (!response.ok) {
@@ -247,7 +248,7 @@ class PayPalClientFixed {
    */
   async getOrder(orderId) {
     const token = await this.getAccessToken();
-    
+
     const response = await fetch(`${this.baseURL}/v2/checkout/orders/${orderId}`, {
       method: 'GET',
       headers: {
@@ -269,17 +270,17 @@ class PayPalClientFixed {
   async createPartnerReferral(sellerData) {
     console.log('🔥 UPDATED PayPal Client - THIS SHOULD APPEAR IN LOGS! 🔥');
     const token = await this.getAccessToken();
-    
+
     // Use the real domain instead of localhost
     const baseUrl = process.env.NEXTAUTH_URL || 'https://party-vendors.com';
     const isDevelopment = process.env.NODE_ENV !== 'production';
-    
+
     console.log('🔍 Environment check:', {
       baseUrl,
       isDevelopment,
       nodeEnv: process.env.NODE_ENV
     });
-    
+
     const referralData = {
       operations: [{
         operation: "API_INTEGRATION",
@@ -357,7 +358,7 @@ class PayPalClientFixed {
 
     const result = await response.json();
     console.log('Created partner referral - FULL RESPONSE:', JSON.stringify(result, null, 2));
-    
+
     // Log all available links
     if (result.links) {
       console.log('🔗 Available PayPal links:');
@@ -365,7 +366,7 @@ class PayPalClientFixed {
         console.log(`  ${index + 1}. ${link.rel}: ${link.href}`);
       });
     }
-    
+
     return result;
   }
 
@@ -375,10 +376,10 @@ class PayPalClientFixed {
   async getMerchantStatus(merchantId) {
     console.log('🔍 getMerchantStatus called with merchantId:', merchantId);
     const token = await this.getAccessToken();
-    
+
     const url = `${this.baseURL}/v1/customer/partners/${merchantId}`;
     console.log('🔍 Making merchant status request to:', url);
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -416,36 +417,36 @@ class PayPalClientFixed {
     console.log('🔍 checkSellerStatus called with merchantId:', merchantId);
     try {
       const status = await this.getMerchantStatus(merchantId);
-      
+
       const issues = [];
-      
+
       if (!status.primary_email_confirmed) {
         issues.push({
           type: 'EMAIL_NOT_CONFIRMED',
           message: 'Please confirm your email address on https://www.paypal.com/businessprofile/settings in order to receive payments! You currently cannot receive payments.'
         });
       }
-      
+
       if (!status.payments_receivable) {
         issues.push({
           type: 'CANNOT_RECEIVE_PAYMENTS',
           message: 'You currently cannot receive payments due to restriction on your PayPal account. Please reach out to PayPal Customer Support or connect to https://www.paypal.com for more information.'
         });
       }
-      
+
       if (!status.oauth_integrations || status.oauth_integrations.length === 0) {
         issues.push({
           type: 'NO_OAUTH_PERMISSIONS',
           message: 'Please complete the onboarding process and grant permissions to AllPartyRent.'
         });
       }
-      
+
       console.log('✅ Seller status check completed:', {
         canReceivePayments: issues.length === 0,
         issuesCount: issues.length,
         issues: issues.map(i => i.type)
       });
-      
+
       return {
         canReceivePayments: issues.length === 0,
         issues,
@@ -457,7 +458,7 @@ class PayPalClientFixed {
         stack: error.stack,
         merchantId
       });
-      
+
       return {
         canReceivePayments: false,
         issues: [{
@@ -470,4 +471,4 @@ class PayPalClientFixed {
   }
 }
 
-export { PayPalClientFixed }; 
+export { PayPalClientFixed };
