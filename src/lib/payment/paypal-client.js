@@ -231,7 +231,8 @@ class PayPalClientFixed {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({})
     });
 
     if (!response.ok) {
