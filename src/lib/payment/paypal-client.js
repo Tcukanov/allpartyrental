@@ -257,6 +257,8 @@ class PayPalClientFixed {
       }
     });
 
+    console.log('RESPONSE', response);
+
     if (!response.ok) {
       throw new Error(`Failed to get order: ${response.status}`);
     }

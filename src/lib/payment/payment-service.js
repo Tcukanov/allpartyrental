@@ -1,6 +1,6 @@
 /**
  * Payment Service - Commission-Based PayPal Integration
- * 
+ *
  * Flow:
  * 1. Client pays full amount (service + commission)
  * 2. Money goes to platform account
@@ -26,10 +26,10 @@ async function getFeeSettings() {
         }
       }
     });
-    
+
     const clientFeePercent = settings.find(s => s.key === 'clientFeePercent')?.value || '5';
     const providerFeePercent = settings.find(s => s.key === 'providerFeePercent')?.value || '12';
-    
+
     return {
       clientFeePercent: parseFloat(clientFeePercent),
       providerFeePercent: parseFloat(providerFeePercent)
@@ -57,9 +57,9 @@ export class PaymentService {
    */
   async createPaymentOrder(bookingData) {
     console.log('🏪 PaymentService.createPaymentOrder called with:', bookingData);
-    
+
     try {
-      const { serviceId, userId, bookingDate, hours, addons = [] } = bookingData;
+      const { serviceId, userId, bookingDate, hours, paymentMethod = '', addons = [] } = bookingData;
 
       console.log('🔍 Fetching service with provider information...');
       // Get service with provider information
@@ -105,7 +105,7 @@ export class PaymentService {
       const basePrice = service.price * hours;
       const addonTotal = addons.reduce((sum, addon) => sum + addon.price, 0);
       const subtotal = basePrice + addonTotal;
-      
+
       // Platform fees (configurable)
       const platformFeePercent = 5; // 5% platform fee
       const platformFee = subtotal * (platformFeePercent / 100);
@@ -136,7 +136,7 @@ export class PaymentService {
                 value: subtotal.toFixed(2)
               },
               handling: {
-                currency_code: 'USD', 
+                currency_code: 'USD',
                 value: platformFee.toFixed(2)
               }
             }
@@ -179,23 +179,34 @@ export class PaymentService {
       console.log('🔗 Calling PayPal client to create order...');
       // Create PayPal order
       const order = await paypalClient.createOrder(orderData);
-      
+
       console.log('✅ PayPal order created:', {
         orderId: order.id,
         status: order.status,
         linksCount: order.links?.length || 0
       });
 
+      if(paymentMethod === 'direct_booking') {
+        return {
+          success: true,
+          orderId: order.id,
+          transactionId: '',
+          approvalUrl: '',
+          total: total,
+          currency: 'USD'
+        }
+      }
+
       console.log('🎯 Getting or creating offer...');
       // Create database transaction record
       const offer = await this.getOrCreateOffer(serviceId, userId, bookingData);
-      
+
       console.log('✅ Offer created/found:', {
         offerId: offer.id,
         price: offer.price,
         status: offer.status
       });
-      
+
       console.log('💾 Creating transaction record...');
       const transaction = await this.prisma.transaction.create({
         data: {
@@ -295,20 +306,91 @@ export class PaymentService {
 
     } catch (error) {
       console.error('Payment capture failed:', error);
-      
+
       // Update transaction status to failed
       if (orderId) {
         await this.prisma.transaction.updateMany({
           where: { paypalOrderId: orderId },
-          data: { 
+          data: {
             status: 'FAILED',
             paypalStatus: 'FAILED'
           }
         });
       }
-      
+
       throw error;
     }
+  }
+
+  async saveAuthorization(bookingData, order) {
+
+    const { serviceId, userId, bookingDate, hours, addons = [] } = bookingData;
+
+    const service = await this.prisma.service.findUnique({
+      where: { id: serviceId },
+      include: {
+        provider: {
+          include: {
+            user: true
+          }
+        },
+        category: true
+      }
+    });
+
+    console.log('💰 Calculating pricing...');
+    // Calculate pricing
+    const basePrice = service.price * hours;
+    const addonTotal = addons.reduce((sum, addon) => sum + addon.price, 0);
+    const subtotal = basePrice + addonTotal;
+
+    // Platform fees (configurable)
+    const platformFeePercent = 5; // 5% platform fee
+    const platformFee = subtotal * (platformFeePercent / 100);
+    const total = subtotal + platformFee;
+
+    console.log('🎯 Getting or creating offer...');
+    // Create database transaction record
+    const offer = await this.getOrCreateOffer(serviceId, userId, bookingData);
+
+    console.log('✅ Offer created/found:', {
+      offerId: offer.id,
+      price: offer.price,
+      status: offer.status
+    });
+
+    console.log('💾 Creating transaction record...');
+    const transaction = await this.prisma.transaction.create({
+      data: {
+        offerId: offer.id,
+        amount: total,
+        status: 'PENDING',
+        paypalOrderId: order.id,
+        paypalStatus: order.status,
+        clientFeePercent: platformFeePercent,
+        providerFeePercent: 100 - platformFeePercent, // Provider gets the rest
+        termsAccepted: false
+      }
+    });
+
+    console.log('✅ Transaction created:', {
+      transactionId: transaction.id,
+      amount: transaction.amount,
+      status: transaction.status,
+      paypalOrderId: transaction.paypalOrderId
+    });
+
+    const result = {
+      success: true,
+      orderId: order.id,
+      transactionId: transaction.id,
+      approvalUrl: '',
+      total: total,
+      currency: 'USD'
+    };
+
+    console.log('✅ PaymentService.createPaymentOrder completed successfully:', result);
+    return result;
   }
 
   /**
@@ -316,7 +398,7 @@ export class PaymentService {
    */
   async getOrCreateOffer(serviceId, clientId, bookingData) {
     const { bookingDate, hours, addons = [] } = bookingData;
-    
+
     // Check if offer already exists for this booking
     let offer = await this.prisma.offer.findFirst({
       where: {
@@ -522,4 +604,4 @@ export class PaymentService {
 }
 
 // Export singleton instance
-export const paymentService = new PaymentService(); 
+export const paymentService = new PaymentService();

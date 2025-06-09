@@ -9,7 +9,7 @@ import { PaymentService } from '@/lib/payment/payment-service';
  */
 export async function POST(request) {
   console.log('🚀 Payment creation endpoint hit');
-  
+
   try {
     // Debug environment variables
     console.log('🔧 Environment debug:', {
@@ -24,31 +24,31 @@ export async function POST(request) {
     });
 
     const session = await getServerSession(authOptions);
-    
+
     console.log('👤 Session check:', {
       hasSession: !!session,
       userId: session?.user?.id,
       userRole: session?.user?.role,
       userEmail: session?.user?.email
     });
-    
+
     if (!session?.user) {
       console.log('❌ No session found');
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Authentication required. Please log in to continue.',
-        code: 'UNAUTHORIZED' 
+        code: 'UNAUTHORIZED'
       }, { status: 401 });
     }
 
     const requestBody = await request.json();
     console.log('📝 Request body received:', requestBody);
-    
-    const { serviceId, bookingDate, hours, addons = [] } = requestBody;
+
+    const { serviceId, bookingDate, hours, paymentMethod = '', addons = [] } = requestBody;
 
     // Validate required fields
     if (!serviceId || !bookingDate || !hours) {
       console.log('❌ Missing required fields:', { serviceId, bookingDate, hours });
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Missing required fields: serviceId, bookingDate, hours',
         code: 'MISSING_FIELDS',
         details: {
@@ -69,7 +69,7 @@ export async function POST(request) {
     // Get service information
     console.log('🔍 Fetching service from database...');
     const { prisma } = require('@/lib/prisma');
-    
+
     const service = await prisma.service.findUnique({
       where: { id: serviceId },
       include: {
@@ -92,9 +92,9 @@ export async function POST(request) {
 
     if (!service) {
       console.log('❌ Service not found for ID:', serviceId);
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: `Service with ID '${serviceId}' not found. The service may have been removed or is no longer available.`,
-        code: 'SERVICE_NOT_FOUND' 
+        code: 'SERVICE_NOT_FOUND'
       }, { status: 404 });
     }
 
@@ -107,8 +107,8 @@ export async function POST(request) {
         hasMerchantId: !!service.provider.paypalMerchantId,
         onboardingStatus: service.provider.paypalOnboardingStatus
       });
-      
-      return NextResponse.json({ 
+
+      return NextResponse.json({
         error: `Payment setup incomplete for this service provider. The provider "${service.provider.businessName || 'this provider'}" needs to complete their PayPal marketplace setup before accepting payments.`,
         code: 'PROVIDER_PAYMENT_NOT_CONFIGURED',
         details: {
@@ -124,14 +124,15 @@ export async function POST(request) {
     // Create payment order using PayPal marketplace
     console.log('💳 Initializing PaymentService...');
     const paymentService = new PaymentService();
-    
+
     console.log('💳 Calling createPaymentOrder...');
     const result = await paymentService.createPaymentOrder({
       serviceId,
       userId: session.user.id,
       bookingDate,
       hours,
-      addons
+      addons,
+      paymentMethod
     });
 
     console.log('✅ Payment order created successfully:', {
@@ -159,38 +160,38 @@ export async function POST(request) {
       name: error.name,
       cause: error.cause
     });
-    
+
     // Handle specific error types
     if (error.code === 'P2025') {
       console.log('❌ Database record not found error');
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Database record not found. The service or related data may have been deleted.',
         code: 'DATABASE_RECORD_NOT_FOUND',
         details: error.message
       }, { status: 404 });
     }
-    
+
     if (error.code === 'P2002') {
       console.log('❌ Duplicate transaction error');
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Duplicate transaction detected. Please try again.',
         code: 'DUPLICATE_TRANSACTION',
         details: error.message
       }, { status: 409 });
     }
-    
+
     // PayPal specific errors
     if (error.message?.includes('Failed to get PayPal access token')) {
       console.log('❌ PayPal authentication error');
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'PayPal authentication failed. Please contact support.',
         code: 'PAYPAL_AUTH_FAILED',
         details: 'PayPal credentials not properly configured'
       }, { status: 500 });
     }
-    
+
     console.log('❌ Generic payment creation error');
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: error.message || 'Failed to create payment order',
       code: 'PAYMENT_CREATION_FAILED',
       details: {
@@ -200,4 +201,4 @@ export async function POST(request) {
       }
     }, { status: 500 });
   }
-} 
+}
