@@ -664,7 +664,6 @@ export default function PaymentPage({ params }) {
       onApprove: async (data) => {
         try {
           const { orderID } = data;
-
           const authRes = await fetch('/api/payments/authorize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -682,13 +681,10 @@ export default function PaymentPage({ params }) {
           });
 
           const result = await authRes.json();
-
           console.log('Payment order created:', result);
-
           if (!result.success) {
             throw new Error(result.error || 'Failed to create booking');
           }
-
           sessionStorage.removeItem('pendingBooking');
 
           // Show success message
@@ -745,51 +741,6 @@ export default function PaymentPage({ params }) {
       expiryField.render("#card-expiry-field-container");
 
       cardFieldRef.current = cardField;
-
-      // Add click listener to submit button and call the submit function on the CardField component
-      // document
-      //     .getElementById("card-field-submit-button")
-      //     .addEventListener("click", () => {
-      //
-      //       if (!validateBilling()) {
-      //         toast({
-      //           title: 'Please fill in all required fields',
-      //           status: 'error',
-      //           duration: 3000,
-      //           isClosable: true,
-      //         });
-      //         return;
-      //       }
-      //
-      //       cardField
-      //           .submit({
-      //             // From your billing address fields
-      //             billingAddress: {
-      //               addressLine1: document.getElementById(
-      //                   "card-billing-address-line-1"
-      //               ).value,
-      //               adminArea1: document.getElementById(
-      //                   "card-billing-address-admin-area-line-1"
-      //               ).value,
-      //               adminArea2: document.getElementById(
-      //                   "card-billing-address-admin-area-line-2"
-      //               ).value,
-      //               postalCode: document.getElementById(
-      //                   "card-billing-address-postal-code"
-      //               ).value,
-      //               countryCode: "US",
-      //             },
-      //
-      //           })
-      //           .then(() => {
-      //             // submit successful
-      //           }).catch(err => {
-      //
-      //               const userMsg = extractPayPalErrorMessage(err, 'Payment failed');
-      //               toast({ title: 'CardFields error', description: userMsg, status: 'error' });
-      //               setIsProcessingPayment(false);
-      //           });
-      //     });
     }
   };
 
