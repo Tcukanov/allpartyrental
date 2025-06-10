@@ -1383,9 +1383,7 @@ export default function PaymentPage({ params }) {
                       )}
                     </VStack>
                   </Box>
-
-
-
+                </Box>
 
                 </VStack>
               </CardBody>
