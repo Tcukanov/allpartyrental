@@ -34,6 +34,7 @@ import { FiMapPin } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import PayPalAdvancedCreditCard from '@/components/payment/PayPalAdvancedCreditCard';
 
 export default function PaymentPage({ params }) {
   const router = useRouter();
@@ -125,7 +126,10 @@ export default function PaymentPage({ params }) {
 
     script.onload = () => {
       console.log('PayPal SDK loaded successfully');
-      setPaypalLoaded(true);
+      // Add a small delay to ensure PayPal is fully ready
+      setTimeout(() => {
+        setPaypalLoaded(true);
+      }, 500);
     };
 
     script.onerror = () => {
@@ -150,28 +154,64 @@ export default function PaymentPage({ params }) {
     };
   }, [toast]);
 
-  // Initialize PayPal buttons for both card and PayPal payments
+  // Initialize PayPal buttons for PayPal wallet payments only
   useEffect(() => {
     if (!paypalLoaded || !bookingData || !window.paypal) return;
 
-    // Initialize credit card buttons (primary method)
-    const cardButtonsContainer = document.getElementById('card-buttons');
-    if (cardButtonsContainer) {
-      cardButtonsContainer.innerHTML = '';
-      initializeCreditCardButtons();
-    }
+    let retryCount = 0;
+    const maxRetries = 5;
 
-    // Initialize PayPal buttons (secondary method)
-    const paypalButtonsContainer = document.getElementById('paypal-buttons');
-    if (paypalButtonsContainer) {
-      paypalButtonsContainer.innerHTML = '';
-      initializePayPalButtons();
-    }
+    const tryInitialize = () => {
+      const paypalButtonsContainer = document.getElementById('paypal-buttons');
+      if (paypalButtonsContainer) {
+        console.log('PayPal buttons container found, initializing...');
+        paypalButtonsContainer.innerHTML = '';
+        initializePayPalButtons();
+      } else {
+        retryCount++;
+        console.log(`PayPal buttons container not found (attempt ${retryCount}/${maxRetries})`);
+
+        if (retryCount < maxRetries) {
+          setTimeout(tryInitialize, 200 * retryCount); // Exponential backoff
+        } else {
+          console.error('PayPal buttons container not found after all retries');
+          toast({
+            title: 'PayPal Loading Issue',
+            description: 'PayPal wallet payment option is temporarily unavailable. You can still use credit cards.',
+            status: 'warning',
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+      }
+    };
 
     initializeCardFields();
+
+    // Start with a small delay
+    const timer = setTimeout(tryInitialize, 500);
+
+    return () => clearTimeout(timer);
+
   }, [paypalLoaded, bookingData]);
 
   const initializePayPalButtons = () => {
+    // Double-check that the container exists
+    const container = document.getElementById('paypal-buttons');
+    if (!container) {
+      console.error('PayPal buttons container not found when trying to initialize');
+      toast({
+        title: 'Payment System Error',
+        description: 'Unable to load PayPal buttons. Please refresh the page.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    console.log('Initializing PayPal buttons for wallet payments...');
+
     window.paypal.Buttons({
       style: {
         layout: 'vertical',
@@ -317,9 +357,20 @@ export default function PaymentPage({ params }) {
       }
     }).render('#paypal-buttons').catch((error) => {
       console.error('Failed to initialize PayPal buttons:', error);
-      const paypalSection = document.getElementById('paypal-section');
-      if (paypalSection) {
-        paypalSection.innerHTML = '<Text color="red.500">PayPal option currently unavailable.</Text>';
+
+      // Show user-friendly error
+      toast({
+        title: 'PayPal Loading Error',
+        description: 'PayPal buttons failed to load. Please refresh the page or try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+
+      // Try to update the container with error message
+      const paypalButtonsContainer = document.getElementById('paypal-buttons');
+      if (paypalButtonsContainer) {
+        paypalButtonsContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #e53e3e;">PayPal buttons failed to load. Please refresh the page.</div>';
       }
     });
   };
@@ -897,6 +948,71 @@ export default function PaymentPage({ params }) {
                     </Alert>
                   )}
 
+                  {/* Debug info for PayPal initialization */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <Alert status="info" size="sm">
+                      <AlertIcon />
+                      <VStack spacing={1} align="start" fontSize="xs">
+                        <Text>PayPal SDK Loaded: {paypalLoaded ? '✅' : '❌'}</Text>
+                        <Text>Window PayPal Available: {typeof window !== 'undefined' && window.paypal ? '✅' : '❌'}</Text>
+                        <Text>Booking Data: {bookingData ? '✅' : '❌'}</Text>
+                      </VStack>
+                    </Alert>
+                  )}
+
+                  {/* PayPal Advanced Credit Card Processing */}
+                  <Box id="card-section">
+                    <PayPalAdvancedCreditCard
+                      amount={bookingData.pricing.total}
+                      bookingData={{
+                        serviceId: bookingData.serviceId,
+                        bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
+                        duration: bookingData.bookingDetails.duration || 4,
+                        address: `${bookingData.bookingDetails.address}, ${bookingData.bookingDetails.city} ${bookingData.bookingDetails.zipCode}`,
+                        comments: bookingData.bookingDetails.specialRequests || '',
+                        contactPhone: bookingData.bookingDetails.contactPhone,
+                        guestCount: bookingData.bookingDetails.guestCount
+                      }}
+                      onSuccess={(data) => {
+                        console.log('Payment successful:', data);
+                        // Clear booking data from sessionStorage
+                        sessionStorage.removeItem('pendingBooking');
+
+                        // Show success message
+                        toast({
+                          title: 'Payment Successful! 🎉',
+                          description: 'Your booking has been submitted to the provider for confirmation.',
+                          status: 'success',
+                          duration: 5000,
+                          isClosable: true,
+                        });
+
+                        // Redirect to confirmation page
+                        router.push(`/book/${serviceId}/confirmed?orderId=${data.orderId || data.orderID}&transactionId=${data.transactionId}`);
+                      }}
+                      onError={(error) => {
+                        console.error('Payment error:', error);
+                        toast({
+                          title: 'Payment Failed',
+                          description: error || 'Please try again or contact support.',
+                          status: 'error',
+                          duration: 5000,
+                          isClosable: true,
+                        });
+                      }}
+                      onCancel={() => {
+                        console.log('Payment cancelled');
+                        toast({
+                          title: 'Payment Cancelled',
+                          description: 'You can try again when ready.',
+                          status: 'warning',
+                          duration: 3000,
+                          isClosable: true,
+                        });
+                      }}
+                      disabled={isProcessingPayment}
+                    />
+
                   {/* Credit Card Form - Modern Design */}
                   <Box id="card-section">
                     {/* Payment Method Header */}
@@ -1267,6 +1383,9 @@ export default function PaymentPage({ params }) {
                       )}
                     </VStack>
                   </Box>
+
+
+
 
                 </VStack>
               </CardBody>
