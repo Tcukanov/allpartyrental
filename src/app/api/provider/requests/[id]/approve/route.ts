@@ -120,30 +120,61 @@ export async function POST(
     if (existingTransaction) {
       console.log(`Updating transaction ${existingTransaction.id} to COMPLETED status`);
       
-      // Auto-capture PayPal payment if it exists
+      // Auto-capture PayPal payment if it exists (for both PayPal and credit card payments)
       if (existingTransaction.paypalOrderId) {
-        console.log(`Auto-capturing PayPal payment for order: ${existingTransaction.paypalOrderId}`);
+        console.log(`Checking PayPal order status for: ${existingTransaction.paypalOrderId}`);
         try {
           const paymentService = new PaymentService();
-          const captureResult = await paymentService.capturePayment(existingTransaction.paypalOrderId);
           
-          if (captureResult.success) {
-            console.log(`PayPal payment captured successfully: ${captureResult.captureId}`);
-            // Transaction status will be updated by the capturePayment method
+          // First check if the order is approved by the customer
+          const orderDetails = await paymentService.getOrderDetails(existingTransaction.paypalOrderId);
+          console.log(`PayPal order status: ${orderDetails.status}`);
+          
+          if (orderDetails.status === 'APPROVED') {
+            // Order is approved, proceed with capture
+            console.log(`Auto-capturing approved PayPal payment for order: ${existingTransaction.paypalOrderId}`);
+            const captureResult = await paymentService.capturePayment(existingTransaction.paypalOrderId);
+            
+            if (captureResult.success) {
+              console.log(`PayPal payment captured successfully: ${captureResult.captureId}`);
+              // Transaction status will be updated to COMPLETED by the capturePayment method
+            } else {
+              console.error(`PayPal capture failed for transaction ${existingTransaction.id}`);
+              await prisma.transaction.update({
+                where: { id: existingTransaction.id },
+                data: {
+                  status: 'PROVIDER_REVIEW',
+                  reviewDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                }
+              });
+            }
           } else {
-            console.error(`PayPal capture failed for transaction ${existingTransaction.id}`);
-            // Still update transaction to PROVIDER_REVIEW even if PayPal capture fails
-            await prisma.transaction.update({
-              where: { id: existingTransaction.id },
-              data: {
-                status: 'PROVIDER_REVIEW',
-                reviewDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            // Order is not approved by customer - decline the service request
+            console.log(`PayPal order ${existingTransaction.paypalOrderId} is not approved (status: ${orderDetails.status}). Cannot approve service request.`);
+            
+            return NextResponse.json({
+              success: false,
+              error: { 
+                code: 'PAYMENT_NOT_COMPLETED', 
+                message: 'Cannot approve service request - customer has not completed payment. Please ask customer to complete their payment first.' 
               }
-            });
+            }, { status: 400 });
           }
         } catch (captureError) {
-          console.error(`PayPal capture error for transaction ${existingTransaction.id}:`, captureError);
-          // Still update transaction to PROVIDER_REVIEW even if PayPal capture fails
+          console.error(`PayPal order check/capture error for transaction ${existingTransaction.id}:`, captureError);
+          
+          // If error contains "ORDER_NOT_APPROVED", provide specific message
+          if (captureError.message && captureError.message.includes('ORDER_NOT_APPROVED')) {
+            return NextResponse.json({
+              success: false,
+              error: { 
+                code: 'PAYMENT_NOT_COMPLETED', 
+                message: 'Cannot approve service request - customer has not completed payment. Please ask customer to complete their payment first.' 
+              }
+            }, { status: 400 });
+          }
+          
+          // For other errors, fall back to PROVIDER_REVIEW
           await prisma.transaction.update({
             where: { id: existingTransaction.id },
             data: {
@@ -153,14 +184,22 @@ export async function POST(
           });
         }
       } else {
-        // No PayPal order, just update status
-        await prisma.transaction.update({
-          where: { id: existingTransaction.id },
-          data: {
-            status: 'PROVIDER_REVIEW',
-            reviewDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000)
-          }
-        });
+        // No PayPal order - check current transaction status
+        if (existingTransaction.status === 'COMPLETED') {
+          console.log(`Transaction ${existingTransaction.id} is already COMPLETED, no update needed`);
+        } else {
+          // Transaction needs to be updated to COMPLETED (e.g., credit card payment that was already captured during payment)
+          // Update directly to COMPLETED status for immediate payment methods
+          await prisma.transaction.update({
+            where: { id: existingTransaction.id },
+            data: {
+              status: 'COMPLETED',
+              escrowStartTime: new Date(),
+              escrowEndTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days escrow
+            }
+          });
+          console.log(`Transaction ${existingTransaction.id} updated to COMPLETED status (no PayPal order required)`);
+        }
       }
     } else {
       console.log(`No existing transaction found for offer ${id}`);

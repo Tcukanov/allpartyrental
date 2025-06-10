@@ -23,7 +23,7 @@ import {
   Flex
 } from '@chakra-ui/react';
 import { CheckIcon, WarningIcon, InfoIcon } from '@chakra-ui/icons';
-import PayPalCreditCardForm from '@/components/payment/PayPalCreditCardForm';
+import PayPalAdvancedCreditCard from '@/components/payment/PayPalAdvancedCreditCard';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -275,7 +275,7 @@ export default function TestPayPalPage() {
               </HStack>
             </CardHeader>
             <CardBody>
-              <PayPalCreditCardForm
+                              <PayPalAdvancedCreditCard
                 amount={25.00} // Test amount
                 bookingData={testBookingData}
                 onSuccess={handlePaymentSuccess}

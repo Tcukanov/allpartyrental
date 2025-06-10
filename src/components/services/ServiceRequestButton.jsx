@@ -25,7 +25,7 @@ import {
 } from '@chakra-ui/react';
 import { CheckIcon } from '@chakra-ui/icons';
 import ServiceAvailabilityCalendar from './ServiceAvailabilityCalendar';
-import PayPalCreditCardForm from '../payment/PayPalCreditCardForm';
+import PayPalAdvancedCreditCard from '../payment/PayPalAdvancedCreditCard';
 import { useRouter } from 'next/navigation';
 
 // Steps for the booking process (simplified)
@@ -260,7 +260,7 @@ const ServiceRequestButton = ({ service, offer }) => {
                   <Text color="gray.600">Secure payment for {service?.name || offer?.service?.name}</Text>
                 </Box>
                 
-                <PayPalCreditCardForm
+                <PayPalAdvancedCreditCard
                   amount={totalAmount}
                   bookingData={transactionId}
                   onSuccess={handlePaymentSuccess}

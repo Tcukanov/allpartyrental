@@ -196,19 +196,43 @@ export class PaymentService {
         status: offer.status
       });
       
-      console.log('💾 Creating transaction record...');
-      const transaction = await this.prisma.transaction.create({
-        data: {
+      // Check if there's already a pending transaction for this offer
+      console.log('🔍 Checking for existing pending transactions...');
+      const existingTransaction = await this.prisma.transaction.findFirst({
+        where: {
           offerId: offer.id,
-          amount: total,
-          status: 'PENDING',
-          paypalOrderId: order.id,
-          paypalStatus: order.status,
-          clientFeePercent: platformFeePercent,
-          providerFeePercent: 100 - platformFeePercent, // Provider gets the rest
-          termsAccepted: false
+          status: 'PENDING'
         }
       });
+
+      let transaction;
+      if (existingTransaction) {
+        console.log('♻️ Found existing pending transaction, updating with new PayPal order...');
+        transaction = await this.prisma.transaction.update({
+          where: { id: existingTransaction.id },
+          data: {
+            paypalOrderId: order.id,
+            paypalStatus: order.status,
+            amount: total,
+            clientFeePercent: platformFeePercent,
+            providerFeePercent: 100 - platformFeePercent
+          }
+        });
+      } else {
+        console.log('💾 Creating new transaction record...');
+        transaction = await this.prisma.transaction.create({
+          data: {
+            offerId: offer.id,
+            amount: total,
+            status: 'PENDING',
+            paypalOrderId: order.id,
+            paypalStatus: order.status,
+            clientFeePercent: platformFeePercent,
+            providerFeePercent: 100 - platformFeePercent, // Provider gets the rest
+            termsAccepted: false
+          }
+        });
+      }
 
       console.log('✅ Transaction created:', {
         transactionId: transaction.id,
@@ -312,19 +336,57 @@ export class PaymentService {
   }
 
   /**
+   * Get PayPal order details to check status
+   */
+  async getOrderDetails(orderId) {
+    try {
+      const orderDetails = await paypalClient.getOrder(orderId);
+      return orderDetails;
+    } catch (error) {
+      console.error('Failed to get PayPal order details:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get or create offer for the booking
    */
   async getOrCreateOffer(serviceId, clientId, bookingData) {
     const { bookingDate, hours, addons = [] } = bookingData;
     
-    // Check if offer already exists for this booking
+    console.log('🔍 Looking for existing offer with:', {
+      serviceId,
+      clientId,
+      bookingDate,
+      hours
+    });
+    
+    // Check if offer already exists for this specific booking
     let offer = await this.prisma.offer.findFirst({
       where: {
         serviceId,
         clientId,
-        status: 'PENDING'
+        status: 'PENDING',
+        description: {
+          contains: new Date(bookingDate).toLocaleDateString()
+        }
+      },
+      include: {
+        partyService: {
+          include: {
+            party: true
+          }
+        }
       }
     });
+
+    if (offer) {
+      console.log('♻️ Found existing offer:', {
+        offerId: offer.id,
+        price: offer.price,
+        description: offer.description
+      });
+    }
 
     if (!offer) {
       // Get service to get provider ID and city

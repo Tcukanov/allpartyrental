@@ -35,6 +35,7 @@ import { FiMapPin } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import PayPalAdvancedCreditCard from '@/components/payment/PayPalAdvancedCreditCard';
 
 export default function PaymentPage({ params }) {
   const router = useRouter();
@@ -93,12 +94,15 @@ export default function PaymentPage({ params }) {
     }
 
     const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons&disable-funding=venmo,paylater&enable-funding=card`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,hosted-fields&disable-funding=venmo,paylater&enable-funding=card`;
     script.async = true;
     
     script.onload = () => {
       console.log('PayPal SDK loaded successfully');
-      setPaypalLoaded(true);
+      // Add a small delay to ensure PayPal is fully ready
+      setTimeout(() => {
+        setPaypalLoaded(true);
+      }, 500);
     };
     
     script.onerror = () => {
@@ -123,26 +127,61 @@ export default function PaymentPage({ params }) {
     };
   }, [toast]);
 
-  // Initialize PayPal buttons for both card and PayPal payments
+  // Initialize PayPal buttons for PayPal wallet payments only
   useEffect(() => {
     if (!paypalLoaded || !bookingData || !window.paypal) return;
 
-    // Initialize credit card buttons (primary method)
-    const cardButtonsContainer = document.getElementById('card-buttons');
-    if (cardButtonsContainer) {
-      cardButtonsContainer.innerHTML = '';
-      initializeCreditCardButtons();
-    }
+    let retryCount = 0;
+    const maxRetries = 5;
 
-    // Initialize PayPal buttons (secondary method)
-    const paypalButtonsContainer = document.getElementById('paypal-buttons');
-    if (paypalButtonsContainer) {
-      paypalButtonsContainer.innerHTML = '';
-      initializePayPalButtons();
-    }
+    const tryInitialize = () => {
+      const paypalButtonsContainer = document.getElementById('paypal-buttons');
+      if (paypalButtonsContainer) {
+        console.log('PayPal buttons container found, initializing...');
+        paypalButtonsContainer.innerHTML = '';
+        initializePayPalButtons();
+      } else {
+        retryCount++;
+        console.log(`PayPal buttons container not found (attempt ${retryCount}/${maxRetries})`);
+        
+        if (retryCount < maxRetries) {
+          setTimeout(tryInitialize, 200 * retryCount); // Exponential backoff
+        } else {
+          console.error('PayPal buttons container not found after all retries');
+          toast({
+            title: 'PayPal Loading Issue',
+            description: 'PayPal wallet payment option is temporarily unavailable. You can still use credit cards.',
+            status: 'warning',
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+      }
+    };
+
+    // Start with a small delay
+    const timer = setTimeout(tryInitialize, 500);
+
+    return () => clearTimeout(timer);
   }, [paypalLoaded, bookingData]);
 
   const initializePayPalButtons = () => {
+    // Double-check that the container exists
+    const container = document.getElementById('paypal-buttons');
+    if (!container) {
+      console.error('PayPal buttons container not found when trying to initialize');
+      toast({
+        title: 'Payment System Error',
+        description: 'Unable to load PayPal buttons. Please refresh the page.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    console.log('Initializing PayPal buttons for wallet payments...');
+    
     window.paypal.Buttons({
       style: {
         layout: 'vertical',
@@ -288,9 +327,20 @@ export default function PaymentPage({ params }) {
       }
     }).render('#paypal-buttons').catch((error) => {
       console.error('Failed to initialize PayPal buttons:', error);
-      const paypalSection = document.getElementById('paypal-section');
-      if (paypalSection) {
-        paypalSection.innerHTML = '<Text color="red.500">PayPal option currently unavailable.</Text>';
+      
+      // Show user-friendly error
+      toast({
+        title: 'PayPal Loading Error',
+        description: 'PayPal buttons failed to load. Please refresh the page or try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      
+      // Try to update the container with error message
+      const paypalButtonsContainer = document.getElementById('paypal-buttons');
+      if (paypalButtonsContainer) {
+        paypalButtonsContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #e53e3e;">PayPal buttons failed to load. Please refresh the page.</div>';
       }
     });
   };
@@ -589,426 +639,73 @@ export default function PaymentPage({ params }) {
                       Processing your payment securely...
                     </Alert>
                   )}
+
+                  {/* Debug info for PayPal initialization */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <Alert status="info" size="sm">
+                      <AlertIcon />
+                      <VStack spacing={1} align="start" fontSize="xs">
+                        <Text>PayPal SDK Loaded: {paypalLoaded ? '✅' : '❌'}</Text>
+                        <Text>Window PayPal Available: {typeof window !== 'undefined' && window.paypal ? '✅' : '❌'}</Text>
+                        <Text>Booking Data: {bookingData ? '✅' : '❌'}</Text>
+                      </VStack>
+                    </Alert>
+                  )}
                   
-                  {/* Credit Card Form - Modern Design */}
+                  {/* PayPal Advanced Credit Card Processing */}
                   <Box id="card-section">
-                    {/* Payment Method Header */}
-                    <HStack spacing={4} mb={6}>
-                      <Box>
-                        <Heading size="sm" mb={1}>Pay with Card</Heading>
-                        <Text fontSize="sm" color="gray.600">
-                          Safe and secure payment processing
-                        </Text>
-                      </Box>
-                      <Box ml="auto">
-                        <HStack spacing={2}>
-                          <Box 
-                            bg="gray.100" 
-                            px={2} 
-                            py={1} 
-                            borderRadius="md"
-                            fontSize="xs"
-                            fontWeight="bold"
-                            color="gray.700"
-                          >
-                            VISA
-                          </Box>
-                          <Box 
-                            bg="gray.100" 
-                            px={2} 
-                            py={1} 
-                            borderRadius="md"
-                            fontSize="xs"
-                            fontWeight="bold"
-                            color="gray.700"
-                          >
-                            MC
-                          </Box>
-                          <Box 
-                            bg="gray.100" 
-                            px={2} 
-                            py={1} 
-                            borderRadius="md"
-                            fontSize="xs"
-                            fontWeight="bold"
-                            color="gray.700"
-                          >
-                            AMEX
-                          </Box>
-                        </HStack>
-                      </Box>
-                    </HStack>
-                    
-                    <VStack spacing={6} align="stretch">
-                      {/* Card Number - Enhanced */}
-                      <FormControl isRequired>
-                        <FormLabel fontWeight="600" color="gray.700" fontSize="sm">
-                          Card Number
-                        </FormLabel>
-                        <Box position="relative">
-                          <Input
-                            placeholder="1234 5678 9012 3456"
-                            size="lg"
-                            bg="white"
-                            border="2px"
-                            borderColor="gray.200"
-                            borderRadius="xl"
-                            _hover={{ borderColor: 'blue.300', shadow: 'sm' }}
-                            _focus={{ 
-                              borderColor: 'blue.500', 
-                              bg: 'white',
-                              shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
-                            }}
-                            fontSize="lg"
-                            letterSpacing="wider"
-                            maxLength={19}
-                            h="60px"
-                            transition="all 0.2s"
-                          />
-                          {/* Card Icon */}
-                          <Box
-                            position="absolute"
-                            right="16px"
-                            top="50%"
-                            transform="translateY(-50%)"
-                            color="gray.400"
-                            fontSize="lg"
-                          >
-                            💳
-                          </Box>
-                        </Box>
-                      </FormControl>
-                      
-                      <Grid templateColumns="2fr 1fr" gap={6}>
-                        {/* Expiry Date - Enhanced */}
-                        <FormControl isRequired>
-                          <FormLabel fontWeight="600" color="gray.700" fontSize="sm">
-                            Expiry Date
-                          </FormLabel>
-                          <Input
-                            placeholder="MM/YY"
-                            size="lg"
-                            bg="white"
-                            border="2px"
-                            borderColor="gray.200"
-                            borderRadius="xl"
-                            _hover={{ borderColor: 'blue.300', shadow: 'sm' }}
-                            _focus={{ 
-                              borderColor: 'blue.500', 
-                              bg: 'white',
-                              shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
-                            }}
-                            fontSize="lg"
-                            letterSpacing="wider"
-                            maxLength={5}
-                            h="60px"
-                            transition="all 0.2s"
-                          />
-                        </FormControl>
+                    <PayPalAdvancedCreditCard
+                      amount={bookingData.pricing.total}
+                      bookingData={{
+                        serviceId: bookingData.serviceId,
+                        bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
+                        duration: bookingData.bookingDetails.duration || 4,
+                        address: `${bookingData.bookingDetails.address}, ${bookingData.bookingDetails.city} ${bookingData.bookingDetails.zipCode}`,
+                        comments: bookingData.bookingDetails.specialRequests || '',
+                        contactPhone: bookingData.bookingDetails.contactPhone,
+                        guestCount: bookingData.bookingDetails.guestCount
+                      }}
+                      onSuccess={(data) => {
+                        console.log('Payment successful:', data);
+                        // Clear booking data from sessionStorage
+                        sessionStorage.removeItem('pendingBooking');
                         
-                        {/* CVV - Enhanced */}
-                        <FormControl isRequired>
-                          <FormLabel fontWeight="600" color="gray.700" fontSize="sm">
-                            CVV
-                          </FormLabel>
-                          <Box position="relative">
-                            <Input
-                              placeholder="123"
-                              type="password"
-                              size="lg"
-                              bg="white"
-                              border="2px"
-                              borderColor="gray.200"
-                              borderRadius="xl"
-                              _hover={{ borderColor: 'blue.300', shadow: 'sm' }}
-                              _focus={{ 
-                                borderColor: 'blue.500', 
-                                bg: 'white',
-                                shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
-                              }}
-                              fontSize="lg"
-                              letterSpacing="wider"
-                              maxLength={4}
-                              h="60px"
-                              transition="all 0.2s"
-                            />
-                            {/* Security Icon */}
-                            <Box
-                              position="absolute"
-                              right="16px"
-                              top="50%"
-                              transform="translateY(-50%)"
-                              color="gray.400"
-                              fontSize="sm"
-                            >
-                              🔒
-                            </Box>
-                          </Box>
-                        </FormControl>
-                      </Grid>
-                      
-                      {/* Cardholder Name - Enhanced */}
-                      <FormControl isRequired>
-                        <FormLabel fontWeight="600" color="gray.700" fontSize="sm">
-                          Cardholder Name
-                        </FormLabel>
-                        <Input
-                          placeholder="John Doe"
-                          size="lg"
-                          bg="white"
-                          border="2px"
-                          borderColor="gray.200"
-                          borderRadius="xl"
-                          _hover={{ borderColor: 'blue.300', shadow: 'sm' }}
-                          _focus={{ 
-                            borderColor: 'blue.500', 
-                            bg: 'white',
-                            shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
-                          }}
-                          fontSize="lg"
-                          h="60px"
-                          transition="all 0.2s"
-                        />
-                      </FormControl>
-                      
-                      {/* Billing Address Section - Collapsible */}
-                      <Box 
-                        bg="gray.50" 
-                        p={6} 
-                        borderRadius="xl" 
-                        border="1px" 
-                        borderColor="gray.200"
-                      >
-                        <HStack justify="space-between" mb={4}>
-                          <Text fontWeight="600" color="gray.700" fontSize="md">
-                            Billing Address
-                          </Text>
-                          <Badge colorScheme="green" fontSize="xs">
-                            SSL Secured
-                          </Badge>
-                        </HStack>
-                        
-                        <VStack spacing={4} align="stretch">
-                          <FormControl isRequired>
-                            <FormLabel fontWeight="500" color="gray.600" fontSize="sm">
-                              Street Address
-                            </FormLabel>
-                            <Input
-                              placeholder="123 Main Street"
-                              size="lg"
-                              bg="white"
-                              border="2px"
-                              borderColor="gray.200"
-                              borderRadius="lg"
-                              _hover={{ borderColor: 'blue.300' }}
-                              _focus={{ 
-                                borderColor: 'blue.500', 
-                                bg: 'white',
-                                shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
-                              }}
-                              h="50px"
-                              transition="all 0.2s"
-                            />
-                          </FormControl>
-                          
-                          <Grid templateColumns="2fr 1fr 1fr" gap={4}>
-                            <FormControl isRequired>
-                              <FormLabel fontWeight="500" color="gray.600" fontSize="sm">
-                                City
-                              </FormLabel>
-                              <Input
-                                placeholder="New York"
-                                size="lg"
-                                bg="white"
-                                border="2px"
-                                borderColor="gray.200"
-                                borderRadius="lg"
-                                _hover={{ borderColor: 'blue.300' }}
-                                _focus={{ 
-                                  borderColor: 'blue.500', 
-                                  bg: 'white',
-                                  shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
-                                }}
-                                h="50px"
-                                transition="all 0.2s"
-                              />
-                            </FormControl>
-                            
-                            <FormControl isRequired>
-                              <FormLabel fontWeight="500" color="gray.600" fontSize="sm">
-                                State
-                              </FormLabel>
-                              <Input
-                                placeholder="NY"
-                                size="lg"
-                                bg="white"
-                                border="2px"
-                                borderColor="gray.200"
-                                borderRadius="lg"
-                                _hover={{ borderColor: 'blue.300' }}
-                                _focus={{ 
-                                  borderColor: 'blue.500', 
-                                  bg: 'white',
-                                  shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
-                                }}
-                                h="50px"
-                                transition="all 0.2s"
-                              />
-                            </FormControl>
-                            
-                            <FormControl isRequired>
-                              <FormLabel fontWeight="500" color="gray.600" fontSize="sm">
-                                ZIP Code
-                              </FormLabel>
-                              <Input
-                                placeholder="10001"
-                                size="lg"
-                                bg="white"
-                                border="2px"
-                                borderColor="gray.200"
-                                borderRadius="lg"
-                                _hover={{ borderColor: 'blue.300' }}
-                                _focus={{ 
-                                  borderColor: 'blue.500', 
-                                  bg: 'white',
-                                  shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
-                                }}
-                                h="50px"
-                                transition="all 0.2s"
-                              />
-                            </FormControl>
-                          </Grid>
-                        </VStack>
-                      </Box>
-                      
-                      {/* Payment Button - Enhanced */}
-                      <Box pt={4}>
-                        <Button
-                          colorScheme="blue"
-                          size="lg"
-                          borderRadius="xl"
-                          isLoading={isProcessingPayment}
-                          loadingText="Processing Payment..."
-                          bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                          color="white"
-                          _hover={{ 
-                            transform: "translateY(-2px)",
-                            shadow: "0 10px 25px rgba(102, 126, 234, 0.3)",
-                            bg: "linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)"
-                          }}
-                          _active={{
-                            transform: "translateY(0px)",
-                            shadow: "0 5px 15px rgba(102, 126, 234, 0.3)"
-                          }}
-                          transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                          h="70px"
-                          fontWeight="bold"
-                          fontSize="lg"
-                          w="full"
-                          position="relative"
-                          overflow="hidden"
-                          _before={{
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: '-100%',
-                            width: '100%',
-                            height: '100%',
-                            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                            transition: 'left 0.5s'
-                          }}
-                          _hover_before={{
-                            left: '100%'
-                          }}
-                          onClick={async () => {
-                            setIsProcessingPayment(true);
-                            
-                            try {
-                              // Create real booking in database instead of simulating
-                              console.log('Creating real booking...');
-                              
-                              const response = await fetch('/api/payments/create', {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                  serviceId: bookingData.serviceId,
-                                  bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
-                                  hours: bookingData.bookingDetails.duration || 4,
-                                  address: `${bookingData.bookingDetails.address}, ${bookingData.bookingDetails.city} ${bookingData.bookingDetails.zipCode}`,
-                                  comments: bookingData.bookingDetails.specialRequests || '',
-                                  contactPhone: bookingData.bookingDetails.contactPhone,
-                                  guestCount: bookingData.bookingDetails.guestCount,
-                                  paymentMethod: 'direct_booking'
-                                }),
-                              });
+                        // Show success message
+                        toast({
+                          title: 'Payment Successful! 🎉',
+                          description: 'Your booking has been submitted to the provider for confirmation.',
+                          status: 'success',
+                          duration: 5000,
+                          isClosable: true,
+                        });
 
-                              if (!response.ok) {
-                                throw new Error(`Payment creation failed: ${response.status}`);
-                              }
-
-                              const data = await response.json();
-                              console.log('Payment order created:', data);
-                              
-                              if (!data.success) {
-                                throw new Error(data.error || 'Failed to create booking');
-                              }
-
-                              // Clear booking data from sessionStorage
-                              sessionStorage.removeItem('pendingBooking');
-                              
-                              // Show success message
-                              toast({
-                                title: 'Booking Created Successfully! 🎉',
-                                description: 'Your booking has been submitted to the provider for confirmation.',
-                                status: 'success',
-                                duration: 5000,
-                                isClosable: true,
-                              });
-
-                              // Redirect to confirmation page with the real transaction ID
-                              router.push(`/book/${serviceId}/confirmed?orderId=${data.orderId}&transactionId=${data.transactionId}`);
-                              
-                            } catch (error) {
-                              console.error('Payment error:', error);
-                              setIsProcessingPayment(false);
-                              toast({
-                                title: 'Booking Failed',
-                                description: error.message || 'Please try again or contact support.',
-                                status: 'error',
-                                duration: 5000,
-                                isClosable: true,
-                              });
-                            }
-                          }}
-                        >
-                          <HStack spacing={3}>
-                            <Text>🔒</Text>
-                            <Text>Complete Secure Payment</Text>
-                            <Text fontWeight="bold">${bookingData.pricing.total.toFixed(2)}</Text>
-                          </HStack>
-                        </Button>
-                        
-                        {/* Trust Indicators */}
-                        <HStack justify="center" mt={4} spacing={6}>
-                          <HStack spacing={1}>
-                            <Text fontSize="xs" color="gray.500">🔐</Text>
-                            <Text fontSize="xs" color="gray.500">256-bit SSL</Text>
-                          </HStack>
-                          <HStack spacing={1}>
-                            <Text fontSize="xs" color="gray.500">🛡️</Text>
-                            <Text fontSize="xs" color="gray.500">PCI Compliant</Text>
-                          </HStack>
-                          <HStack spacing={1}>
-                            <Text fontSize="xs" color="gray.500">💳</Text>
-                            <Text fontSize="xs" color="gray.500">Bank-level Security</Text>
-                          </HStack>
-                        </HStack>
-                      </Box>
-                    </VStack>
+                        // Redirect to confirmation page
+                        router.push(`/book/${serviceId}/confirmed?orderId=${data.orderId || data.orderID}&transactionId=${data.transactionId}`);
+                      }}
+                      onError={(error) => {
+                        console.error('Payment error:', error);
+                        toast({
+                          title: 'Payment Failed',
+                          description: error || 'Please try again or contact support.',
+                          status: 'error',
+                          duration: 5000,
+                          isClosable: true,
+                        });
+                      }}
+                      onCancel={() => {
+                        console.log('Payment cancelled');
+                        toast({
+                          title: 'Payment Cancelled',
+                          description: 'You can try again when ready.',
+                          status: 'warning',
+                          duration: 3000,
+                          isClosable: true,
+                        });
+                      }}
+                      disabled={isProcessingPayment}
+                    />
                   </Box>
-                  
+
                   {/* Divider */}
                   <Box position="relative" py={4}>
                     <Divider />
@@ -1026,7 +723,7 @@ export default function PaymentPage({ params }) {
                       OR
                     </Box>
                   </Box>
-                  
+
                   {/* PayPal Payment - Alternative Method */}
                   <Box id="paypal-section">
                     <VStack spacing={4} align="stretch">
@@ -1073,6 +770,8 @@ export default function PaymentPage({ params }) {
                       )}
                     </VStack>
                   </Box>
+                  
+
                   
                 </VStack>
               </CardBody>
