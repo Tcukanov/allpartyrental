@@ -6,25 +6,25 @@ import { PayPalClientFixed } from "@/lib/payment/paypal-client";
 
 export async function POST(request: Request) {
   console.log('🔄 PayPal refresh status endpoint hit');
-  
+
   try {
     const session = await getServerSession(authOptions);
-    
+
     console.log('👤 Session check:', {
       hasSession: !!session,
       userId: session?.user?.id,
       userRole: session?.user?.role
     });
-    
+
     if (!session?.user || session.user.role !== 'PROVIDER') {
       console.log('❌ Unauthorized refresh status request');
-      return NextResponse.json({ 
-        error: 'Unauthorized' 
+      return NextResponse.json({
+        error: 'Unauthorized'
       }, { status: 401 });
     }
 
     console.log('🔍 Getting provider record for user:', session.user.id);
-    
+
     // Get or create provider record
     let provider = await prisma.provider.findUnique({
       where: { userId: session.user.id }
@@ -56,19 +56,19 @@ export async function POST(request: Request) {
 
     if (provider.paypalMerchantId) {
       console.log('🔍 Checking status for existing merchant ID:', provider.paypalMerchantId);
-      
+
       // Check if this is an auto-generated merchant ID (development mode)
       const isDevelopment = process.env.NODE_ENV !== 'production';
       const isAutoMerchantId = provider.paypalMerchantId?.startsWith('auto-merchant-') || provider.paypalMerchantId?.startsWith('SANDBOX-DEV-');
       const isSandboxMode = process.env.PAYPAL_MODE === 'sandbox';
-      
+
       console.log('🔧 Environment check:', {
         isDevelopment,
         isAutoMerchantId,
         isSandboxMode,
         merchantIdFormat: provider.paypalMerchantId?.substring(0, 15) + '...'
       });
-      
+
       // For sandbox mode with real merchant IDs from onboarding, enable payments automatically
       if (isSandboxMode && !isAutoMerchantId && provider.paypalMerchantId) {
         console.log('🔧 Sandbox mode with real merchant ID - enabling payments automatically');
@@ -93,7 +93,9 @@ export async function POST(request: Request) {
         // Try to verify with real PayPal API (production mode)
         try {
           const statusCheck = await paypalClient.checkSellerStatus(provider.paypalMerchantId);
-          
+
+
+
           console.log('📊 PayPal status check result:', {
             canReceivePayments: statusCheck.canReceivePayments,
             issuesCount: statusCheck.issues?.length || 0,
@@ -122,16 +124,16 @@ export async function POST(request: Request) {
             stack: error.stack,
             merchantId: provider.paypalMerchantId
           });
-          
+
           // For sandbox accounts, if the status check fails due to API permissions, enable payments anyway
           if (isSandboxMode) {
             console.log('🔧 Sandbox mode - enabling payments despite API permission error');
             updateData = {
               paypalCanReceivePayments: true,
               paypalOnboardingStatus: 'COMPLETED',
-              paypalStatusIssues: JSON.stringify([{ 
-                type: 'API_PERMISSIONS_ISSUE_SANDBOX_ENABLED', 
-                message: 'PayPal partner API not accessible but sandbox payments enabled for testing' 
+              paypalStatusIssues: JSON.stringify([{
+                type: 'API_PERMISSIONS_ISSUE_SANDBOX_ENABLED',
+                message: 'PayPal partner API not accessible but sandbox payments enabled for testing'
               }])
             };
             statusMessage = 'Sandbox payments enabled for testing (partner API permissions required for status check)';
@@ -139,9 +141,9 @@ export async function POST(request: Request) {
             updateData = {
               paypalCanReceivePayments: false,
               paypalOnboardingStatus: 'ERROR',
-              paypalStatusIssues: JSON.stringify([{ 
-                type: 'CONNECTION_ERROR', 
-                message: 'Failed to verify PayPal account status' 
+              paypalStatusIssues: JSON.stringify([{
+                type: 'CONNECTION_ERROR',
+                message: 'Failed to verify PayPal account status'
               }])
             };
             statusMessage = 'Failed to verify PayPal account status';
@@ -152,7 +154,7 @@ export async function POST(request: Request) {
       // No merchant ID - check if in development mode for sandbox connection
       const isDevelopment = process.env.NODE_ENV !== 'production';
       const isLocalhost = process.env.NEXTAUTH_URL?.includes('localhost');
-      
+
       console.log('🔧 No merchant ID found, checking environment:', {
         isDevelopment,
         isLocalhost,
@@ -161,14 +163,14 @@ export async function POST(request: Request) {
         paypalOnboardingStatus: (provider as any).paypalOnboardingStatus,
         paypalOnboardingId: (provider as any).paypalOnboardingId
       });
-      
+
       if (isDevelopment || isLocalhost) {
         // Development mode: Check if onboarding was completed and manually connect
         const knownSandboxMerchantId = 'SANDBOX-DEV-' + session.user.id;
         const knownSandboxEmail = session.user.email || 'sandbox@example.com';
-        
+
         console.log('🔧 Development mode - attempting to connect to sandbox account');
-        
+
         // For development, assume successful connection after onboarding
         if ((provider as any).paypalOnboardingStatus === 'PENDING' || (provider as any).paypalOnboardingId) {
           updateData = {
@@ -180,12 +182,12 @@ export async function POST(request: Request) {
             paypalOnboardingComplete: true
           };
           statusMessage = `Successfully connected to sandbox PayPal account (Development Mode)`;
-          
+
           console.log('✅ Development sandbox connection established:', updateData);
         } else {
           console.log('❌ No onboarding record found');
           return NextResponse.json({
-            error: { 
+            error: {
               message: 'No PayPal onboarding found. Please start the PayPal connection process first.',
               debug: {
                 hasOnboardingId: !!(provider as any).paypalOnboardingId,
@@ -198,7 +200,7 @@ export async function POST(request: Request) {
       } else {
         console.log('❌ Production mode - no merchant ID found');
         return NextResponse.json({
-          error: { 
+          error: {
             message: 'No PayPal merchant ID found. Please complete PayPal onboarding first.',
             debug: {
               hasOnboardingId: !!(provider as any).paypalOnboardingId,
@@ -212,7 +214,7 @@ export async function POST(request: Request) {
 
     // Update provider with refreshed status
     console.log('💾 Updating provider with data:', updateData);
-    
+
     const updatedProvider = await prisma.provider.update({
       where: { userId: session.user.id },
       data: updateData
@@ -238,8 +240,8 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Error refreshing PayPal status:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: { message: 'Failed to refresh PayPal status' }
     }, { status: 500 });
   }
-} 
+}

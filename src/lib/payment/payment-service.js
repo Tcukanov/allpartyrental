@@ -61,6 +61,20 @@ export class PaymentService {
     try {
       const { serviceId, userId, bookingDate, hours, paymentMethod = '', addons = [] } = bookingData;
 
+
+      const existedOffer = await this.prisma.offer.findFirst({
+        where: {
+          serviceId,
+          clientId: userId,
+          status: 'PENDING'
+        }
+      });
+
+      if(existedOffer) {
+        console.log('�� Offer already exists for this service and user');
+        throw new Error('Offer already exists');
+      }
+
       console.log('🔍 Fetching service with provider information...');
       // Get service with provider information
       const service = await this.prisma.service.findUnique({

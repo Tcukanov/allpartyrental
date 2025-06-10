@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, {useState, useEffect, use, useRef} from 'react'
 import {
   Container,
   Box,
@@ -25,7 +25,6 @@ import {
   List,
   ListItem,
   ListIcon,
-  Icon,
   FormControl,
   FormLabel,
   Input
@@ -46,9 +45,36 @@ export default function PaymentPage({ params }) {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [cardFieldsReady, setCardFieldsReady] = useState(false);
+  const [billing, setBilling] = useState({
+    line1: '',
+    city: '',
+    state: '',
+    zip: ''
+  });
+  const [errors, setErrors] = useState({
+    line1: false,
+    city: false,
+    state: false,
+    zip: false
+  });
+  const cardFieldRef = useRef(null);
 
   // Unwrap params using use() as required by Next.js 15
   const { serviceId } = use(params);
+
+  const validateBilling = () => {
+
+    console.log({billing});
+
+    const newErrors = {
+      line1: billing.line1.trim() === '',
+      city:   billing.city.trim()   === '',
+      state:  billing.state.trim()  === '',
+      zip:    billing.zip.trim()    === ''
+    };
+    setErrors(newErrors);
+    return !Object.values(newErrors).some(v => v);
+  };
 
   // Load booking data from sessionStorage
   useEffect(() => {
@@ -93,7 +119,8 @@ export default function PaymentPage({ params }) {
     }
 
     const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,card-fields&disable-funding=venmo,paylater&enable-funding=card`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,card-fields&disable-funding=venmo,paylater&enable-funding=card&commit=true`;
+    script.setAttribute('data-partner-attribution-id', 'NYCKIDSPARTYENT_SP_PPCP');
     script.async = true;
 
     script.onload = () => {
@@ -666,41 +693,83 @@ export default function PaymentPage({ params }) {
       });
       expiryField.render("#card-expiry-field-container");
 
+      cardFieldRef.current = cardField;
+
       // Add click listener to submit button and call the submit function on the CardField component
-      document
-          .getElementById("card-field-submit-button")
-          .addEventListener("click", () => {
-            cardField
-                .submit({
-                  // From your billing address fields
-                  billingAddress: {
-                    addressLine1: document.getElementById(
-                        "card-billing-address-line-1"
-                    ).value,
-                    adminArea1: document.getElementById(
-                        "card-billing-address-admin-area-line-1"
-                    ).value,
-                    adminArea2: document.getElementById(
-                        "card-billing-address-admin-area-line-2"
-                    ).value,
-                    postalCode: document.getElementById(
-                        "card-billing-address-postal-code"
-                    ).value,
-                    countryCode: "US",
-                  },
-
-                })
-                .then(() => {
-                  // submit successful
-                }).catch(err => {
-
-                    const userMsg = extractPayPalErrorMessage(err, 'Payment failed');
-                    toast({ title: 'CardFields error', description: userMsg, status: 'error' });
-                    setIsProcessingPayment(false);
-                });
-          });
+      // document
+      //     .getElementById("card-field-submit-button")
+      //     .addEventListener("click", () => {
+      //
+      //       if (!validateBilling()) {
+      //         toast({
+      //           title: 'Please fill in all required fields',
+      //           status: 'error',
+      //           duration: 3000,
+      //           isClosable: true,
+      //         });
+      //         return;
+      //       }
+      //
+      //       cardField
+      //           .submit({
+      //             // From your billing address fields
+      //             billingAddress: {
+      //               addressLine1: document.getElementById(
+      //                   "card-billing-address-line-1"
+      //               ).value,
+      //               adminArea1: document.getElementById(
+      //                   "card-billing-address-admin-area-line-1"
+      //               ).value,
+      //               adminArea2: document.getElementById(
+      //                   "card-billing-address-admin-area-line-2"
+      //               ).value,
+      //               postalCode: document.getElementById(
+      //                   "card-billing-address-postal-code"
+      //               ).value,
+      //               countryCode: "US",
+      //             },
+      //
+      //           })
+      //           .then(() => {
+      //             // submit successful
+      //           }).catch(err => {
+      //
+      //               const userMsg = extractPayPalErrorMessage(err, 'Payment failed');
+      //               toast({ title: 'CardFields error', description: userMsg, status: 'error' });
+      //               setIsProcessingPayment(false);
+      //           });
+      //     });
     }
   };
+
+  const submitPayment = async () => {
+    if (!validateBilling()) {
+      toast({
+        title: 'Please fill in all required fields',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    setIsProcessingPayment(true);
+    try {
+      await cardFieldRef.current.submit({
+        billingAddress: {
+          addressLine1: billing.line1,
+          adminArea1: billing.city,
+          adminArea2: billing.state,
+          postalCode: billing.zip,
+          countryCode: 'US',
+        }
+      });
+    } catch (err) {
+      const msg = extractPayPalErrorMessage(err, 'Payment failed');
+      toast({ title: 'Payment Error', description: msg, status: 'error' });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -835,7 +904,7 @@ export default function PaymentPage({ params }) {
                       {/* Card Fields */}
                       <Box>
                         <div id="card-form" className="card_container">
-                          <Box>
+                          <Box marginBottom="16px">
 
                             <HStack spacing={4} mb={6}>
                               <Box>
@@ -888,7 +957,7 @@ export default function PaymentPage({ params }) {
                                 <FormLabel fontWeight="600" color="gray.700" fontSize="sm">
                                   Card Number
                                 </FormLabel>
-                                <Box position="relative">
+                                <Box position="relative" marginLeft="-8px" marginRight="-8px">
                                   <div id="card-number-field-container"></div>
                                 </Box>
                               </FormControl>
@@ -897,20 +966,27 @@ export default function PaymentPage({ params }) {
                                   <FormLabel fontWeight="600" color="gray.700" fontSize="sm">
                                     Expiry Date
                                   </FormLabel>
-                                  <div id="card-expiry-field-container"></div>
+                                  <Box position="relative" marginLeft="-8px" marginRight="-8px">
+                                    <div id="card-expiry-field-container"></div>
+                                  </Box>
                                 </FormControl>
                                 <FormControl isRequired>
+
                                   <FormLabel fontWeight="600" color="gray.700" fontSize="sm">
                                     CVV
                                   </FormLabel>
-                                  <div id="card-cvv-field-container"></div>
+                                  <Box position="relative" marginLeft="-8px" marginRight="-8px">
+                                    <div id="card-cvv-field-container"></div>
+                                  </Box>
                                 </FormControl>
                               </Grid>
-                              <FormControl isRequired>
+                              <FormControl>
                                 <FormLabel fontWeight="600" color="gray.700" fontSize="sm">
                                   Cardholder Name
                                 </FormLabel>
-                                <div id="card-name-field-container"></div>
+                                <Box position="relative" marginLeft="-8px" marginRight="-8px">
+                                  <div id="card-name-field-container"></div>
+                                </Box>
                               </FormControl>
                             </VStack>
                           </Box>
@@ -932,7 +1008,7 @@ export default function PaymentPage({ params }) {
                             </HStack>
 
                             <VStack spacing={4} align="stretch">
-                              <FormControl isRequired>
+                              <FormControl isRequired isInvalid={errors.line1}>
                                 <FormLabel htmlFor="card-billing-address-line-1" fontWeight="500" color="gray.600" fontSize="sm">
                                   Street Address
                                 </FormLabel>
@@ -951,19 +1027,29 @@ export default function PaymentPage({ params }) {
                                       bg: 'white',
                                       shadow: '0 0 0 3px rgba(66, 153, 225, 0.1)'
                                     }}
+                                    value={billing.line1}
+                                    onChange={e => {
+                                      setBilling({...billing, line1: e.target.value});
+                                      setErrors({...errors, line1: false});
+                                    }}
                                     h="50px"
                                     transition="all 0.2s"
                                 />
                               </FormControl>
 
                               <Grid templateColumns="2fr 1fr 1fr" gap={4}>
-                                <FormControl isRequired>
+                                <FormControl isRequired isInvalid={errors.city}>
                                   <FormLabel htmlFor="card-billing-address-admin-area-line-1" fontWeight="500" color="gray.600" fontSize="sm">
                                     City
                                   </FormLabel>
                                   <Input
                                       id="card-billing-address-admin-area-line-1"
                                       name="card-billing-address-admin-area-line-1"
+                                      value={billing.city}
+                                      onChange={e => {
+                                        setBilling({...billing, city: e.target.value});
+                                        setErrors({...errors, city: false});
+                                      }}
                                       placeholder="New York"
                                       size="lg"
                                       bg="white"
@@ -981,13 +1067,18 @@ export default function PaymentPage({ params }) {
                                   />
                                 </FormControl>
 
-                                <FormControl isRequired>
+                                <FormControl isRequired isInvalid={errors.state}>
                                   <FormLabel htmlFor="card-billing-address-admin-area-line-2" fontWeight="500" color="gray.600" fontSize="sm">
                                     State
                                   </FormLabel>
                                   <Input
                                       id="card-billing-address-admin-area-line-2"
                                       name="card-billing-address-admin-area-line-2"
+                                      value={billing.state}
+                                      onChange={e => {
+                                        setBilling({...billing, state: e.target.value});
+                                        setErrors({...errors, state: false});
+                                      }}
                                       placeholder="NY"
                                       size="lg"
                                       bg="white"
@@ -1005,13 +1096,18 @@ export default function PaymentPage({ params }) {
                                   />
                                 </FormControl>
 
-                                <FormControl isRequired>
+                                <FormControl isRequired isInvalid={errors.zip}>
                                   <FormLabel htmlFor="card-billing-address-postal-code" fontWeight="500" color="gray.600" fontSize="sm">
                                     ZIP Code
                                   </FormLabel>
                                   <Input
                                       id="card-billing-address-postal-code"
                                       name="card-billing-address-postal-code"
+                                      value={billing.zip}
+                                      onChange={e => {
+                                        setBilling({...billing, zip: e.target.value});
+                                        setErrors({...errors, zip: false});
+                                      }}
                                       placeholder="10001"
                                       size="lg"
                                       bg="white"
@@ -1034,66 +1130,6 @@ export default function PaymentPage({ params }) {
                             </VStack>
 
                           </Box>
-                          {/*<div>*/}
-                          {/*  <label htmlFor="card-billing-address-line-1">Billing Address</label>*/}
-                          {/*  <input*/}
-                          {/*      type="text"*/}
-                          {/*      id="card-billing-address-line-1"*/}
-                          {/*      name="card-billing-address-line-1"*/}
-                          {/*      autoComplete="off"*/}
-                          {/*      placeholder="Address line 1"*/}
-                          {/*  />*/}
-                          {/*</div>*/}
-                          {/*<div>*/}
-                          {/*  <input*/}
-                          {/*      type="text"*/}
-                          {/*      id="card-billing-address-line-2"*/}
-                          {/*      name="card-billing-address-line-2"*/}
-                          {/*      autoComplete="off"*/}
-                          {/*      placeholder="Address line 2"*/}
-                          {/*  />*/}
-                          {/*</div>*/}
-                          {/*<div>*/}
-                          {/*  <input*/}
-                          {/*      type="text"*/}
-                          {/*      id="card-billing-address-admin-area-line-1"*/}
-                          {/*      name="card-billing-address-admin-area-line-1"*/}
-                          {/*      autoComplete="off"*/}
-                          {/*      placeholder="Admin area line 1"*/}
-                          {/*  />*/}
-                          {/*</div>*/}
-                          {/*<div>*/}
-                          {/*  <input*/}
-                          {/*      type="text"*/}
-                          {/*      id="card-billing-address-admin-area-line-2"*/}
-                          {/*      name="card-billing-address-admin-area-line-2"*/}
-                          {/*      autoComplete="off"*/}
-                          {/*      placeholder="Admin area line 2"*/}
-                          {/*  />*/}
-                          {/*</div>*/}
-                          {/*<div>*/}
-                          {/*  <input*/}
-                          {/*      type="text"*/}
-                          {/*      id="card-billing-address-country-code"*/}
-                          {/*      name="card-billing-address-country-code"*/}
-                          {/*      autoComplete="off"*/}
-                          {/*      placeholder="Country code"*/}
-                          {/*  />*/}
-                          {/*</div>*/}
-                          {/*<div>*/}
-                          {/*  <input*/}
-                          {/*      type="text"*/}
-                          {/*      id="card-billing-address-postal-code"*/}
-                          {/*      name="card-billing-address-postal-code"*/}
-                          {/*      autoComplete="off"*/}
-                          {/*      placeholder="Postal/zip code"*/}
-                          {/*  />*/}
-                          {/*</div>*/}
-
-                          {/*<br/><br/>*/}
-                          {/*<button id="card-field-submit-button" type="button">*/}
-                          {/*  Pay now with Card*/}
-                          {/*</button>*/}
 
                           {/* Payment Button - Enhanced */}
                           <Box pt={4}>
@@ -1102,6 +1138,7 @@ export default function PaymentPage({ params }) {
                                 colorScheme="blue"
                                 size="lg"
                                 borderRadius="xl"
+                                isDisabled={isProcessingPayment}
                                 isLoading={isProcessingPayment}
                                 loadingText="Processing Payment..."
                                 bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
@@ -1135,6 +1172,7 @@ export default function PaymentPage({ params }) {
                                 _hover_before={{
                                   left: '100%'
                                 }}
+                                onClick={submitPayment}
                             >
                               <HStack spacing={3}>
                                 <Text>🔒</Text>

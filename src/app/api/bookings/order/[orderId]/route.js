@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function GET(request, { params }) {
+export async function GET(request, context) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -15,7 +15,8 @@ export async function GET(request, { params }) {
       );
     }
 
-    const { orderId } = params;
+    const { params } = context;
+    const { orderId } = await params;
 
     if (!orderId) {
       return NextResponse.json(
@@ -78,12 +79,17 @@ export async function GET(request, { params }) {
       );
     }
 
+
+    console.log('======== transaction =========');
+    console.log(transaction);
+    console.log('=================');
+
     // Transform data to match expected format
     const bookingData = {
       id: transaction.id,
       amount: transaction.amount,
       status: transaction.status,
-      bookingDate: transaction.party.date,
+      bookingDate: transaction.party?.date || '',
       address: transaction.offer.partyService?.specificOptions?.address || '',
       comments: transaction.offer.partyService?.specificOptions?.comments || '',
       service: transaction.offer.service,
@@ -104,4 +110,4 @@ export async function GET(request, { params }) {
   } finally {
     await prisma.$disconnect();
   }
-} 
+}
