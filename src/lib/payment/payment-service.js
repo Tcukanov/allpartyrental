@@ -200,17 +200,6 @@ export class PaymentService {
         linksCount: order.links?.length || 0
       });
 
-      if(paymentMethod === 'direct_booking') {
-        return {
-          success: true,
-          orderId: order.id,
-          transactionId: '',
-          approvalUrl: '',
-          total: total,
-          currency: 'USD'
-        }
-      }
-
       console.log('🎯 Getting or creating offer...');
       // Create database transaction record
       const offer = await this.getOrCreateOffer(serviceId, userId, bookingData);
