@@ -12,23 +12,9 @@ Provider Service Locations allow service providers to specify which cities they 
 
 ## Database Schema
 
-### Previous Implementation (Before Version 1.0)
+### Current Implementation
 
-The initial implementation used **placeholder services** to track service locations:
-
-- A placeholder service was created for each city a provider operates in
-- These services were marked as `INACTIVE` to prevent them from appearing in search results
-- The service names were prefixed with `LOCATION_PLACEHOLDER_` or `Placeholder Service for`
-- The `cityId` field referenced the city the provider operates in
-
-This approach had several drawbacks:
-- It used the `Service` table for something it wasn't designed for
-- It created unnecessary records in the database
-- It made querying provider locations more complex
-
-### Current Implementation (Version 1.0+)
-
-The current implementation uses a dedicated junction table to track service locations:
+The platform uses a dedicated junction table to track service locations:
 
 ```prisma
 model ProviderCity {
@@ -44,10 +30,20 @@ model ProviderCity {
 }
 ```
 
-This provides several benefits:
-- Cleaner database design with proper relationships
-- More efficient querying of provider locations
-- Simplified API endpoints for managing locations
+### Service Location Logic
+
+**Important:** Services are **not directly tied to cities**. Instead:
+
+1. **Services belong to providers** - Each service has a `providerId` but no `cityId`
+2. **Providers serve cities** - The `ProviderCity` table tracks which cities each provider serves
+3. **Service availability** - A service is available in a city if its provider serves that city
+4. **Location filtering** - When filtering services by city, the system finds all providers who serve that city, then returns their services
+
+This design provides several benefits:
+- Services are location-agnostic and can be offered in multiple cities
+- Providers can easily manage their service areas without affecting individual services
+- More efficient querying and better database normalization
+- Simplified service creation (no need to specify city for each service)
 
 ## API Endpoints
 

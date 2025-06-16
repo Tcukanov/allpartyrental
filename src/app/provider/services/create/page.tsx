@@ -40,11 +40,7 @@ interface Category {
   slug: string;
 }
 
-interface City {
-  id: string;
-  name: string;
-  slug: string;
-}
+
 
 // Define the service form data structure
 interface ServiceFormData {
@@ -52,7 +48,6 @@ interface ServiceFormData {
   description: string;
   price: string;
   categoryId: string;
-  cityId: string;
   availableDays: string[];
   availableHoursStart: string;
   availableHoursEnd: string;
@@ -86,7 +81,6 @@ export default function CreateServicePage() {
     description: '',
     price: '',
     categoryId: '',
-    cityId: '',
     availableDays: [],
     availableHoursStart: '09:00',
     availableHoursEnd: '17:00',
@@ -112,7 +106,6 @@ export default function CreateServicePage() {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [cities, setCities] = useState<City[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -134,7 +127,7 @@ export default function CreateServicePage() {
   const [selectedBlockDate, setSelectedBlockDate] = useState<Date | null>(null);
   
   useEffect(() => {
-    const fetchCategoriesAndCities = async () => {
+    const fetchCategories = async () => {
       try {
         setIsLoading(true);
         
@@ -156,16 +149,6 @@ export default function CreateServicePage() {
         }
         const categoriesData = await categoriesResponse.json();
         setCategories(categoriesData.data || []);
-        
-        // Fetch cities
-        const citiesResponse = await fetch('/api/cities');
-        if (!citiesResponse.ok) {
-          throw new Error(`Failed to fetch cities: ${citiesResponse.status}`);
-        }
-        const citiesData = await citiesResponse.json();
-        setCities(citiesData.data || []);
-        
-        // Don't set default city anymore
       } catch (error) {
         console.error('Error fetching data:', error);
         setLoadingError(error instanceof Error ? error.message : 'Failed to load required data');
@@ -181,40 +164,10 @@ export default function CreateServicePage() {
       }
     };
     
-    fetchCategoriesAndCities();
+    fetchCategories();
   }, [toast, router, session, status]);
   
-  useEffect(() => {
-    async function loadData() {
-      setIsLoadingData(true);
-      try {
-        // Fetch both cities and categories in parallel
-        const [cityResponse, categoryResponse] = await Promise.all([
-          fetch('/api/cities'),
-          fetch('/api/categories')
-        ]);
 
-        if (!cityResponse.ok || !categoryResponse.ok) {
-          throw new Error('Failed to load data');
-        }
-
-        const cityData = await cityResponse.json();
-        const categoryData = await categoryResponse.json();
-
-        setCities(cityData.data || []);
-        setCategories(categoryData.data || []);
-
-        // Don't auto-select any category, let the user choose
-      } catch (error) {
-        console.error('Error loading data:', error);
-        setError('Failed to load necessary data. Please try again later.');
-      } finally {
-        setIsLoadingData(false);
-      }
-    }
-
-    loadData();
-  }, []);
   
   // Add function to fetch category filters
   const fetchCategoryFilters = async (categoryId: string) => {
@@ -433,7 +386,6 @@ export default function CreateServicePage() {
         description: formData.description,
         price: parseFloat(formData.price),
         categoryId: formData.categoryId,
-        cityId: formData.cityId,
         availableDays: selectedDays,
         availableHoursStart: formData.availableHoursStart,
         availableHoursEnd: formData.availableHoursEnd,

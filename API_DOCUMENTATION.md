@@ -11,6 +11,7 @@ This document provides details for testing the All Party Rent API endpoints. Use
 - [Chat](#chat)
 - [Notifications](#notifications)
 - [Transactions](#transactions)
+- [Provider Cities](#provider-cities)
 - [Categories & Cities](#categories--cities)
 - [Email Configuration](#email-configuration)
 
@@ -81,7 +82,7 @@ Returns a list of services with optional filtering.
 
 **Query Parameters:**
 - `categoryId`: Filter by category ID
-- `cityId`: Filter by city ID
+- `cityId`: Filter by city ID (filters services from providers who serve this city)
 - `search`: Search term for service name/description
 - `minPrice`: Minimum price filter
 - `maxPrice`: Maximum price filter
@@ -107,10 +108,6 @@ Returns a list of services with optional filtering.
       "category": {
         "id": "category-id",
         "name": "Category Name"
-      },
-      "city": {
-        "id": "city-id",
-        "name": "City Name"
       }
     }
   ],
@@ -133,7 +130,6 @@ Creates a new service. Requires provider authentication.
   "description": "Service description",
   "price": 100,
   "categoryId": "category-id",
-  "cityId": "city-id",
   "status": "ACTIVE"
 }
 ```
@@ -146,16 +142,11 @@ Creates a new service. Requires provider authentication.
   "description": "Service description",
   "price": 100,
   "categoryId": "category-id",
-  "cityId": "city-id",
   "status": "ACTIVE",
   "providerId": "provider-id",
   "category": {
     "id": "category-id",
     "name": "Category Name"
-  },
-  "city": {
-    "id": "city-id",
-    "name": "City Name"
   }
 }
 ```
@@ -177,10 +168,6 @@ Gets a specific service by ID.
   "category": {
     "id": "category-id",
     "name": "Category Name"
-  },
-  "city": {
-    "id": "city-id",
-    "name": "City Name"
   }
 }
 ```
@@ -934,6 +921,80 @@ Client Pays: $105.00 (service + 5% client fee)
 - `COMPLETED` - Provider accepted, transaction complete
 - `CANCELLED` - Transaction cancelled
 - `REFUNDED` - Payment refunded
+
+## Provider Cities
+
+### GET /provider/cities
+Gets all cities a provider operates in. Requires provider authentication.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "city-id-1",
+      "name": "New York",
+      "state": "NY",
+      "slug": "new-york",
+      "providerCityId": "provider-city-id-1"
+    },
+    {
+      "id": "city-id-2",
+      "name": "Los Angeles",
+      "state": "CA",
+      "slug": "los-angeles",
+      "providerCityId": "provider-city-id-2"
+    }
+  ]
+}
+```
+
+### POST /provider/cities
+Adds a city to a provider's service locations. Requires provider authentication.
+
+**Request Body:**
+```json
+{
+  "cityId": "city-id"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Service location added successfully",
+  "data": {
+    "city": {
+      "id": "city-id",
+      "name": "City Name",
+      "state": "State",
+      "slug": "city-slug"
+    },
+    "providerCityId": "provider-city-id"
+  }
+}
+```
+
+### DELETE /provider/cities/:id
+Removes a city from a provider's service locations. The `:id` parameter is the city ID. Requires provider authentication.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Service location removed successfully",
+  "data": {
+    "city": {
+      "id": "city-id",
+      "name": "City Name",
+      "state": "State",
+      "slug": "city-slug"
+    }
+  }
+}
+```
 
 ## Categories & Cities
 

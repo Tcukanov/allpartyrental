@@ -80,9 +80,10 @@ model Provider {
   paypalEnvironment          String?   @default("sandbox")
 
   // Relations
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   services     Service[]
   offers       Offer[]
+  cities       ProviderCity[]
 }
 
 model Calendar {
@@ -130,14 +131,12 @@ model City {
   isDefault      Boolean        @default(false)
   parties        Party[]
   providerCities ProviderCity[]
-  services       Service[]
 }
 
 model Service {
   id                  String          @id @default(cuid())
   providerId          String
   categoryId          String
-  cityId              String?
   name                String
   description         String
   price               Decimal
@@ -156,7 +155,6 @@ model Service {
   offers              Offer[]
   partyServices       PartyService[]
   category            ServiceCategory @relation(fields: [categoryId], references: [id])
-  city                City?           @relation(fields: [cityId], references: [id])
   provider            Provider        @relation(fields: [providerId], references: [id])
   addons              ServiceAddon[]
 }
@@ -378,6 +376,7 @@ model ProviderCity {
   cityId     String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  provider   Provider @relation(fields: [providerId], references: [id])
   city       City     @relation(fields: [cityId], references: [id])
 
   @@unique([providerId, cityId])

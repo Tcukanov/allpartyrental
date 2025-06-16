@@ -34,11 +34,14 @@ erDiagram
     
     Provider ||--o{ Service : "offers services"
     Provider ||--o{ Offer : "makes offers"
+    Provider ||--o{ ProviderCity : "serves cities"
     
     Service }o--|| ServiceCategory : "belongs to category"
-    Service }o--|| City : "located in city"
     Service ||--o{ ServiceAddon : "has addons"
     Service ||--o{ Offer : "receives offers"
+    
+    ProviderCity }o--|| City : "references city"
+    ProviderCity }o--|| Provider : "references provider"
     
     Party }o--|| User : "created by client"
     Party }o--|| City : "located in city"
@@ -77,10 +80,24 @@ erDiagram
         string id PK
         string providerId FK
         string categoryId FK
-        string cityId FK
         string name
         decimal price
         enum status "ACTIVE|INACTIVE"
+    }
+    
+    ProviderCity {
+        string id PK
+        string providerId FK
+        string cityId FK
+        datetime createdAt
+        datetime updatedAt
+    }
+    
+    City {
+        string id PK
+        string name
+        string state
+        string slug
     }
     
     Transaction {

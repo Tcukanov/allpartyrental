@@ -10,7 +10,6 @@ interface ServiceWithMetadata {
   description: string;
   price: number | string;
   categoryId: string;
-  cityId?: string | null;
   providerId: string;
   photos: string[];
   status: string;
@@ -30,14 +29,6 @@ interface ServiceWithMetadata {
     createdAt: Date;
     updatedAt: Date;
     slug: string;
-  };
-  city: {
-    id: string;
-    name: string;
-    createdAt: Date;
-    updatedAt: Date;
-    slug: string;
-    state: string;
   };
 }
 
@@ -178,8 +169,7 @@ export async function GET() {
         providerId: provider.id  // Use Provider ID, not User ID
       },
       include: {
-        category: true,
-        city: true
+        category: true
       },
       orderBy: {
         updatedAt: 'desc' // Show most recently updated services first
@@ -290,7 +280,6 @@ export async function POST(request: Request) {
       description, 
       price, 
       categoryId, 
-      cityId, 
       filterValues, 
       images, 
       addons,
@@ -377,7 +366,6 @@ export async function POST(request: Request) {
         description,
         price: parseFloat(price.toString()),
         categoryId,
-        cityId: cityId || null,
         providerId,
         photos: data.photos || [],
         availableDays: data.availableDays || [],
@@ -429,12 +417,11 @@ export async function POST(request: Request) {
     });
     
     // Prepare the response
-    // Get the complete service with its category and city info
+    // Get the complete service with its category info
     const completeService = await prisma.service.findUnique({
       where: { id: service.id },
       include: {
-        category: true,
-        city: true
+        category: true
       }
     });
     
@@ -476,14 +463,7 @@ export async function POST(request: Request) {
         }, { status: 400 });
       }
       
-      if (error.meta?.field_name?.includes('cityId')) {
-        return NextResponse.json({ 
-          success: false,
-          error: 'Invalid city selected. The selected city may no longer exist.',
-          code: 'INVALID_CITY',
-          details: 'Please select a different city and try again.'
-        }, { status: 400 });
-      }
+
       
       return NextResponse.json({ 
         success: false,

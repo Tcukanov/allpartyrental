@@ -28,7 +28,6 @@ type Service = {
   photos: string[];
   provider: User;
   categoryId: string;
-  cityId?: string | null;
   [key: string]: any;
 };
 
@@ -205,33 +204,15 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
     }
 
     // Fetch services for this location and category
+    // Services are now filtered by providers who serve this city
+    const providerIds = await getProviderIdsWithCity(city.id);
+    
     const services = await prisma.service.findMany({
       where: {
         AND: [
           { categoryId: category.id },
           { status: 'ACTIVE' },
-          {
-            OR: [
-              { cityId: city.id }, // Direct match on city
-              {
-                AND: [
-                  // Provider has this city as a service location
-                  {
-                    providerId: {
-                      in: await getProviderIdsWithCity(city.id)
-                    }
-                  },
-                  // The service is either in this city or has no city specified
-                  {
-                    OR: [
-                      { cityId: city.id },
-                      { cityId: null }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
+          { providerId: { in: providerIds } } // Only services from providers who serve this city
         ]
       }
     });

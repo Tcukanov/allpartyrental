@@ -50,12 +50,14 @@ async function getFeeSettings() {
 export class PaymentService {
   constructor() {
     this.prisma = new PrismaClient();
+    console.log('🔥 PaymentService constructor called - NEW VERSION WITH PLATFORM FEES 🔥');
   }
 
   /**
    * Create PayPal order for marketplace payment
    */
   async createPaymentOrder(bookingData) {
+    console.log('🔥🔥🔥 PAYMENT SERVICE CREATE ORDER CALLED - NEW VERSION 🔥🔥🔥');
     console.log('🏪 PaymentService.createPaymentOrder called with:', bookingData);
 
     try {
@@ -134,8 +136,8 @@ export class PaymentService {
         total
       });
 
-      console.log('📋 Creating PayPal order data...');
-      // Create PayPal order with marketplace split
+      console.log('📋 Creating PayPal order with platform fees...');
+      // Create PayPal order with platform fees as per PayPal integration guide
       const orderData = {
         intent: 'CAPTURE',
         purchase_units: [{
@@ -159,11 +161,14 @@ export class PaymentService {
             merchant_id: service.provider.paypalMerchantId
           },
           payment_instruction: {
-            disbursement_mode: 'DELAYED', // Hold funds in escrow
+            disbursement_mode: 'INSTANT',
             platform_fees: [{
               amount: {
                 currency_code: 'USD',
                 value: platformFee.toFixed(2)
+              },
+              payee: {
+                merchant_id: process.env.PAYPAL_PLATFORM_MERCHANT_ID
               }
             }]
           },
@@ -188,10 +193,16 @@ export class PaymentService {
         }
       };
 
+      console.log('💰 Platform commission configuration:', {
+        platformFee: platformFee.toFixed(2),
+        platformMerchantId: process.env.PAYPAL_PLATFORM_MERCHANT_ID,
+        usingDedicatedAccount: !!process.env.PAYPAL_PLATFORM_MERCHANT_ID
+      });
+
       console.log('📋 PayPal order data created:', JSON.stringify(orderData, null, 2));
 
       console.log('🔗 Calling PayPal client to create order...');
-      // Create PayPal order
+      // Create PayPal order with platform fees
       const order = await paypalClient.createOrder(orderData);
 
       console.log('✅ PayPal order created:', {
@@ -286,6 +297,8 @@ export class PaymentService {
    */
   async capturePayment(orderId) {
     try {
+      console.log('🎯 PaymentService.capturePayment called for order:', orderId);
+      
       // Find transaction by PayPal order ID
       const transaction = await this.prisma.transaction.findFirst({
         where: { paypalOrderId: orderId },
@@ -307,8 +320,65 @@ export class PaymentService {
         throw new Error('Transaction not found for order ID: ' + orderId);
       }
 
+      console.log('💰 Transaction details before capture:', {
+        transactionId: transaction.id,
+        amount: transaction.amount,
+        clientFeePercent: transaction.clientFeePercent,
+        providerFeePercent: transaction.providerFeePercent,
+        paypalOrderId: transaction.paypalOrderId,
+        status: transaction.status
+      });
+
+      // Get PayPal order details before capture to see commission configuration
+      console.log('🔍 Getting PayPal order details before capture...');
+      const orderDetails = await paypalClient.getOrder(orderId);
+      
+      console.log('📋 PayPal order commission analysis:', {
+        orderId: orderId,
+        orderStatus: orderDetails.status,
+        hasPlatformFees: !!orderDetails.purchase_units?.[0]?.payment_instruction?.platform_fees,
+        platformFeesCount: orderDetails.purchase_units?.[0]?.payment_instruction?.platform_fees?.length || 0,
+        platformFees: orderDetails.purchase_units?.[0]?.payment_instruction?.platform_fees || 'None configured',
+        totalAmount: orderDetails.purchase_units?.[0]?.amount?.value,
+        currency: orderDetails.purchase_units?.[0]?.amount?.currency_code
+      });
+
       // Capture the PayPal payment
+      console.log('💳 Capturing PayPal payment...');
       const captureResult = await paypalClient.captureOrder(orderId);
+      
+             console.log('✅ PayPal capture result analysis:', {
+         captureId: captureResult.id,
+         status: captureResult.status,
+         grossAmount: captureResult.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value,
+         netAmount: captureResult.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown?.net_amount?.value,
+         paypalFee: captureResult.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown?.paypal_fee?.value,
+         platformFee: captureResult.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown?.platform_fees?.[0]?.amount?.value,
+         platformFeePayee: captureResult.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown?.platform_fees?.[0]?.payee?.merchant_id
+       });
+
+       // Log the complete seller_receivable_breakdown for debugging
+       console.log('🔍 Complete PayPal seller_receivable_breakdown:', JSON.stringify(
+         captureResult.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown, 
+         null, 
+         2
+       ));
+
+       // Log platform fee details specifically
+       const platformFees = captureResult.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown?.platform_fees;
+       if (platformFees && platformFees.length > 0) {
+         console.log('💰 Platform fee details:', {
+           count: platformFees.length,
+           fees: platformFees.map(fee => ({
+             amount: fee.amount?.value,
+             currency: fee.amount?.currency_code,
+             payee: fee.payee?.merchant_id,
+             payeeType: fee.payee?.email_address ? 'email' : 'merchant_id'
+           }))
+         });
+       } else {
+         console.log('❌ No platform fees found in capture result');
+       }
 
       // Update transaction with capture details
       const updatedTransaction = await this.prisma.transaction.update({
@@ -475,12 +545,11 @@ export class PaymentService {
     }
 
     if (!offer) {
-      // Get service to get provider ID and city
+      // Get service to get provider ID
       const service = await this.prisma.service.findUnique({
         where: { id: serviceId },
         include: {
-          provider: true,
-          city: true  // Include city relation if it exists
+          provider: true
         }
       });
 
@@ -488,17 +557,13 @@ export class PaymentService {
         throw new Error('Service not found');
       }
 
-      // Handle city - get from service or use a default city
-      let cityId = service.cityId;
-      if (!cityId) {
-        // If service doesn't have a city, get the first available city as default
-        const defaultCity = await this.prisma.city.findFirst();
-        if (!defaultCity) {
-          throw new Error('No cities available in the system');
-        }
-        cityId = defaultCity.id;
-        console.log('🏙️ Service has no city, using default city:', defaultCity.name);
+      // Get a default city for the party (services are no longer tied to specific cities)
+      const defaultCity = await this.prisma.city.findFirst();
+      if (!defaultCity) {
+        throw new Error('No cities available in the system');
       }
+      const cityId = defaultCity.id;
+      console.log('🏙️ Using default city for party:', defaultCity.name);
 
       // For direct bookings, we need to create a party first
       const party = await this.prisma.party.create({

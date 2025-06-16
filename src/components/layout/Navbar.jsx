@@ -110,9 +110,9 @@ export default function Navbar() {
                 <Button 
                   colorScheme="brand" 
                   variant="solid" 
-                  onClick={() => router.push('/provider/dashboard')}
+                  onClick={() => router.push('/provider/cabinet')}
                 >
-                  Provider Dashboard
+                  Provider Cabinet
                 </Button>
               )}
               

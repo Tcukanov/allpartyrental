@@ -10,7 +10,6 @@ interface ServiceWithMetadata {
   description: string;
   price: number | string;
   categoryId: string;
-  cityId: string;
   providerId: string;
   photos: string[];
   status: string;
@@ -69,7 +68,7 @@ export async function GET(
           },
         },
         category: true,
-        city: true,
+
       },
     });
 
@@ -184,7 +183,7 @@ export async function PUT(
     }
 
     // Remove non-Prisma fields if they exist
-    const { provider, category, city, ...serviceData } = requestData;
+    const { provider, category, ...serviceData } = requestData;
 
     // Add metadata back if it exists
     if (metadata) {
@@ -198,8 +197,7 @@ export async function PUT(
       },
       data: serviceData,
       include: {
-        category: true,
-        city: true
+        category: true
       }
     });
 

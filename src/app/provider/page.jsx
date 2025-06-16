@@ -13,7 +13,7 @@ export default function ProviderPage() {
     if (status === 'loading') return;
 
     if (status === 'unauthenticated') {
-      router.push('/auth/signin?callbackUrl=/provider/dashboard');
+      router.push('/auth/signin?callbackUrl=/provider/cabinet');
       return;
     }
 
@@ -23,7 +23,7 @@ export default function ProviderPage() {
     }
 
     // If authenticated as provider, redirect to dashboard
-    router.push('/provider/dashboard');
+    router.push('/provider/cabinet');
   }, [session, status, router]);
 
   return (

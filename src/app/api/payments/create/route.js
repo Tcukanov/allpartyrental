@@ -8,6 +8,7 @@ import { PaymentService } from '@/lib/payment/payment-service';
  * POST /api/payments/create
  */
 export async function POST(request) {
+  console.log('🔥🔥🔥 PAYMENT CREATION ENDPOINT HIT - NEW VERSION 🔥🔥🔥');
   console.log('🚀 Payment creation endpoint hit');
 
   try {

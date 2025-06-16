@@ -28,6 +28,10 @@ async function main() {
   console.log('Creating provider records...');
   const providers = await createProviders(users.providers);
 
+  // Create provider-city relationships
+  console.log('Creating provider city relationships...');
+  await createProviderCities(providers, cities);
+
   // Create services offered by providers
   console.log('Creating services...');
   await createServices(providers, categories, cities);
@@ -283,6 +287,28 @@ async function createProviders(providerUsers) {
   );
 }
 
+async function createProviderCities(providers, cities) {
+  const providerCityRelationships = [];
+  
+  // Create relationships so each provider serves all cities
+  providers.forEach(provider => {
+    cities.forEach(city => {
+      providerCityRelationships.push({
+        providerId: provider.id,
+        cityId: city.id
+      });
+    });
+  });
+
+  return Promise.all(
+    providerCityRelationships.map(relationship => 
+      prisma.providerCity.create({
+        data: relationship
+      })
+    )
+  );
+}
+
 async function createServices(providers, categories, cities) {
   // Map category names to IDs for easier lookup
   const categoryMap = categories.reduce((map, category) => {
@@ -299,15 +325,12 @@ async function createServices(providers, categories, cities) {
   // Create services for each provider based on their specialty
   const services = [];
 
-  // Create services for each city
-  cities.forEach(city => {
-    // Soft play services
+      // Create services for providers (not tied to specific cities)
     services.push({
       providerId: providers[0].id,
       categoryId: categoryMap['Soft play'],
-      cityId: city.id,
-      name: `Kids Soft Play Set in ${city.name}`,
-      description: `Safe and colorful soft play equipment for young children. Perfect for parties and events in ${city.name}.`,
+      name: `Kids Soft Play Set`,
+      description: `Safe and colorful soft play equipment for young children. Perfect for parties and events.`,
       price: 249.99,
       photos: ['https://images.unsplash.com/photo-1566140967404-b8b3932483f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
@@ -317,9 +340,8 @@ async function createServices(providers, categories, cities) {
     services.push({
       providerId: providers[1].id,
       categoryId: categoryMap['Soft play'],
-      cityId: city.id,
-      name: `Toddler Play Area in ${city.name}`,
-      description: `Complete soft play setup for toddlers including ball pit, soft blocks, and climbing structures in ${city.name}.`,
+      name: `Toddler Play Area`,
+      description: `Complete soft play setup for toddlers including ball pit, soft blocks, and climbing structures.`,
       price: 299.99,
       photos: ['https://images.unsplash.com/photo-1596461639144-dea8e88c9dab?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
@@ -329,15 +351,13 @@ async function createServices(providers, categories, cities) {
     services.push({
       providerId: providers[2].id,
       categoryId: categoryMap['Soft play'],
-      cityId: city.id,
-      name: `Deluxe Soft Play Package in ${city.name}`,
-      description: `Premium soft play equipment including slides, tunnels, ball pits and more. Professional setup in ${city.name}.`,
+      name: `Deluxe Soft Play Package`,
+      description: `Premium soft play equipment including slides, tunnels, ball pits and more. Professional setup available.`,
       price: 399.99,
       photos: ['https://images.unsplash.com/photo-1607453998774-d533f65dac99?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80'],
       status: 'ACTIVE',
       colors: ['pink', 'blue', 'white'],
     });
-  });
 
   return Promise.all(
     services.map(service => 
@@ -420,12 +440,12 @@ async function createPartyServicesAndOffers(parties, providers) {
       continue;
     }
 
-    // Filter services by city
-    const cityServices = services.filter(service => service.cityId === party.cityId);
+    // Get all services (no longer filtered by city since services aren't tied to cities)
+    const availableServices = services;
     
     // Create 3-5 party services for each party
     const serviceCount = Math.floor(Math.random() * 3) + 3;
-    const selectedServices = cityServices.slice(0, serviceCount);
+    const selectedServices = availableServices.slice(0, serviceCount);
     
     for (const service of selectedServices) {
       // Create party service
@@ -543,7 +563,6 @@ async function createCompletedParties(clients, providers, categories, cities) {
         data: {
           providerId: provider.id,
           categoryId: softPlayCategoryId,
-          cityId: party.cityId,
           name: `Soft Play Setup for ${party.name}`,
           description: `Special soft play equipment provided for ${party.name}`,
           price: 150 + Math.floor(Math.random() * 200),

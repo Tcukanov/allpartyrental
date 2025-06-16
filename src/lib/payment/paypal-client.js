@@ -134,7 +134,7 @@ class PayPalClientFixed {
               value: platformCommission.toFixed(2)
             },
             payee: {
-              merchant_id: this.clientId // Use main client ID as platform merchant ID
+              merchant_id: process.env.PAYPAL_PLATFORM_MERCHANT_ID || this.clientId // Use dedicated platform merchant ID
             }
           }]
         }
@@ -149,6 +149,12 @@ class PayPalClientFixed {
       }
     };
 
+    console.log('💰 Platform commission configuration:', {
+      platformCommission: platformCommission.toFixed(2),
+      platformMerchantId: process.env.PAYPAL_PLATFORM_MERCHANT_ID || this.clientId,
+      usingDedicatedAccount: !!process.env.PAYPAL_PLATFORM_MERCHANT_ID
+    });
+    
     console.log('Creating marketplace order:', JSON.stringify(orderData, null, 2));
 
     const response = await fetch(`${this.baseURL}/v2/checkout/orders`, {

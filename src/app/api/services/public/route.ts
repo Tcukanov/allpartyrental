@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       where.categoryId = categoryId;
     }
 
-    // Handle city filtering in a different way
+    // Handle city filtering - services are now filtered by providers who serve the city
     if (cityId) {
       try {
         console.log(`Processing city filtering for cityId: ${cityId}`);
@@ -61,34 +61,20 @@ export async function GET(request: NextRequest) {
           console.log(`No providers found with service locations in city ${cityId}`);
         }
         
-        // Fixed approach: Either services in this exact city OR services from providers who serve this city
-        // This ensures we only include relevant services
+        // Filter services by providers who serve this city
         if (providerIds.length > 0) {
-          where.OR = [
-            { cityId }, // Services directly in this city
-            { 
-              AND: [
-                { providerId: { in: providerIds } }, // From providers who serve this city
-                { 
-                  OR: [
-                    { cityId }, // Either exact match on city
-                    { cityId: null } // Or no city specified (provider-wide services)
-                  ]
-                }
-              ]
-            }
-          ];
-          console.log(`Using improved city filtering with ${providerIds.length} provider IDs`);
+          where.providerId = { in: providerIds };
+          console.log(`Filtering services by ${providerIds.length} providers who serve this city`);
         } else {
-          // If no providers found, just filter by cityId
-          where.cityId = cityId;
-          console.log(`No providers serve this city, filtering only by exact cityId match: ${cityId}`);
+          // If no providers serve this city, return no results
+          where.id = { in: [] }; // This will return no services
+          console.log(`No providers serve this city, returning empty results`);
         }
       } catch (error) {
         console.error('Error finding providers with city:', error);
-        // Fallback to simple cityId filtering
-        where.cityId = cityId;
-        console.log(`Error occurred, falling back to simple cityId filtering: ${cityId}`);
+        // Fallback to returning no results if there's an error
+        where.id = { in: [] };
+        console.log(`Error occurred, returning empty results`);
       }
     }
 
@@ -221,26 +207,11 @@ export async function GET(request: NextRequest) {
     try {
       console.log('About to execute service query with provider select');
       
-      // First try without including the provider relation to see if that works
-      const servicesBasic = await prisma.service.findMany({
+      // Query services with provider info (no city relation since services are no longer tied to cities)
+      const services = await prisma.service.findMany({
         where,
         include: {
           category: true,
-          city: true,
-        },
-        orderBy,
-        skip,
-        take: limit,
-      });
-
-      console.log(`Found ${servicesBasic.length} services (basic query without provider)`);
-
-      // Now include only the minimal provider fields needed by the client component
-      const servicesWithMinimalProvider = await prisma.service.findMany({
-        where,
-        include: {
-          category: true,
-          city: true,
           provider: {
             select: {
               id: true,
@@ -258,10 +229,7 @@ export async function GET(request: NextRequest) {
         take: limit,
       });
       
-      console.log(`Found ${servicesWithMinimalProvider.length} services with minimal provider info`);
-      
-      // Use the minimal provider results
-      const services = servicesWithMinimalProvider;
+      console.log(`Found ${services.length} services from providers`);
       
       // Get total count for pagination
       const total = await prisma.service.count({ where });

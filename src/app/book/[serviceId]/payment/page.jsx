@@ -62,6 +62,14 @@ export default function PaymentPage({ params }) {
   // Unwrap params using use() as required by Next.js 15
   const { serviceId } = use(params);
 
+  // Debug component mount
+  useEffect(() => {
+    console.log('💳 Payment Page Component Mounted');
+    console.log('- Service ID:', serviceId);
+    console.log('- Environment:', process.env.NODE_ENV);
+    console.log('- PayPal Client ID available:', !!process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID);
+  }, [serviceId]);
+
   const validateBilling = () => {
 
     console.log({billing});
@@ -107,32 +115,56 @@ export default function PaymentPage({ params }) {
 
   // Load PayPal SDK
   useEffect(() => {
+    console.log('🔍 PayPal SDK Loading Debug:');
+    console.log('- NEXT_PUBLIC_PAYPAL_CLIENT_ID:', process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID);
+    console.log('- window.paypal exists:', !!window.paypal);
+    console.log('- paypalLoaded state:', paypalLoaded);
+
     if (!process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID) {
-      console.error('PayPal Client ID not found');
+      console.error('❌ PayPal Client ID not found in environment variables');
+      toast({
+        title: 'Configuration Error',
+        description: 'PayPal Client ID not configured. Please contact support.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
       return;
     }
 
     // Check if PayPal is already loaded
     if (window.paypal) {
+      console.log('✅ PayPal SDK already loaded, setting state');
       setPaypalLoaded(true);
       return;
     }
 
+    console.log('📦 Creating PayPal SDK script...');
     const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,card-fields&disable-funding=venmo,paylater&enable-funding=card&commit=true`;
+    const sdkUrl = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,card-fields&disable-funding=venmo,paylater&enable-funding=card&commit=true`;
+    console.log('- SDK URL:', sdkUrl);
+    
+    script.src = sdkUrl;
     script.setAttribute('data-partner-attribution-id', 'NYCKIDSPARTYENT_SP_PPCP');
     script.async = true;
 
     script.onload = () => {
-      console.log('PayPal SDK loaded successfully');
+      console.log('✅ PayPal SDK script loaded successfully');
+      console.log('- window.paypal available:', !!window.paypal);
+      console.log('- PayPal version:', window.paypal?.version);
+      
       // Add a small delay to ensure PayPal is fully ready
       setTimeout(() => {
+        console.log('🚀 Setting paypalLoaded to true');
         setPaypalLoaded(true);
       }, 500);
     };
 
-    script.onerror = () => {
-      console.error('Failed to load PayPal SDK');
+    script.onerror = (error) => {
+      console.error('❌ Failed to load PayPal SDK:', error);
+      console.error('- Script src:', script.src);
+      console.error('- Error event:', error);
+      
       toast({
         title: 'Payment Error',
         description: 'Failed to load payment system. Please refresh the page.',
@@ -142,9 +174,11 @@ export default function PaymentPage({ params }) {
       });
     };
 
+    console.log('📝 Appending PayPal script to document head');
     document.head.appendChild(script);
 
     return () => {
+      console.log('🧹 Cleaning up PayPal script');
       // Cleanup script if component unmounts
       const existingScript = document.querySelector(`script[src*="paypal"]`);
       if (existingScript && existingScript.parentNode) {
@@ -590,6 +624,22 @@ export default function PaymentPage({ params }) {
   }
 
   const initializeCardFields = () => {
+    console.log('🎯 Initializing PayPal Card Fields...');
+    console.log('- window.paypal available:', !!window.paypal);
+    console.log('- window.paypal.CardFields available:', !!window.paypal?.CardFields);
+    console.log('- paypalLoaded state:', paypalLoaded);
+
+    if (!window.paypal || !window.paypal.CardFields) {
+      console.error('❌ PayPal CardFields not available');
+      toast({
+        title: 'Payment System Error',
+        description: 'PayPal card payment system not loaded. Please refresh the page.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
 
     const chakraStyle = {
       base: {
@@ -628,6 +678,7 @@ export default function PaymentPage({ params }) {
     let transactionId;
     let orderId = '';
 
+    console.log('🏗️ Creating PayPal CardFields instance...');
     const cardField = window.paypal.CardFields({
       createOrder: () => {
         setIsProcessingPayment(true);
@@ -710,32 +761,64 @@ export default function PaymentPage({ params }) {
       style: chakraStyle,
     });
 
+    console.log('🔍 Checking CardFields eligibility...');
+    console.log('- cardField.isEligible():', cardField.isEligible());
+    
     if (cardField.isEligible()) {
-      const nameField = cardField.NameField({
-        style: chakraStyle,
-        placeholder: "John Doe"
-      });
-      nameField.render("#card-name-field-container");
+      console.log('✅ CardFields is eligible, rendering fields...');
+      
+      try {
+        const nameField = cardField.NameField({
+          style: chakraStyle,
+          placeholder: "John Doe"
+        });
+        console.log('- Rendering name field to #card-name-field-container');
+        nameField.render("#card-name-field-container");
 
-      const numberField = cardField.NumberField({
-        style: chakraStyle,
-        placeholder: "1234 5678 9012 3456",
-      });
-      numberField.render("#card-number-field-container");
+        const numberField = cardField.NumberField({
+          style: chakraStyle,
+          placeholder: "1234 5678 9012 3456",
+        });
+        console.log('- Rendering number field to #card-number-field-container');
+        numberField.render("#card-number-field-container");
 
-      const cvvField = cardField.CVVField({
-        style: chakraStyle,
-        placeholder: "123"
-      });
-      cvvField.render("#card-cvv-field-container");
+        const cvvField = cardField.CVVField({
+          style: chakraStyle,
+          placeholder: "123"
+        });
+        console.log('- Rendering CVV field to #card-cvv-field-container');
+        cvvField.render("#card-cvv-field-container");
 
-      const expiryField = cardField.ExpiryField({
-        style: chakraStyle,
-        placeholder: "MM/YY"
-      });
-      expiryField.render("#card-expiry-field-container");
+        const expiryField = cardField.ExpiryField({
+          style: chakraStyle,
+          placeholder: "MM/YY"
+        });
+        console.log('- Rendering expiry field to #card-expiry-field-container');
+        expiryField.render("#card-expiry-field-container");
 
-      cardFieldRef.current = cardField;
+        cardFieldRef.current = cardField;
+        setCardFieldsReady(true);
+        console.log('✅ All card fields rendered successfully');
+        
+      } catch (error) {
+        console.error('❌ Error rendering card fields:', error);
+        toast({
+          title: 'Payment System Error',
+          description: 'Failed to initialize card payment fields. Please refresh the page.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } else {
+      console.warn('⚠️ CardFields not eligible for this configuration');
+      toast({
+        title: 'Payment Method Unavailable',
+        description: 'Credit card payments are not available. Please try PayPal wallet.',
+        status: 'warning',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
@@ -899,9 +982,14 @@ export default function PaymentPage({ params }) {
                     <Alert status="info" size="sm">
                       <AlertIcon />
                       <VStack spacing={1} align="start" fontSize="xs">
-                        <Text>PayPal SDK Loaded: {paypalLoaded ? '✅' : '❌'}</Text>
-                        <Text>Window PayPal Available: {typeof window !== 'undefined' && window.paypal ? '✅' : '❌'}</Text>
-                        <Text>Booking Data: {bookingData ? '✅' : '❌'}</Text>
+                        <Text><strong>PayPal Debug Info:</strong></Text>
+                        <Text>• PayPal SDK Loaded: {paypalLoaded ? '✅' : '❌'}</Text>
+                        <Text>• Window PayPal Available: {typeof window !== 'undefined' && window.paypal ? '✅' : '❌'}</Text>
+                        <Text>• PayPal CardFields Available: {typeof window !== 'undefined' && window.paypal?.CardFields ? '✅' : '❌'}</Text>
+                        <Text>• Card Fields Ready: {cardFieldsReady ? '✅' : '❌'}</Text>
+                        <Text>• Booking Data: {bookingData ? '✅' : '❌'}</Text>
+                        <Text>• Client ID: {process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ? `${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID.substring(0, 10)}...` : '❌ Missing'}</Text>
+                        <Text>• Processing Payment: {isProcessingPayment ? '✅' : '❌'}</Text>
                       </VStack>
                     </Alert>
                   )}

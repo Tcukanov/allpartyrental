@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
       },
       include: {
         category: true,
-        city: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -78,12 +77,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { 
-      categoryId, 
-      cityId, 
-      name, 
-      description, 
-      price, 
+        const {
+      categoryId,
+      name,
+      description,
+      price,
       photos,
       availableDays,
       availableHoursStart,
@@ -93,7 +91,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate input
-    if (!categoryId || !cityId || !name || !description || !price) {
+    if (!categoryId || !name || !description || !price) {
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing required fields' } },
         { status: 400 }
@@ -122,7 +120,6 @@ export async function POST(request: NextRequest) {
     console.log('Creating service with fields:', {
       providerId: session.user.id,
       categoryId,
-      cityId,
       name,
       description,
       price: typeof price,
@@ -134,28 +131,6 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      // Validate city existence first
-      if (cityId) {
-        const cityExists = await prisma.city.findUnique({
-          where: { id: cityId },
-        });
-        
-        if (!cityExists) {
-          console.error(`City with ID ${cityId} not found in database`);
-          return NextResponse.json(
-            { 
-              success: false, 
-              error: { 
-                code: 'VALIDATION_ERROR', 
-                message: 'Selected city not found. Please select a valid city.' 
-              } 
-            },
-            { status: 400 }
-          );
-        }
-
-        console.log(`City validation passed: ${cityId} - ${cityExists.name}`);
-      }
 
       // Validate category existence
       if (categoryId) {
@@ -184,7 +159,6 @@ export async function POST(request: NextRequest) {
       const createData: any = {
         providerId: session.user.id as string,
         categoryId,
-        cityId,
         name: name.trim(),
         description: description.trim(),
         price: typeof price === 'string' ? parseFloat(price) : price,

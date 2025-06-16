@@ -126,7 +126,6 @@ export async function GET(request: NextRequest) {
           }
         },
         category: true,
-        city: true,
       },
       orderBy,
       skip,
@@ -215,10 +214,7 @@ export async function POST(request: Request) {
     // Extract filterValues and addons from the data
     const { filterValues, addons, ...serviceData } = data;
     
-    // Convert empty cityId to null to match existing data pattern
-    if (serviceData.cityId === '' || !serviceData.cityId) {
-      serviceData.cityId = null;
-    }
+
     
     // Prepare metadata if filterValues exist
     let metadata = null;
@@ -259,7 +255,6 @@ export async function POST(request: Request) {
           }
         },
         category: true,
-        city: true,
         addons: true,
       }
     });
