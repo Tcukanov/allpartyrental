@@ -153,12 +153,9 @@ export async function PUT(
     const updatedServiceResults = await prisma.$queryRaw`
       SELECT s.*, 
              c.id as "categoryId", c.name as "categoryName", 
-             c.slug as "categorySlug", c.description as "categoryDescription",
-             ct.id as "cityId", ct.name as "cityName", 
-             ct.slug as "citySlug", ct.state as "cityState"
+             c.slug as "categorySlug", c.description as "categoryDescription"
       FROM "Service" s
       LEFT JOIN "ServiceCategory" c ON s."categoryId" = c.id
-      LEFT JOIN "City" ct ON s."cityId" = ct.id
       WHERE s.id = ${id}
       LIMIT 1
     `;

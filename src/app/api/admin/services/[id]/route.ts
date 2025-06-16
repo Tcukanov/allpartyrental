@@ -34,7 +34,6 @@ export async function GET(
       include: {
         provider: true,
         category: true,
-        city: true,
         addons: true,
       },
     });
@@ -108,7 +107,6 @@ export async function PATCH(
       include: {
         provider: true,
         category: true,
-        city: true,
       },
     });
 

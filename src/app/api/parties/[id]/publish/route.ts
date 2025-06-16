@@ -86,12 +86,22 @@ export async function GET(
     for (const partyService of services) {
       const providers = await prisma.provider.findMany({
         where: {
-          services: {
-            some: {
-              categoryId: partyService.service.categoryId,
-              cityId: party.cityId,
+          AND: [
+            {
+              services: {
+                some: {
+                  categoryId: partyService.service.categoryId,
+                },
+              },
             },
-          },
+            {
+              cities: {
+                some: {
+                  cityId: party.cityId,
+                },
+              },
+            },
+          ],
         },
         include: {
           user: {

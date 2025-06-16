@@ -38,7 +38,6 @@ export async function PUT(
       name,
       description,
       price,
-      cityId,
       availableDays,
       availableHoursStart,
       availableHoursEnd,
@@ -53,7 +52,6 @@ export async function PUT(
       where: { id },
       include: {
         category: true,
-        city: true,
         provider: true
       }
     });
@@ -72,7 +70,6 @@ export async function PUT(
         name,
         description,
         price: typeof price === 'string' ? parseFloat(price) : price,
-        cityId,
         availableDays: availableDays || [],
         availableHoursStart,
         availableHoursEnd,
@@ -83,7 +80,6 @@ export async function PUT(
       } as any,
       include: {
         category: true,
-        city: true,
         provider: true
       }
     });

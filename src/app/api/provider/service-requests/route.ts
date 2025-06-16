@@ -17,13 +17,20 @@ export async function POST(req: NextRequest) {
       }, { status: 401 });
     }
     
-    const { serviceId, message, requestDate, bookingAddress } = await req.json();
-    console.log('Service request received:', { serviceId, message, requestDate });
+    const { serviceId, message, requestDate, bookingAddress, cityId } = await req.json();
+    console.log('Service request received:', { serviceId, message, requestDate, cityId });
     
     if (!serviceId) {
       return NextResponse.json({ 
         success: false, 
         error: { message: 'Service ID is required' } 
+      }, { status: 400 });
+    }
+    
+    if (!cityId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: { message: 'City ID is required - please specify where you want the service' } 
       }, { status: 400 });
     }
     
@@ -34,7 +41,6 @@ export async function POST(req: NextRequest) {
         id: true,
         name: true,
         providerId: true,
-        cityId: true,
         price: true
       }
     });
@@ -48,12 +54,24 @@ export async function POST(req: NextRequest) {
     
     console.log('Service found:', service);
     
+    // Verify the city exists
+    const city = await prisma.city.findUnique({
+      where: { id: cityId }
+    });
+    
+    if (!city) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Invalid city ID provided' } },
+        { status: 400 }
+      );
+    }
+    
     // Create the service request in the party table
     const party = await prisma.party.create({
       data: {
         name: `Request for ${service.name}`,
         clientId: session.user.id,
-        cityId: service.cityId, // Use the service's city
+        cityId: cityId, // Use the city specified by the user
         date: requestDate ? new Date(requestDate) : new Date(),
         startTime: '12:00',
         duration: 4,

@@ -131,12 +131,22 @@ export async function POST(
         // Find providers that offer services in this category and city
         const providers = await prisma.provider.findMany({
           where: {
-            services: {
-              some: {
-                categoryId: partyService.service?.categoryId,
-                cityId: party.cityId,
+            AND: [
+              {
+                services: {
+                  some: {
+                    categoryId: partyService.service?.categoryId,
+                  },
+                },
               },
-            },
+              {
+                cities: {
+                  some: {
+                    cityId: party.cityId,
+                  },
+                },
+              },
+            ],
           },
           include: {
             user: {

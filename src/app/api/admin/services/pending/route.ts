@@ -47,7 +47,6 @@ export async function GET(request: NextRequest) {
           },
         },
         category: true,
-        city: true,
       },
       orderBy: {
         createdAt: 'asc', // Oldest first

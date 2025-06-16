@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const skip = (page - 1) * limit;
 
-    // Find provider services to get categories and cities they serve
+    // Find provider services to get categories they offer
     const providerServices = await prisma.service.findMany({
       where: {
         providerId: session.user.id,
@@ -40,11 +40,20 @@ export async function GET(request: NextRequest) {
       },
       select: {
         categoryId: true,
+      },
+    });
+
+    // Find cities the provider serves
+    const providerCities = await prisma.providerCity.findMany({
+      where: {
+        providerId: session.user.id,
+      },
+      select: {
         cityId: true,
       },
     });
 
-    if (providerServices.length === 0) {
+    if (providerServices.length === 0 || providerCities.length === 0) {
       return NextResponse.json({ 
         success: true, 
         data: [],
@@ -59,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     // Extract unique categories and cities the provider serves
     const providerCategoryIds = Array.from(new Set(providerServices.map(s => s.categoryId)));
-    const providerCityIds = Array.from(new Set(providerServices.map(s => s.cityId)));
+    const providerCityIds = Array.from(new Set(providerCities.map(pc => pc.cityId)));
 
     // Build the query
     const whereClause: any = {

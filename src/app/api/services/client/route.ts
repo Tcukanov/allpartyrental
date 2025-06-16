@@ -45,7 +45,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (cityId) {
-      where.cityId = cityId;
+      // Since services are location-agnostic, filter by providers who serve this city
+      where.provider = {
+        cities: {
+          some: {
+            cityId: cityId,
+          },
+        },
+      };
     }
 
     if (search) {
@@ -103,7 +110,6 @@ export async function GET(request: NextRequest) {
           },
         },
         category: true,
-        city: true,
       },
       orderBy,
       skip,

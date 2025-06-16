@@ -53,19 +53,9 @@ export async function POST(request: NextRequest) {
     // Process each provider
     for (const provider of providers) {
       try {
-        // Find all placeholder services for this provider's user
-        const placeholderServices = await prisma.service.findMany({
-          where: {
-            providerId: provider.userId,
-            status: 'INACTIVE',
-            OR: [
-              { name: { startsWith: 'LOCATION_PLACEHOLDER_' } },
-              { name: { startsWith: 'Placeholder Service for' } },
-            ],
-            cityId: { not: null },
-          },
-          select: { id: true, cityId: true, name: true },
-        });
+        // Since services no longer have cityId, this migration is no longer applicable
+        // Skip placeholder service migration as the architecture has changed
+        const placeholderServices = [];
         
         console.log(`POST /api/provider/cities/migrate: Found ${placeholderServices.length} placeholder services for provider ${provider.id}`);
         results.totalPlaceholderServices += placeholderServices.length;
@@ -155,17 +145,8 @@ export async function GET() {
       );
     }
     
-    // Count placeholder services
-    const placeholderServiceCount = await prisma.service.count({
-      where: {
-        status: 'INACTIVE',
-        OR: [
-          { name: { startsWith: 'LOCATION_PLACEHOLDER_' } },
-          { name: { startsWith: 'Placeholder Service for' } },
-        ],
-        cityId: { not: null },
-      },
-    });
+    // Since services no longer have cityId, placeholder service count is 0
+    const placeholderServiceCount = 0;
     
     // Count provider city relationships
     const providerCityCountResult = await prisma.$queryRaw`

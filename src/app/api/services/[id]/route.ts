@@ -9,7 +9,6 @@ interface ServiceWithMetadata {
   description: string;
   price: number | string;
   categoryId: string;
-  cityId?: string | null;
   providerId: string;
   photos: string[];
   status: string;
@@ -105,7 +104,6 @@ export async function PUT(
       where: { id },
       select: {
         providerId: true,
-        cityId: true,
         categoryId: true, 
         name: true,
         description: true,
@@ -158,7 +156,6 @@ export async function PUT(
       description,
       price,
       categoryId,
-      cityId,
       photos,
       status,
       availableDays,
@@ -178,7 +175,6 @@ export async function PUT(
     if (description !== undefined) updateData.description = description;
     if (price !== undefined) updateData.price = price;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
-    if (cityId !== undefined) updateData.cityId = cityId || null;
     if (photos !== undefined) updateData.photos = photos;
     if (status !== undefined) updateData.status = status;
     if (colors !== undefined) updateData.colors = colors;

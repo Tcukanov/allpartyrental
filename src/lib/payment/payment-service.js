@@ -181,7 +181,9 @@ export class PaymentService {
             },
             quantity: hours.toString(),
             category: 'DIGITAL_GOODS'
-          }]
+          }],
+          // Add soft descriptor for better transaction descriptions
+          soft_descriptor: 'AllPartyRent'
         }],
         application_context: {
           brand_name: 'AllPartyRent',

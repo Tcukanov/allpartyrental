@@ -28,7 +28,6 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const status = searchParams.get('status');
     const categoryId = searchParams.get('categoryId');
-    const cityId = searchParams.get('cityId');
     const search = searchParams.get('search');
     
     // Calculate pagination
@@ -43,10 +42,6 @@ export async function GET(request: NextRequest) {
     
     if (categoryId && categoryId !== 'all') {
       where.categoryId = categoryId;
-    }
-    
-    if (cityId && cityId !== 'all') {
-      where.cityId = cityId;
     }
     
     if (search) {
@@ -68,13 +63,6 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-          },
-        },
-        city: {
-          select: {
-            id: true,
-            name: true,
-            state: true,
           },
         },
       },
@@ -139,7 +127,6 @@ export async function POST(request: NextRequest) {
       description, 
       providerId, 
       categoryId, 
-      cityId, 
       price, 
       status, 
       photos,
@@ -165,7 +152,6 @@ export async function POST(request: NextRequest) {
         description,
         providerId,
         categoryId,
-        cityId,
         price,
         status: status || 'ACTIVE',
         photos: photos || [],
@@ -181,13 +167,6 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             name: true,
-          },
-        },
-        city: {
-          select: {
-            id: true,
-            name: true,
-            state: true,
           },
         },
       },

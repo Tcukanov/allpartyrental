@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma/client';
 import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
+import { DEFAULT_CITY_SETTING_KEY } from '@/lib/cities/default-city';
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,6 +66,26 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Get the default city ID
+    const defaultCitySetting = await prisma.systemSettings.findUnique({
+      where: { key: DEFAULT_CITY_SETTING_KEY }
+    });
+    
+    let defaultCityId = defaultCitySetting?.value;
+    
+    // If no default city is set, get the first available city
+    if (!defaultCityId) {
+      const firstCity = await prisma.city.findFirst();
+      defaultCityId = firstCity?.id;
+    }
+    
+    if (!defaultCityId) {
+      return NextResponse.json(
+        { success: false, error: { message: 'No cities available in the system' } },
+        { status: 400 }
+      );
+    }
+
     // Create the debug transaction and related entities step by step
     
     // 1. Create the Party first
@@ -77,7 +98,7 @@ export async function POST(request: NextRequest) {
         guestCount: 2,
         status: "DRAFT", // Valid PartyStatus enum value
         clientId: userId,
-        cityId: service.cityId || "default-city-id", // Provide a fallback
+        cityId: defaultCityId, // Use the default city
       }
     });
     

@@ -84,35 +84,9 @@ export async function DELETE(
     const providerCity = providerCityResult[0];
     console.log(`DELETE /api/provider/cities/${id}: Found provider-city relation: ${providerCity.id}`);
     
-    // Check if the provider has active services in this city
-    const activeServices = await prisma.service.findMany({
-      where: {
-        providerId: session.user.id,
-        cityId: id,
-        NOT: { 
-          status: 'INACTIVE'
-        }
-      },
-    });
-    
-    console.log(`DELETE /api/provider/cities/${id}: Found ${activeServices.length} active services in this city`);
-    
-    // If there are active services, don't allow deletion
-    if (activeServices.length > 0) {
-      const activeServiceNames = activeServices.map(s => s.name).join(', ');
-      console.log(`DELETE /api/provider/cities/${id}: Cannot remove due to active services: ${activeServiceNames}`);
-      
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: { 
-            message: 'Cannot remove this location because you have active services in this area. Deactivate or delete those services first.',
-            activeServices: activeServices.map(s => ({ id: s.id, name: s.name }))
-          } 
-        },
-        { status: 400 }
-      );
-    }
+    // Since services are now location-agnostic, we can safely remove cities from service areas
+    // without checking for active services in specific cities
+    console.log(`DELETE /api/provider/cities/${id}: Proceeding to remove city from service areas`);
     
     try {
       // Delete the provider-city relation using raw SQL
