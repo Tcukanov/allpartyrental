@@ -310,6 +310,9 @@ async function createProviderCities(providers, cities) {
 }
 
 async function createServices(providers, categories, cities) {
+  console.log(`Creating services for ${providers.length} providers`);
+  console.log('Provider IDs:', providers.map(p => p.id));
+  
   // Map category names to IDs for easier lookup
   const categoryMap = categories.reduce((map, category) => {
     map[category.name] = category.id;
@@ -325,7 +328,9 @@ async function createServices(providers, categories, cities) {
   // Create services for each provider based on their specialty
   const services = [];
 
-      // Create services for providers (not tied to specific cities)
+  // Create services for providers (not tied to specific cities)
+  // Only create services for the number of providers we actually have
+  if (providers.length >= 1) {
     services.push({
       providerId: providers[0].id,
       categoryId: categoryMap['Soft play'],
@@ -336,7 +341,9 @@ async function createServices(providers, categories, cities) {
       status: 'ACTIVE',
       colors: ['blue', 'red', 'yellow'],
     });
+  }
 
+  if (providers.length >= 2) {
     services.push({
       providerId: providers[1].id,
       categoryId: categoryMap['Soft play'],
@@ -347,7 +354,9 @@ async function createServices(providers, categories, cities) {
       status: 'ACTIVE',
       colors: ['green', 'purple', 'orange'],
     });
+  }
 
+  if (providers.length >= 3) {
     services.push({
       providerId: providers[2].id,
       categoryId: categoryMap['Soft play'],
@@ -358,14 +367,44 @@ async function createServices(providers, categories, cities) {
       status: 'ACTIVE',
       colors: ['pink', 'blue', 'white'],
     });
+  }
+  
+  console.log(`Created ${services.length} service objects`);
+  console.log('Service provider IDs:', services.map(s => s.providerId));
 
-  return Promise.all(
-    services.map(service => 
-      prisma.service.create({
-        data: service
-      })
-    )
-  );
+  // Create services one by one for better error tracking
+  const createdServices = [];
+  for (let i = 0; i < services.length; i++) {
+    try {
+      const providerId = services[i].providerId;
+      console.log(`Creating service ${i + 1}: ${services[i].name} for provider ${providerId}`);
+      
+      // Verify the provider exists before creating the service
+      const providerExists = await prisma.provider.findUnique({
+        where: { id: providerId }
+      });
+      
+      if (!providerExists) {
+        throw new Error(`Provider with ID ${providerId} not found in database`);
+      }
+      
+      console.log(`✓ Provider ${providerId} exists in database`);
+      
+      // Log the exact data being sent
+      console.log('Service data to be created:', JSON.stringify(services[i], null, 2));
+      
+      const service = await prisma.service.create({
+        data: services[i]
+      });
+      createdServices.push(service);
+      console.log(`✓ Successfully created service: ${service.name}`);
+    } catch (error) {
+      console.error(`✗ Failed to create service ${services[i].name}:`, error.message);
+      throw error;
+    }
+  }
+  
+  return createdServices;
 }
 
 async function createParties(clients, cities) {

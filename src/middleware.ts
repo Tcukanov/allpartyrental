@@ -7,6 +7,7 @@ const RESERVED_PATHS = [
   'api',
   'client',
   'provider',
+  'providers',
   'admin',
   '_next',
   'next',
@@ -36,6 +37,11 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
       }
       
+      // Allow access to public provider profile pages
+      if (pathname.startsWith('/providers/')) {
+        return NextResponse.next();
+      }
+      
       // Allow access to API routes, auth routes, and other system routes
       if (pathname.startsWith('/api/') || 
           pathname.startsWith('/auth/') || 
@@ -43,12 +49,18 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
       }
       
-      // Redirect providers from root or other pages to their dashboard
-      if (pathname === '/' || 
-          (!pathname.startsWith('/provider/') && 
-           !pathname.startsWith('/api/') && 
-           !pathname.startsWith('/auth/') && 
-           !pathname.startsWith('/_next/'))) {
+      // Allow access to services and other public pages
+      if (pathname.startsWith('/services/') || 
+          pathname.startsWith('/about') ||
+          pathname.startsWith('/contact') ||
+          pathname.startsWith('/how-it-works') ||
+          pathname.startsWith('/terms') ||
+          pathname.startsWith('/privacy')) {
+        return NextResponse.next();
+      }
+      
+      // Redirect providers from root to their dashboard
+      if (pathname === '/') {
         return NextResponse.redirect(new URL('/provider/dashboard', request.url));
       }
     }

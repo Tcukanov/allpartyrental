@@ -73,8 +73,9 @@ export default function MainLayout({ children }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   
-  // Check if current route is a provider route
-  const isProviderRoute = pathname.startsWith('/provider');
+  // Check if current route is a provider dashboard route (not public provider profiles)
+  // Use exact match for /provider/ prefix, not /providers/
+  const isProviderRoute = pathname === '/provider' || pathname.startsWith('/provider/');
   
   // Handle route change
   useEffect(() => {
@@ -101,7 +102,7 @@ export default function MainLayout({ children }) {
     router.push('/');
   };
   
-  // If this is a provider route, don't render the main navbar since ProviderLayout handles it
+  // If this is a provider dashboard route, don't render the main navbar since ProviderLayout handles it
   if (isProviderRoute) {
     return <Box>{children}</Box>;
   }

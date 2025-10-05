@@ -92,7 +92,7 @@ export default async function ProviderProfilePage(props: { params: Promise<{ id:
       FROM "User" u
       LEFT JOIN "Provider" pr ON u.id = pr."userId"
       LEFT JOIN "Profile" p ON u.id = p."userId"
-      WHERE u.id = ${params.id}
+      WHERE u.id = ${id}
       LIMIT 1
     `;
 
@@ -103,18 +103,16 @@ export default async function ProviderProfilePage(props: { params: Promise<{ id:
     }
 
     // Get active services for this provider using raw SQL
+    // Services don't have cityId - they're associated with providers who have service areas
     const servicesResult = await prisma.$queryRaw`
       SELECT 
         s.*,
         sc.name as category_name,
-        sc.slug as category_slug,
-        c.name as city_name,
-        c.slug as city_slug
+        sc.slug as category_slug
       FROM "Service" s
       LEFT JOIN "ServiceCategory" sc ON s."categoryId" = sc.id
-      LEFT JOIN "City" c ON s."cityId" = c.id
       LEFT JOIN "Provider" pr ON s."providerId" = pr.id
-      WHERE pr."userId" = ${params.id} AND s.status = 'ACTIVE'
+      WHERE pr."userId" = ${id} AND s.status = 'ACTIVE'
       ORDER BY s."createdAt" DESC
     `;
 
@@ -209,7 +207,12 @@ export default async function ProviderProfilePage(props: { params: Promise<{ id:
         </VStack>
       </Container>
     );
-  } catch (error) {
+  } catch (error: any) {
+    // Re-throw notFound errors so Next.js can handle them properly
+    if (error?.digest === 'NEXT_NOT_FOUND') {
+      throw error;
+    }
+    
     console.error('Error fetching provider:', error);
     return (
       <Container maxW="container.xl" py={8}>

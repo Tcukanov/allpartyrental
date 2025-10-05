@@ -19,7 +19,6 @@ model User {
   verificationToken    String?
   verificationTokenExp DateTime?
   password             String?
-  
   accounts             Account[]
   advertisements       Advertisement[]
   calendar             Calendar[]
@@ -53,37 +52,33 @@ model Profile {
 }
 
 model Provider {
-  id                   String   @id @default(cuid())
-  userId               String   @unique
-  businessName         String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  availability         Json?
-  bio                  String?
-  isVerified           Boolean  @default(false)
-  phone                String?
-  vatNumber            String?
-  verificationLevel    VerificationLevel @default(NONE)
-  website              String?
-  
-  // PayPal Marketplace Fields
-  paypalMerchantId            String?
-  paypalEmail                 String?
-  paypalOnboardingComplete    Boolean   @default(false)
-  paypalOnboardingId          String?
-  paypalTrackingId            String?
-  paypalOnboardingStatus      String?   @default("NOT_STARTED")
-  paypalCanReceivePayments    Boolean   @default(false)
-  paypalStatusIssues          String?
-  accountType                 String?
-  paypalStatus               String?
-  paypalEnvironment          String?   @default("sandbox")
-
-  // Relations
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  services     Service[]
-  offers       Offer[]
-  cities       ProviderCity[]
+  id                       String            @id @default(cuid())
+  userId                   String            @unique
+  businessName             String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  availability             Json?
+  bio                      String?
+  isVerified               Boolean           @default(false)
+  phone                    String?
+  vatNumber                String?
+  verificationLevel        VerificationLevel @default(NONE)
+  website                  String?
+  paypalMerchantId         String?
+  paypalEmail              String?
+  paypalOnboardingComplete Boolean           @default(false)
+  paypalOnboardingId       String?
+  paypalTrackingId         String?
+  paypalOnboardingStatus   String?           @default("NOT_STARTED")
+  paypalCanReceivePayments Boolean           @default(false)
+  paypalStatusIssues       String?
+  accountType              String?
+  paypalStatus             String?
+  paypalEnvironment        String?           @default("sandbox")
+  offers                   Offer[]
+  user                     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cities                   ProviderCity[]
+  Service                  Service[]
 }
 
 model Calendar {
@@ -223,35 +218,29 @@ model Offer {
 }
 
 model Transaction {
-  id               String            @id @default(cuid())
-  partyId          String?
-  offerId          String            @unique
-  amount           Float
-  status           TransactionStatus @default(PENDING)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  
-  // PayPal Marketplace Fields
-  paypalOrderId          String?    // PayPal Order ID
-  paypalCaptureId        String?    // PayPal Capture ID
-  paypalTransactionId    String?    // PayPal Transaction ID
-  paypalPayerId          String?    // PayPal Payer ID
-  paypalStatus           String?    // PayPal payment status
-  
-  // Escrow and Terms
-  clientFeePercent   Float?
-  escrowEndTime      DateTime?
-  escrowStartTime    DateTime?
-  providerFeePercent Float?
-  reviewDeadline     DateTime?
-  termsAccepted      Boolean?
-  termsAcceptedAt    DateTime?
-  termsType          String?
-
-  // Relations
-  party Party? @relation(fields: [partyId], references: [id])
-  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  dispute Dispute?
+  id                  String            @id @default(cuid())
+  partyId             String?
+  offerId             String            @unique
+  amount              Float
+  status              TransactionStatus @default(PENDING)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  paypalOrderId       String?
+  paypalCaptureId     String?
+  paypalTransactionId String?
+  paypalPayerId       String?
+  paypalStatus        String?
+  clientFeePercent    Float?
+  escrowEndTime       DateTime?
+  escrowStartTime     DateTime?
+  providerFeePercent  Float?
+  reviewDeadline      DateTime?
+  termsAccepted       Boolean?
+  termsAcceptedAt     DateTime?
+  termsType           String?
+  dispute             Dispute?
+  offer               Offer             @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  party               Party?            @relation(fields: [partyId], references: [id])
 }
 
 model Dispute {
@@ -303,21 +292,21 @@ model Notification {
 }
 
 model Advertisement {
-  id          String               @id @default(cuid())
+  id          String              @id @default(cuid())
   userId      String
-  providerId  String?              // For backward compatibility
+  providerId  String?
   packageId   String
   packageName String
   price       Decimal
   duration    String
-  features    String[]             @default([])
-  status      AdvertisementStatus  @default(PENDING_PAYMENT)
+  features    String[]            @default([])
+  status      AdvertisementStatus @default(PENDING_PAYMENT)
   startDate   DateTime?
   endDate     DateTime?
-  isActive    Boolean              @default(false)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  user        User                 @relation(fields: [userId], references: [id])
+  isActive    Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  user        User                @relation(fields: [userId], references: [id])
 }
 
 model SystemSettings {
@@ -376,8 +365,8 @@ model ProviderCity {
   cityId     String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  provider   Provider @relation(fields: [providerId], references: [id])
   city       City     @relation(fields: [cityId], references: [id])
+  provider   Provider @relation(fields: [providerId], references: [id])
 
   @@unique([providerId, cityId])
 }

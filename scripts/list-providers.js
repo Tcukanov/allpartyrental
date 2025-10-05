@@ -21,9 +21,14 @@ async function main() {
             phone: true
           }
         },
-        services: {
+        provider: {
           select: {
-            id: true
+            id: true,
+            Service: {
+              select: {
+                id: true
+              }
+            }
           }
         }
       },
@@ -41,7 +46,7 @@ async function main() {
     console.log('-'.repeat(80));
     
     providers.forEach((provider, index) => {
-      const serviceCount = provider.services.length;
+      const serviceCount = provider.provider?.Service?.length || 0;
       
       console.log(`[${index + 1}] ID: ${provider.id}`);
       console.log(`    Name: ${provider.name}`);

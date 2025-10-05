@@ -970,7 +970,7 @@ export default function ServiceDetailPage({ params }) {
             <Flex gap={2} mt={2}>
               <Button 
                 as={Link} 
-                href={`/providers/${service.provider.id}`}
+                href={`/providers/${service.provider.user?.id || service.provider.userId || service.provider.id}`}
                 colorScheme="blue" 
                 variant="outline"
                 leftIcon={<FaUser />}

@@ -123,7 +123,7 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
   const { location, service } = params;
   
   // Reserved paths that should not be handled by this route
-  const reservedPaths = ['api', 'auth', 'admin', 'client', 'provider', 'services'];
+  const reservedPaths = ['api', 'auth', 'admin', 'client', 'provider', 'providers', 'services'];
   
   // Handle cases where the route was incorrectly matched to API routes
   if (location === 'api' || location === 'socket') {
