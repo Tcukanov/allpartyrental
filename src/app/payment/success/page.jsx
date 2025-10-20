@@ -14,7 +14,12 @@ import {
   AlertDescription,
   Spinner,
   Box,
-  CheckCircleIcon
+  CheckCircleIcon,
+  Divider,
+  Badge,
+  HStack,
+  Grid,
+  GridItem
 } from '@chakra-ui/react';
 import { CheckCircleIcon as CheckIcon } from '@chakra-ui/icons';
 
@@ -24,6 +29,7 @@ export default function PaymentSuccessPage() {
   const [isProcessing, setIsProcessing] = useState(true);
   const [paymentStatus, setPaymentStatus] = useState('processing');
   const [paymentData, setPaymentData] = useState(null);
+  const [paymentDetails, setPaymentDetails] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -51,7 +57,8 @@ export default function PaymentSuccessPage() {
           throw new Error(data.error || 'Payment capture failed');
         }
 
-        setPaymentData(data.data);
+        setPaymentData(data);
+        setPaymentDetails(data.paymentDetails);
         setPaymentStatus('success');
         
       } catch (error) {
@@ -108,14 +115,88 @@ export default function PaymentSuccessPage() {
 
             <VStack spacing={4} w="full">
               <Box p={4} border="1px" borderColor="gray.200" borderRadius="md" bg="gray.50" w="full">
-                <Text fontWeight="bold" mb={2}>Payment Details</Text>
-                <Text>Amount Paid: ${paymentData?.amountReceived?.toFixed(2)}</Text>
-                <Text>Status: {paymentData?.status}</Text>
-                <Text>Transaction ID: {paymentData?.transactionId}</Text>
-                <Text fontSize="sm" color="gray.600" mt={2}>
+                <Text fontWeight="bold" mb={3}>Payment Details</Text>
+                <VStack align="stretch" spacing={2}>
+                  <HStack justify="space-between">
+                    <Text color="gray.600">Amount Paid:</Text>
+                    <Text fontWeight="semibold">${paymentData?.amount || '0.00'}</Text>
+                  </HStack>
+                  
+                  {paymentDetails?.paymentSource && (
+                    <HStack justify="space-between">
+                      <Text color="gray.600">Payment Method:</Text>
+                      <Badge colorScheme="blue">{paymentDetails.paymentSource}</Badge>
+                    </HStack>
+                  )}
+                  
+                  {paymentDetails?.payerEmail && (
+                    <HStack justify="space-between">
+                      <Text color="gray.600">Buyer Email:</Text>
+                      <Text fontSize="sm">{paymentDetails.payerEmail}</Text>
+                    </HStack>
+                  )}
+                  
+                  <HStack justify="space-between">
+                    <Text color="gray.600">Status:</Text>
+                    <Badge colorScheme="green">{paymentData?.status || 'Completed'}</Badge>
+                  </HStack>
+                  
+                  <HStack justify="space-between">
+                    <Text color="gray.600">Transaction ID:</Text>
+                    <Text fontSize="xs" color="gray.500">{paymentData?.transactionId}</Text>
+                  </HStack>
+                </VStack>
+                
+                <Text fontSize="sm" color="gray.600" mt={3}>
                   You will receive email notifications about your booking status.
                 </Text>
               </Box>
+
+              {/* Shipping Address */}
+              {paymentDetails?.shippingAddress && (
+                <Box p={4} border="1px" borderColor="gray.200" borderRadius="md" bg="gray.50" w="full">
+                  <Text fontWeight="bold" mb={3}>Shipping Address</Text>
+                  <VStack align="stretch" spacing={1}>
+                    {paymentDetails.shippingAddress.line1 && (
+                      <Text>{paymentDetails.shippingAddress.line1}</Text>
+                    )}
+                    {paymentDetails.shippingAddress.line2 && (
+                      <Text>{paymentDetails.shippingAddress.line2}</Text>
+                    )}
+                    <Text>
+                      {paymentDetails.shippingAddress.city && `${paymentDetails.shippingAddress.city}, `}
+                      {paymentDetails.shippingAddress.state && `${paymentDetails.shippingAddress.state} `}
+                      {paymentDetails.shippingAddress.postalCode}
+                    </Text>
+                    {paymentDetails.shippingAddress.country && (
+                      <Text>{paymentDetails.shippingAddress.country}</Text>
+                    )}
+                  </VStack>
+                </Box>
+              )}
+
+              {/* Billing Address */}
+              {paymentDetails?.billingAddress && (
+                <Box p={4} border="1px" borderColor="gray.200" borderRadius="md" bg="gray.50" w="full">
+                  <Text fontWeight="bold" mb={3}>Billing Address</Text>
+                  <VStack align="stretch" spacing={1}>
+                    {paymentDetails.billingAddress.line1 && (
+                      <Text>{paymentDetails.billingAddress.line1}</Text>
+                    )}
+                    {paymentDetails.billingAddress.line2 && (
+                      <Text>{paymentDetails.billingAddress.line2}</Text>
+                    )}
+                    <Text>
+                      {paymentDetails.billingAddress.city && `${paymentDetails.billingAddress.city}, `}
+                      {paymentDetails.billingAddress.state && `${paymentDetails.billingAddress.state} `}
+                      {paymentDetails.billingAddress.postalCode}
+                    </Text>
+                    {paymentDetails.billingAddress.country && (
+                      <Text>{paymentDetails.billingAddress.country}</Text>
+                    )}
+                  </VStack>
+                </Box>
+              )}
 
               <VStack spacing={3} w="full">
                 <Button colorScheme="blue" size="lg" w="full" onClick={handleViewBooking}>

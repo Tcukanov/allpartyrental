@@ -75,6 +75,7 @@ model Provider {
   accountType              String?
   paypalStatus             String?
   paypalEnvironment        String?           @default("sandbox")
+  enablePayLater           Boolean           @default(true)
   offers                   Offer[]
   user                     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   cities                   ProviderCity[]

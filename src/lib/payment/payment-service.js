@@ -54,6 +54,35 @@ export class PaymentService {
   }
 
   /**
+   * Determine payment source from PayPal capture result
+   */
+  getPaymentSource(captureResult) {
+    // Check payment source from the capture
+    const paymentSource = captureResult.payment_source || captureResult.payer?.payment_source;
+    
+    if (paymentSource) {
+      if (paymentSource.paypal) return 'PayPal';
+      if (paymentSource.venmo) return 'Venmo';
+      if (paymentSource.card) return `Card (${paymentSource.card.brand || 'Credit/Debit'})`;
+      if (paymentSource.apple_pay) return 'Apple Pay';
+      if (paymentSource.google_pay) return 'Google Pay';
+    }
+
+    // Fallback: check funding source
+    const fundingSource = captureResult.payer?.funding_instrument?.type || 
+                         captureResult.purchase_units?.[0]?.payments?.captures?.[0]?.payment_method;
+    
+    if (fundingSource) {
+      if (fundingSource.includes('PAYPAL') || fundingSource.includes('BALANCE')) return 'PayPal';
+      if (fundingSource.includes('VENMO')) return 'Venmo';
+      if (fundingSource.includes('CARD')) return 'Card';
+    }
+
+    // Default
+    return 'PayPal';
+  }
+
+  /**
    * Create PayPal order for marketplace payment
    */
   async createPaymentOrder(bookingData) {
@@ -396,11 +425,38 @@ export class PaymentService {
         }
       });
 
+      // Extract payment details for thank you page
+      const capture = captureResult.purchase_units?.[0]?.payments?.captures?.[0];
+      const paymentSource = this.getPaymentSource(captureResult);
+      
       return {
         success: true,
         transaction: updatedTransaction,
         captureId: captureResult.id,
-        status: captureResult.status
+        status: captureResult.status,
+        // Payment details for thank you page
+        paymentDetails: {
+          paymentSource: paymentSource,
+          payerEmail: captureResult.payer?.email_address || null,
+          payerName: captureResult.payer?.name ? 
+            `${captureResult.payer.name.given_name || ''} ${captureResult.payer.name.surname || ''}`.trim() : null,
+          shippingAddress: captureResult.purchase_units?.[0]?.shipping?.address ? {
+            line1: captureResult.purchase_units[0].shipping.address.address_line_1,
+            line2: captureResult.purchase_units[0].shipping.address.address_line_2,
+            city: captureResult.purchase_units[0].shipping.address.admin_area_2,
+            state: captureResult.purchase_units[0].shipping.address.admin_area_1,
+            postalCode: captureResult.purchase_units[0].shipping.address.postal_code,
+            country: captureResult.purchase_units[0].shipping.address.country_code
+          } : null,
+          billingAddress: captureResult.payer?.address ? {
+            line1: captureResult.payer.address.address_line_1,
+            line2: captureResult.payer.address.address_line_2,
+            city: captureResult.payer.address.admin_area_2,
+            state: captureResult.payer.address.admin_area_1,
+            postalCode: captureResult.payer.address.postal_code,
+            country: captureResult.payer.address.country_code
+          } : null
+        }
       };
 
     } catch (error) {

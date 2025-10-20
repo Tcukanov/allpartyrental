@@ -193,6 +193,9 @@ export default function BookingDetailsPage({ params }) {
           price: service.price,
           photos: service.photos
         },
+        provider: {
+          enablePayLater: service.provider?.enablePayLater ?? true
+        },
         bookingDetails: bookingData,
         pricing
       };

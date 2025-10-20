@@ -100,7 +100,7 @@ const PayPalAdvancedCreditCard = ({
       setDebugInfo('Loading PayPal SDK...');
       
       const script = document.createElement('script');
-      script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&components=buttons,hosted-fields&intent=capture&enable-funding=card&disable-funding=venmo,paylater`;
+      script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&components=buttons,hosted-fields,messages&intent=capture&enable-funding=card&disable-funding=paylater`;
       script.setAttribute('data-partner-attribution-id', 'NYCKIDSPARTYENT_SP_PPCP');
       script.async = true;
       

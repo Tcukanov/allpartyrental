@@ -41,7 +41,8 @@ export async function POST(request) {
       success: true,
       captureId: result.captureId,
       status: result.status,
-      transactionId: result.transaction.id
+      transactionId: result.transaction.id,
+      paymentDetails: result.paymentDetails || null
     });
 
   } catch (error) {

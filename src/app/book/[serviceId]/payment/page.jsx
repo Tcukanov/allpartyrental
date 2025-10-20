@@ -141,8 +141,15 @@ export default function PaymentPage({ params }) {
 
     console.log('📦 Creating PayPal SDK script...');
     const script = document.createElement('script');
-    const sdkUrl = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,card-fields&disable-funding=venmo,paylater&enable-funding=card&commit=true`;
+    
+    // Conditionally disable Pay Later based on provider setting
+    const disableFunding = bookingData?.provider?.enablePayLater === false 
+      ? 'paylater' 
+      : '';  // Empty string means Pay Later is enabled
+    
+    const sdkUrl = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,card-fields,messages${disableFunding ? `&disable-funding=${disableFunding}` : ''}&enable-funding=card&commit=true`;
     console.log('- SDK URL:', sdkUrl);
+    console.log('- Pay Later enabled:', bookingData?.provider?.enablePayLater !== false);
     
     script.src = sdkUrl;
     script.setAttribute('data-partner-attribution-id', 'NYCKIDSPARTYENT_SP_PPCP');
@@ -185,7 +192,19 @@ export default function PaymentPage({ params }) {
         existingScript.parentNode.removeChild(existingScript);
       }
     };
-  }, [toast]);
+  }, [toast, bookingData]);
+
+  // Render PayPal Messages for financing options
+  useEffect(() => {
+    if (!paypalLoaded || !window.paypal || !window.paypal.Messages) return;
+    
+    console.log('🎨 Rendering PayPal Messages component');
+    try {
+      window.paypal.Messages().render();
+    } catch (error) {
+      console.error('Error rendering PayPal Messages:', error);
+    }
+  }, [paypalLoaded]);
 
   // Initialize PayPal buttons for PayPal wallet payments only
   useEffect(() => {
@@ -1346,6 +1365,24 @@ export default function PaymentPage({ params }) {
                             </Box>
                           </Box>
                         </HStack>
+
+                        {/* PayPal Messaging - Shows financing options */}
+                        <Box 
+                          p={3} 
+                          bg="blue.50" 
+                          borderRadius="md" 
+                          border="1px" 
+                          borderColor="blue.100"
+                        >
+                          <div 
+                            data-pp-message 
+                            data-pp-amount={bookingData.pricing.total.toFixed(2)}
+                            data-pp-style-layout="text"
+                            data-pp-style-logo-type="inline"
+                            data-pp-style-text-color="black"
+                            data-pp-style-text-size="12"
+                          ></div>
+                        </Box>
 
                         {/* PayPal Buttons Container */}
                         <Box

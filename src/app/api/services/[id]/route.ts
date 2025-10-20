@@ -47,6 +47,7 @@ export async function GET(
         provider: {
           select: {
             id: true,
+            enablePayLater: true,
             user: {
               select: {
                 id: true,

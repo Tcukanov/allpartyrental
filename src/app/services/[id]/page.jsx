@@ -152,6 +152,51 @@ export default function ServiceDetailPage({ params }) {
     }
   }, [session]);
   
+  // Load PayPal SDK for messaging
+  useEffect(() => {
+    // Check if PayPal SDK is already loaded
+    if (window.paypal?.Messages) {
+      console.log('✅ PayPal SDK already loaded, rendering messages');
+      try {
+        window.paypal.Messages().render();
+      } catch (error) {
+        console.error('Error rendering PayPal Messages:', error);
+      }
+      return;
+    }
+
+    // Load PayPal SDK if not present
+    const script = document.createElement('script');
+    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&components=messages`;
+    script.setAttribute('data-partner-attribution-id', 'NYCKIDSPARTYENT_SP_PPCP');
+    script.async = true;
+
+    script.onload = () => {
+      console.log('✅ PayPal SDK loaded, rendering messages');
+      if (window.paypal?.Messages) {
+        try {
+          window.paypal.Messages().render();
+        } catch (error) {
+          console.error('Error rendering PayPal Messages:', error);
+        }
+      }
+    };
+
+    script.onerror = () => {
+      console.error('Failed to load PayPal SDK for messaging');
+    };
+
+    document.head.appendChild(script);
+
+    return () => {
+      // Cleanup
+      const existingScript = document.querySelector(`script[src*="paypal"][src*="components=messages"]`);
+      if (existingScript && existingScript.parentNode) {
+        existingScript.parentNode.removeChild(existingScript);
+      }
+    };
+  }, []);
+
   // Fetch service data from database or use fallback
   useEffect(() => {
     const fetchServiceData = async () => {
@@ -750,6 +795,17 @@ export default function ServiceDetailPage({ params }) {
                   <Text>{service.duration}</Text>
                       </Flex>
                     )}
+              
+              {/* PayPal Messaging - Shows financing options */}
+              <Box mt={2} mb={2}>
+                <div 
+                  data-pp-message 
+                  data-pp-amount={Number(service.price).toFixed(2)}
+                  data-pp-style-layout="text"
+                  data-pp-style-text-color="black"
+                  data-pp-style-text-size="12"
+                ></div>
+              </Box>
                     
               {!isOwner && session && session.user.role === 'CLIENT' && (
                 <Button 
