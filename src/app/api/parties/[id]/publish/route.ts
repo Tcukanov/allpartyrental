@@ -88,7 +88,7 @@ export async function GET(
         where: {
           AND: [
             {
-              services: {
+              Service: {
                 some: {
                   categoryId: partyService.service.categoryId,
                 },
