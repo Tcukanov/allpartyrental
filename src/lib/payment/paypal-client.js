@@ -280,7 +280,7 @@ class PayPalClientFixed {
     const token = await this.getAccessToken();
 
     // Use the real domain instead of localhost
-    const baseUrl = process.env.NEXTAUTH_URL || 'https://party-vendors.com';
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://allpartyrental.com';
     const isDevelopment = process.env.NODE_ENV !== 'production';
 
     console.log('🔍 Environment check:', {

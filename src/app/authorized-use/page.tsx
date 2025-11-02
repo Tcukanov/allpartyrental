@@ -24,8 +24,8 @@ export default function AuthorizedUsePage() {
           </Text>
 
           <Text fontSize="md">
-            Welcome to Party-Vendors.com ("we", "our", or "us"). This Authorized Use Policy ("Policy") governs the acceptable use 
-            of our website and services available at https://www.party-vendors.com/ ("Platform").
+            Welcome to AllPartyRental.com ("we", "our", or "us"). This Authorized Use Policy ("Policy") governs the acceptable use 
+            of our website and services available at https://allpartyrental.com/ ("Platform").
           </Text>
 
           <Text fontSize="md">

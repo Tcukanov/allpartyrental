@@ -32,7 +32,8 @@ export async function GET(req) {
     
     if (!session?.user) {
       console.log('❌ No session found, redirecting to signin');
-      return NextResponse.redirect(`https://www.party-vendors.com/auth/signin`);
+      const baseUrl = process.env.NEXTAUTH_URL || 'https://allpartyrental.com';
+      return NextResponse.redirect(`${baseUrl}/auth/signin`);
     }
 
     console.log('📋 PayPal callback received:', {
@@ -94,17 +95,19 @@ export async function GET(req) {
     }
 
     // Redirect back to provider dashboard with status
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://allpartyrental.com';
     const redirectUrl = permissionsGranted === 'true' 
-      ? `https://www.party-vendors.com/provider/dashboard/paypal?status=success&merchant=${encodeURIComponent(merchantIdInPayPal || 'unknown')}`
-      : `https://www.party-vendors.com/provider/dashboard/paypal?status=failed`;
+      ? `${baseUrl}/provider/dashboard/paypal?status=success&merchant=${encodeURIComponent(merchantIdInPayPal || 'unknown')}`
+      : `${baseUrl}/provider/dashboard/paypal?status=failed`;
 
     console.log('🔄 Redirecting to:', redirectUrl);
     return NextResponse.redirect(redirectUrl);
 
   } catch (error) {
     console.error('💥 PayPal callback error:', error);
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://allpartyrental.com';
     return NextResponse.redirect(
-      `https://www.party-vendors.com/provider/dashboard/paypal?status=error&message=${encodeURIComponent(error.message)}`
+      `${baseUrl}/provider/dashboard/paypal?status=error&message=${encodeURIComponent(error.message)}`
     );
   }
 } 
