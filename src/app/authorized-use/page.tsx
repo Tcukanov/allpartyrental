@@ -39,7 +39,7 @@ export default function AuthorizedUsePage() {
                 1. Permitted Use
               </Heading>
               <Text mb={3}>
-                You are authorized to use Party-Vendors.com solely for the purpose of:
+                You are authorized to use Allpartyrental.com solely for the purpose of:
               </Text>
               <List spacing={3} pl={5}>
                 <ListItem>

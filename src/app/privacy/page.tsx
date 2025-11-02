@@ -144,7 +144,7 @@ export default function PrivacyPage() {
                 7. Contact Us
               </Heading>
               <Text>
-                If you have any questions about this Privacy Policy, please contact us at info@party-vendors.com
+                If you have any questions about this Privacy Policy, please contact us at info@partyrental.com
               </Text>
             </Box>
           </VStack>

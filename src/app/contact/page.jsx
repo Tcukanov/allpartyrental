@@ -119,7 +119,7 @@ export default function ContactPage() {
                     <Icon as={EmailIcon} boxSize={6} color="brand.500" />
                     <VStack align="start" spacing={1}>
                       <Text fontWeight="bold">Email Us</Text>
-                      <Text>info@party-vendors.com</Text>
+                      <Text>info@allpartyrental.com</Text>
                     </VStack>
                   </HStack>
                 </CardBody>
