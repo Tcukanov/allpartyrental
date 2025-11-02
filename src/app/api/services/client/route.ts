@@ -37,7 +37,10 @@ export async function GET(request: NextRequest) {
     // Build the where clause
     const where: any = {
       // Only include active services
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      provider: {
+        paypalCanReceivePayments: true, // Only show services from PayPal-approved sellers
+      },
     };
 
     if (categoryId) {
@@ -47,6 +50,7 @@ export async function GET(request: NextRequest) {
     if (cityId) {
       // Since services are location-agnostic, filter by providers who serve this city
       where.provider = {
+        ...where.provider,
         cities: {
           some: {
             cityId: cityId,

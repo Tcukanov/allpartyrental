@@ -212,7 +212,8 @@ export default async function LocationServicePage(props: { params: Promise<{ loc
         AND: [
           { categoryId: category.id },
           { status: 'ACTIVE' },
-          { providerId: { in: providerIds } } // Only services from providers who serve this city
+          { providerId: { in: providerIds } }, // Only services from providers who serve this city
+          { provider: { paypalCanReceivePayments: true } } // Only PayPal-approved sellers
         ]
       }
     });

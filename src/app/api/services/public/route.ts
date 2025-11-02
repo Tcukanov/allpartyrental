@@ -32,6 +32,9 @@ export async function GET(request: NextRequest) {
     // Build query conditions
     const where: any = {
       status: 'ACTIVE', // Only return active services
+      provider: {
+        paypalCanReceivePayments: true, // Only show services from PayPal-approved sellers
+      },
     };
 
     if (categoryId) {
@@ -63,7 +66,11 @@ export async function GET(request: NextRequest) {
         
         // Filter services by providers who serve this city
         if (providerIds.length > 0) {
-          where.providerId = { in: providerIds };
+          // Merge with existing provider filter
+          where.provider = {
+            ...where.provider,
+            id: { in: providerIds }
+          };
           console.log(`Filtering services by ${providerIds.length} providers who serve this city`);
         } else {
           // If no providers serve this city, return no results
