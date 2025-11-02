@@ -229,13 +229,27 @@ export default function PayPalSettingsPage() {
     
     if (!confirmed) return;
 
+    setIsLoading(true);
+
     try {
       // API call to disconnect PayPal account
-      // This would clear the PayPal merchant ID and related fields
+      const response = await fetch('/api/paypal/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to disconnect PayPal account');
+      }
+
       toast({
         title: 'PayPal Disconnected',
-        description: 'Your PayPal account has been disconnected.',
-        status: 'info',
+        description: 'Your PayPal account has been disconnected successfully.',
+        status: 'success',
         duration: 3000,
         isClosable: true,
       });
@@ -252,13 +266,16 @@ export default function PayPalSettingsPage() {
       }));
       
     } catch (error) {
+      console.error('PayPal disconnect error:', error);
       toast({
         title: 'Disconnection Failed',
-        description: 'Failed to disconnect PayPal account. Please try again.',
+        description: error.message || 'Failed to disconnect PayPal account. Please try again.',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
