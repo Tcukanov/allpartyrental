@@ -405,25 +405,69 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
   // Minimal image processing function - just basic validation
   const processImage = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      // Simple validation
+      // Validate file type
       if (!file.type.startsWith('image/')) {
         reject(new Error(`File "${file.name}" is not an image`));
         return;
       }
       
-      // Read the file
       const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.result && typeof reader.result === 'string') {
-          // Return the image data but limit the size if needed
-          if (reader.result.length > 500000) {
-            console.warn(`Image ${file.name} is large (${Math.round(reader.result.length/1024)}KB), may cause issues`);
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.onload = () => {
+          // Create canvas for compression
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
           }
-          resolve(reader.result);
-        } else {
-          reject(new Error(`Failed to read file "${file.name}"`));
-        }
+          
+          // Calculate new dimensions (max 1920x1920)
+          let width = img.width;
+          let height = img.height;
+          const maxDimension = 1920;
+          
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = (height / width) * maxDimension;
+              width = maxDimension;
+            } else {
+              width = (width / height) * maxDimension;
+              height = maxDimension;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw and compress
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Start with quality 0.8 and reduce until under 1MB
+          let quality = 0.8;
+          let compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          
+          // Base64 string is ~1.37x larger than actual file size
+          // Target: 1MB = 1,048,576 bytes, so base64 should be ~1,400,000 chars
+          const targetSize = 1400000;
+          
+          while (compressedDataUrl.length > targetSize && quality > 0.1) {
+            quality -= 0.1;
+            compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+          
+          const finalSizeKB = Math.round(compressedDataUrl.length / 1024);
+          console.log(`Compressed ${file.name}: ${Math.round(file.size/1024)}KB → ${finalSizeKB}KB (quality: ${quality.toFixed(1)})`);
+          
+          resolve(compressedDataUrl);
+        };
+        
+        img.onerror = () => reject(new Error(`Failed to load image "${file.name}"`));
+        img.src = e.target?.result as string;
       };
+      
       reader.onerror = () => reject(new Error(`Failed to read file "${file.name}"`));
       reader.readAsDataURL(file);
     });

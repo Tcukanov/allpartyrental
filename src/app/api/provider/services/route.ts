@@ -3,6 +3,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { prisma } from '@/lib/prisma/client';
 
+// Increase body size limit to 50MB for image uploads
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+  },
+};
+
 // Define an extended service type that includes metadata
 interface ServiceWithMetadata {
   id: string;
