@@ -488,7 +488,7 @@ export default function AdminServicesPage() {
                               )}
                               <MenuItem 
                                 icon={<FiEdit />}
-                                onClick={() => router.push(`/admin/services/${service.id}/edit`)}
+                                onClick={() => router.push(`/provider/services/edit/${service.id}`)}
                               >
                                 Edit
                               </MenuItem>
