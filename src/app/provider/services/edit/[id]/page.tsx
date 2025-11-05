@@ -223,7 +223,7 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
       }
     };
     
-    if (session?.user?.role === 'PROVIDER') {
+    if (session?.user?.role === 'PROVIDER' || session?.user?.role === 'ADMIN') {
       fetchServiceDetails();
     }
   }, [id, session, toast]);
@@ -257,16 +257,16 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
     }
   };
   
-  // Check if user is authenticated and has provider role
+  // Check if user is authenticated and has provider or admin role
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth/signin');
     } else if (status === 'authenticated') {
-      if (session?.user?.role !== 'PROVIDER') {
+      if (session?.user?.role !== 'PROVIDER' && session?.user?.role !== 'ADMIN') {
         router.push('/');
         toast({
           title: 'Access Denied',
-          description: 'Only service providers can access this page',
+          description: 'Only service providers and admins can access this page',
           status: 'error',
           duration: 3000,
           isClosable: true,
