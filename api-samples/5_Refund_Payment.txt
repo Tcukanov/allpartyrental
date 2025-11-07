@@ -1,0 +1,91 @@
+═══════════════════════════════════════════════════════════════
+API SAMPLE 5: REFUND PAYMENT
+═══════════════════════════════════════════════════════════════
+
+Purpose: Issue a refund to the buyer
+When: Provider clicks "Issue Refund" on transaction
+File: src/lib/payment/payment-service.js - refundPayment()
+
+───────────────────────────────────────────────────────────────
+REQUEST
+───────────────────────────────────────────────────────────────
+
+Endpoint: POST /v2/payments/captures/{capture_id}/refund
+Base URL: https://api-m.sandbox.paypal.com
+Full URL: https://api-m.sandbox.paypal.com/v2/payments/captures/8AB12345CD67890E/refund
+
+Headers:
+{
+  "Authorization": "Bearer A21AAKpHExample_Access_Token_Here_1234567890...",
+  "Content-Type": "application/json",
+  "PayPal-Partner-Attribution-Id": "NYCKIDSPARTYENT_SP_PPCP",
+  "PayPal-Auth-Assertion": "eyJhbGciOiJub25lIn0.eyJpc3MiOiJZT1VSX0NMSUVOVF9JRCIsInBheWVyX2lkIjoiMjc4WFA1TUhDNlhIWSJ9."
+}
+
+Body:
+{
+  "amount": {
+    "value": "249.99",
+    "currency_code": "USD"
+  },
+  "invoice_id": "transaction_cm123abc456",
+  "note_to_payer": "Service cancellation - full refund issued"
+}
+
+───────────────────────────────────────────────────────────────
+RESPONSE
+───────────────────────────────────────────────────────────────
+
+Status: 201 Created
+
+Headers:
+{
+  "Content-Type": "application/json",
+  "Paypal-Debug-Id": "mno567debug890"
+}
+
+Body:
+{
+  "id": "9CD12345EF67890G",
+  "status": "COMPLETED",
+  "amount": {
+    "currency_code": "USD",
+    "value": "249.99"
+  },
+  "invoice_id": "transaction_cm123abc456",
+  "note_to_payer": "Service cancellation - full refund issued",
+  "seller_payable_breakdown": {
+    "gross_amount": {
+      "currency_code": "USD",
+      "value": "249.99"
+    },
+    "paypal_fee": {
+      "currency_code": "USD",
+      "value": "7.55"
+    },
+    "net_amount": {
+      "currency_code": "USD",
+      "value": "242.44"
+    },
+    "total_refunded_amount": {
+      "currency_code": "USD",
+      "value": "249.99"
+    }
+  },
+  "create_time": "2025-01-06T14:15:00Z",
+  "update_time": "2025-01-06T14:15:00Z",
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v2/payments/refunds/9CD12345EF67890G",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/8AB12345CD67890E",
+      "rel": "up",
+      "method": "GET"
+    }
+  ]
+}
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,119 @@
+═══════════════════════════════════════════════════════════════
+API SAMPLE 4: CAPTURE ORDER
+═══════════════════════════════════════════════════════════════
+
+Purpose: Capture payment after buyer approves
+When: Buyer completes PayPal checkout and returns to site
+File: src/lib/payment/payment-service.js - capturePayment()
+
+───────────────────────────────────────────────────────────────
+REQUEST
+───────────────────────────────────────────────────────────────
+
+Endpoint: POST /v2/checkout/orders/{order_id}/capture
+Base URL: https://api-m.sandbox.paypal.com
+Full URL: https://api-m.sandbox.paypal.com/v2/checkout/orders/8RV12345ABC67890D/capture
+
+Headers:
+{
+  "Authorization": "Bearer A21AAKpHExample_Access_Token_Here_1234567890...",
+  "Content-Type": "application/json",
+  "PayPal-Partner-Attribution-Id": "NYCKIDSPARTYENT_SP_PPCP",
+  "PayPal-Auth-Assertion": "eyJhbGciOiJub25lIn0.eyJpc3MiOiJZT1VSX0NMSUVOVF9JRCIsInBheWVyX2lkIjoiMjc4WFA1TUhDNlhIWSJ9."
+}
+
+Body: (empty - capture full order amount)
+
+───────────────────────────────────────────────────────────────
+RESPONSE
+───────────────────────────────────────────────────────────────
+
+Status: 201 Created
+
+Headers:
+{
+  "Content-Type": "application/json",
+  "Paypal-Debug-Id": "jkl901debug234"
+}
+
+Body:
+{
+  "id": "8RV12345ABC67890D",
+  "status": "COMPLETED",
+  "purchase_units": [
+    {
+      "reference_id": "transaction_cm123abc456",
+      "shipping": {
+        "name": {
+          "full_name": "Jane Smith"
+        },
+        "address": {
+          "address_line_1": "123 Main Street",
+          "address_line_2": "Apt 4B",
+          "admin_area_2": "Brooklyn",
+          "admin_area_1": "NY",
+          "postal_code": "11201",
+          "country_code": "US"
+        }
+      },
+      "payments": {
+        "captures": [
+          {
+            "id": "8AB12345CD67890E",
+            "status": "COMPLETED",
+            "amount": {
+              "currency_code": "USD",
+              "value": "249.99"
+            },
+            "final_capture": true,
+            "seller_protection": {
+              "status": "ELIGIBLE",
+              "dispute_categories": [
+                "ITEM_NOT_RECEIVED",
+                "UNAUTHORIZED_TRANSACTION"
+              ]
+            },
+            "seller_receivable_breakdown": {
+              "gross_amount": {
+                "currency_code": "USD",
+                "value": "249.99"
+              },
+              "paypal_fee": {
+                "currency_code": "USD",
+                "value": "7.55"
+              },
+              "net_amount": {
+                "currency_code": "USD",
+                "value": "242.44"
+              }
+            },
+            "create_time": "2025-01-06T10:30:00Z",
+            "update_time": "2025-01-06T10:30:00Z"
+          }
+        ]
+      }
+    }
+  ],
+  "payer": {
+    "name": {
+      "given_name": "Jane",
+      "surname": "Smith"
+    },
+    "email_address": "buyer@example.com",
+    "payer_id": "BUYER123PAYERID",
+    "address": {
+      "country_code": "US"
+    }
+  },
+  "create_time": "2025-01-06T10:25:00Z",
+  "update_time": "2025-01-06T10:30:00Z",
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v2/checkout/orders/8RV12345ABC67890D",
+      "rel": "self",
+      "method": "GET"
+    }
+  ]
+}
+
+═══════════════════════════════════════════════════════════════

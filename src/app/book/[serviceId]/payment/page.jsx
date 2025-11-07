@@ -147,7 +147,7 @@ export default function PaymentPage({ params }) {
       ? 'paylater' 
       : '';  // Empty string means Pay Later is enabled
     
-    const sdkUrl = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,card-fields,messages${disableFunding ? `&disable-funding=${disableFunding}` : ''}&enable-funding=card&commit=true`;
+    const sdkUrl = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD&intent=capture&components=buttons,card-fields,messages${disableFunding ? `&disable-funding=${disableFunding}` : ''}&enable-funding=venmo,card&commit=true`;
     console.log('- SDK URL:', sdkUrl);
     console.log('- Pay Later enabled:', bookingData?.provider?.enablePayLater !== false);
     
@@ -160,11 +160,42 @@ export default function PaymentPage({ params }) {
       console.log('- window.paypal available:', !!window.paypal);
       console.log('- PayPal version:', window.paypal?.version);
       
-      // Add a small delay to ensure PayPal is fully ready
-      setTimeout(() => {
-        console.log('🚀 Setting paypalLoaded to true');
-        setPaypalLoaded(true);
-      }, 500);
+      // Wait for CardFields to be available with retry logic
+      let retryCount = 0;
+      const maxRetries = 20; // 20 attempts over 10 seconds
+      
+      const checkPayPalReady = () => {
+        console.log(`🔍 Checking PayPal readiness (attempt ${retryCount + 1}/${maxRetries})...`);
+        console.log('- window.paypal:', !!window.paypal);
+        console.log('- window.paypal.Buttons:', !!window.paypal?.Buttons);
+        console.log('- window.paypal.CardFields:', !!window.paypal?.CardFields);
+        console.log('- window.paypal.Messages:', !!window.paypal?.Messages);
+        
+        if (window.paypal && window.paypal.Buttons && window.paypal.CardFields) {
+          console.log('✅ PayPal fully ready with all components!');
+          setPaypalLoaded(true);
+          return;
+        }
+        
+        retryCount++;
+        if (retryCount < maxRetries) {
+          setTimeout(checkPayPalReady, 500);
+        } else {
+          console.error('❌ PayPal components not available after maximum retries');
+          toast({
+            title: 'Payment System Loading',
+            description: 'Payment system is taking longer than usual. Please wait or refresh the page.',
+            status: 'warning',
+            duration: 7000,
+            isClosable: true,
+          });
+          // Set it anyway to allow at least PayPal button to work
+          setPaypalLoaded(true);
+        }
+      };
+      
+      // Start checking after initial delay
+      setTimeout(checkPayPalReady, 500);
     };
 
     script.onerror = (error) => {
@@ -649,14 +680,38 @@ export default function PaymentPage({ params }) {
     console.log('- paypalLoaded state:', paypalLoaded);
 
     if (!window.paypal || !window.paypal.CardFields) {
-      console.error('❌ PayPal CardFields not available');
-      toast({
-        title: 'Payment System Error',
-        description: 'PayPal card payment system not loaded. Please refresh the page.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      console.error('❌ PayPal CardFields not available, retrying...');
+      
+      // Retry after a short delay (CardFields might still be loading)
+      let retryAttempt = 0;
+      const maxRetries = 5;
+      
+      const retryInitialize = () => {
+        retryAttempt++;
+        console.log(`🔄 Retry attempt ${retryAttempt}/${maxRetries} for CardFields...`);
+        
+        if (window.paypal && window.paypal.CardFields) {
+          console.log('✅ CardFields now available, initializing...');
+          initializeCardFields(); // Recursive call now that it's available
+          return;
+        }
+        
+        if (retryAttempt < maxRetries) {
+          setTimeout(retryInitialize, 1000); // Wait 1 second between retries
+        } else {
+          console.error('❌ PayPal CardFields still not available after retries');
+          toast({
+            title: 'Payment System Error',
+            description: 'PayPal card payment system not loaded. Please refresh the page or try PayPal wallet.',
+            status: 'error',
+            duration: 7000,
+            isClosable: true,
+          });
+        }
+      };
+      
+      // Start retry after 1 second
+      setTimeout(retryInitialize, 1000);
       return;
     }
 

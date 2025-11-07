@@ -1,0 +1,110 @@
+═══════════════════════════════════════════════════════════════
+API SAMPLE 3: CREATE ORDER
+═══════════════════════════════════════════════════════════════
+
+Purpose: Create a PayPal order when buyer clicks checkout
+When: Buyer clicks "PayPal" or "Pay with Card" button
+File: src/lib/payment/payment-service.js - createOrder()
+
+───────────────────────────────────────────────────────────────
+REQUEST
+───────────────────────────────────────────────────────────────
+
+Endpoint: POST /v2/checkout/orders
+Base URL: https://api-m.sandbox.paypal.com
+Full URL: https://api-m.sandbox.paypal.com/v2/checkout/orders
+
+Headers:
+{
+  "Authorization": "Bearer A21AAKpHExample_Access_Token_Here_1234567890...",
+  "Content-Type": "application/json",
+  "PayPal-Partner-Attribution-Id": "NYCKIDSPARTYENT_SP_PPCP",
+  "PayPal-Auth-Assertion": "eyJhbGciOiJub25lIn0.eyJpc3MiOiJZT1VSX0NMSUVOVF9JRCIsInBheWVyX2lkIjoiMjc4WFA1TUhDNlhIWSJ9."
+}
+
+Body:
+{
+  "intent": "CAPTURE",
+  "purchase_units": [
+    {
+      "reference_id": "transaction_cm123abc456",
+      "description": "Kids Soft Play Set rental",
+      "amount": {
+        "currency_code": "USD",
+        "value": "249.99",
+        "breakdown": {
+          "item_total": {
+            "currency_code": "USD",
+            "value": "249.99"
+          }
+        }
+      },
+      "payee": {
+        "merchant_id": "278XP5MHC6XHY"
+      },
+      "items": [
+        {
+          "name": "Kids Soft Play Set",
+          "description": "Safe and colorful soft play equipment for young children",
+          "unit_amount": {
+            "currency_code": "USD",
+            "value": "249.99"
+          },
+          "quantity": "1",
+          "category": "PHYSICAL_GOODS"
+        }
+      ]
+    }
+  ],
+  "application_context": {
+    "brand_name": "AllPartyRental.com",
+    "locale": "en-US",
+    "landing_page": "NO_PREFERENCE",
+    "shipping_preference": "NO_SHIPPING",
+    "user_action": "PAY_NOW",
+    "return_url": "https://allpartyrental.com/payment/success?transactionId=cm123abc456",
+    "cancel_url": "https://allpartyrental.com/payment/cancel?transactionId=cm123abc456"
+  }
+}
+
+───────────────────────────────────────────────────────────────
+RESPONSE
+───────────────────────────────────────────────────────────────
+
+Status: 201 Created
+
+Headers:
+{
+  "Content-Type": "application/json",
+  "Paypal-Debug-Id": "ghi345debug678"
+}
+
+Body:
+{
+  "id": "8RV12345ABC67890D",
+  "status": "CREATED",
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v2/checkout/orders/8RV12345ABC67890D",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://www.sandbox.paypal.com/checkoutnow?token=8RV12345ABC67890D",
+      "rel": "approve",
+      "method": "GET"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v2/checkout/orders/8RV12345ABC67890D",
+      "rel": "update",
+      "method": "PATCH"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v2/checkout/orders/8RV12345ABC67890D/capture",
+      "rel": "capture",
+      "method": "POST"
+    }
+  ]
+}
+
+═══════════════════════════════════════════════════════════════

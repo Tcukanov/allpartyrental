@@ -1,0 +1,89 @@
+═══════════════════════════════════════════════════════════════
+API SAMPLE 1: CREATE PARTNER REFERRAL
+═══════════════════════════════════════════════════════════════
+
+Purpose: Onboard a new seller to PayPal Marketplace
+When: Provider clicks "Connect PayPal Account"
+File: src/lib/payment/paypal-client.js - createPartnerReferral()
+
+───────────────────────────────────────────────────────────────
+REQUEST
+───────────────────────────────────────────────────────────────
+
+Endpoint: POST /v2/customer/partner-referrals
+Base URL: https://api-m.sandbox.paypal.com
+Full URL: https://api-m.sandbox.paypal.com/v2/customer/partner-referrals
+
+Headers:
+{
+  "Authorization": "Bearer A21AAKpHExample_Access_Token_Here_1234567890...",
+  "Content-Type": "application/json",
+  "PayPal-Partner-Attribution-Id": "NYCKIDSPARTYENT_SP_PPCP"
+}
+
+Body:
+{
+  "operations": [
+    {
+      "operation": "API_INTEGRATION",
+      "api_integration_preference": {
+        "rest_api_integration": {
+          "integration_method": "PAYPAL",
+          "integration_type": "THIRD_PARTY",
+          "third_party_details": {
+            "features": ["PAYMENT", "REFUND"]
+          }
+        }
+      }
+    }
+  ],
+  "products": ["EXPRESS_CHECKOUT"],
+  "legal_consents": [
+    {
+      "type": "SHARE_DATA_CONSENT",
+      "granted": true
+    }
+  ],
+  "partner_config_override": {
+    "return_url": "https://allpartyrental.com/api/paypal/callback",
+    "return_url_description": "Return to AllPartyRent Dashboard"
+  },
+  "tracking_id": "PROVIDER-cmge1m6ja0003d3no5668m6l4-1736189348420",
+  "customer_data": {
+    "customer_type": "MERCHANT",
+    "person_details": {
+      "email_address": "provider@example.com",
+      "name": {
+        "given_name": "John",
+        "surname": "Doe"
+      }
+    }
+  }
+}
+
+───────────────────────────────────────────────────────────────
+RESPONSE
+───────────────────────────────────────────────────────────────
+
+Status: 201 Created
+
+Headers:
+{
+  "Content-Type": "application/json",
+  "Paypal-Debug-Id": "abc123debug456"
+}
+
+Body:
+{
+  "links": [
+    {
+      "href": "https://www.sandbox.paypal.com/signin/authorize?flowEntry=static&client_id=YOUR_CLIENT_ID&response_type=code&scope=openid&redirect_uri=https://api.paypal.com/...",
+      "rel": "action_url",
+      "method": "GET",
+      "description": "The URL for seller onboarding"
+    }
+  ],
+  "partner_referral_id": "ZEJmD4BvXexamplePartnerReferralId123"
+}
+
+═══════════════════════════════════════════════════════════════

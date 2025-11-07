@@ -1,0 +1,83 @@
+═══════════════════════════════════════════════════════════════
+API SAMPLE 2: SHOW SELLER STATUS
+═══════════════════════════════════════════════════════════════
+
+Purpose: Check if seller can receive payments
+When: After onboarding, or when clicking "Refresh Status"
+File: src/lib/payment/paypal-client.js - checkSellerStatus()
+
+───────────────────────────────────────────────────────────────
+REQUEST
+───────────────────────────────────────────────────────────────
+
+Endpoint: GET /v1/customer/partners/{partner_id}/merchant-integrations/{merchant_id}
+Base URL: https://api-m.sandbox.paypal.com
+Full URL: https://api-m.sandbox.paypal.com/v1/customer/partners/YOUR_PARTNER_ID/merchant-integrations/278XP5MHC6XHY
+
+Headers:
+{
+  "Authorization": "Bearer A21AAKpHExample_Access_Token_Here_1234567890...",
+  "Content-Type": "application/json",
+  "PayPal-Partner-Attribution-Id": "NYCKIDSPARTYENT_SP_PPCP"
+}
+
+Body: (none - GET request)
+
+───────────────────────────────────────────────────────────────
+RESPONSE
+───────────────────────────────────────────────────────────────
+
+Status: 200 OK
+
+Headers:
+{
+  "Content-Type": "application/json",
+  "Paypal-Debug-Id": "def789debug012"
+}
+
+Body:
+{
+  "merchant_id": "278XP5MHC6XHY",
+  "tracking_id": "PROVIDER-cmge1m6ja0003d3no5668m6l4-1736189348420",
+  "products": [
+    {
+      "name": "EXPRESS_CHECKOUT",
+      "vetting_status": "SUBSCRIBED",
+      "capabilities": [
+        "CUSTOM_CARD_PROCESSING",
+        "PAYPAL_WALLET_PAYMENTS_PROCESSING"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "CUSTOM_CARD_PROCESSING",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "PAYPAL_WALLET_PAYMENTS_PROCESSING",
+      "status": "ACTIVE"
+    }
+  ],
+  "payments_receivable": true,
+  "primary_email_confirmed": true,
+  "oauth_integrations": [
+    {
+      "integration_type": "OAUTH_THIRD_PARTY",
+      "integration_method": "PAYPAL",
+      "oauth_third_party": [
+        {
+          "partner_client_id": "YOUR_CLIENT_ID_HERE",
+          "merchant_client_id": "MERCHANT_CLIENT_ID_HERE",
+          "scopes": [
+            "https://uri.paypal.com/services/payments/realtimepayment",
+            "https://uri.paypal.com/services/payments/refund",
+            "https://uri.paypal.com/services/payments/payment/authcapture"
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+═══════════════════════════════════════════════════════════════
