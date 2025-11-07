@@ -181,6 +181,16 @@ export async function POST(request) {
       }, { status: 409 });
     }
 
+    // Offer already exists error
+    if (error.message?.includes('Offer already exists')) {
+      console.log('❌ Duplicate offer error');
+      return NextResponse.json({
+        error: 'You already have a pending booking request for this service. Please complete or cancel your previous booking before creating a new one.',
+        code: 'OFFER_ALREADY_EXISTS',
+        details: 'A pending offer already exists for this service'
+      }, { status: 409 });
+    }
+
     // PayPal specific errors
     if (error.message?.includes('Failed to get PayPal access token')) {
       console.log('❌ PayPal authentication error');

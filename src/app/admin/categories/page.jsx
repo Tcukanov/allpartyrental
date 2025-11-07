@@ -71,7 +71,7 @@ export default function AdminCategoriesPage() {
         fetchCategories();
       }
     } else if (status === 'unauthenticated') {
-      router.push('/api/auth/signin?callbackUrl=/admin/categories');
+      router.push('/auth/signin?callbackUrl=/admin/categories');
     }
   }, [status, session, router, toast]);
 

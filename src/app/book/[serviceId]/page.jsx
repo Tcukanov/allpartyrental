@@ -165,7 +165,8 @@ export default function BookingDetailsPage({ params }) {
         duration: 3000,
         isClosable: true,
       });
-      router.push(`/api/auth/signin?callbackUrl=${encodeURIComponent(window.location.href)}`);
+      // Use relative path so it works on both localhost and production
+      router.push(`/auth/signin?callbackUrl=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 

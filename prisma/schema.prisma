@@ -148,6 +148,7 @@ model Service {
   colors              String[]        @default([])
   metadata            String?
   blockedDates        DateTime[]      @default([]) @db.Timestamp
+  slug                String?         @unique
   offers              Offer[]
   partyServices       PartyService[]
   category            ServiceCategory @relation(fields: [categoryId], references: [id])

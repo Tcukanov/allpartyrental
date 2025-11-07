@@ -425,7 +425,8 @@ export default function ServiceDetailPage({ params }) {
           duration: 3000,
           isClosable: true
         });
-        router.push(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/services/${id}`)}`);
+        // Use relative path so it works on both localhost and production
+        router.push(`/auth/signin?callbackUrl=${encodeURIComponent(`/services/${id}`)}`);
         return;
       }
 
@@ -826,7 +827,7 @@ export default function ServiceDetailPage({ params }) {
               )}
               
               {!session && (
-                <Button colorScheme="blue" width="full" as="a" href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/book/${id}`)}`}>
+                <Button colorScheme="blue" width="full" as="a" href={`/auth/signin?callbackUrl=${encodeURIComponent(`/book/${id}`)}`}>
                   Sign in to Book
                 </Button>
               )}

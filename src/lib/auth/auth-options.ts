@@ -77,10 +77,35 @@ export const authOptions: AuthOptions = {
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
+      // Smart redirect: if URL is localhost, return localhost. If production, return production.
+      // This allows both environments to work properly.
+      
+      // If it's a relative URL, use the baseUrl
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      // Allows callback URLs on the same origin
-      if (new URL(url).origin === baseUrl) return url;
+      
+      try {
+        const urlObj = new URL(url);
+        const baseUrlObj = new URL(baseUrl);
+        
+        // Allow localhost URLs when on localhost
+        if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
+          return url;
+        }
+        
+        // Allow production domain URLs
+        if (urlObj.hostname === 'allpartyrental.com' || urlObj.hostname === 'www.allpartyrental.com') {
+          return url;
+        }
+        
+        // Allow same origin
+        if (urlObj.origin === baseUrlObj.origin) {
+          return url;
+        }
+      } catch (error) {
+        console.error('Redirect URL parsing error:', error);
+      }
+      
+      // Default: return to base URL
       return baseUrl;
     },
     async jwt({ token, user, account }) {

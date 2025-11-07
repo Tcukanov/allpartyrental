@@ -132,11 +132,18 @@ export default function PaymentPage({ params }) {
       return;
     }
 
-    // Check if PayPal is already loaded
-    if (window.paypal) {
-      console.log('✅ PayPal SDK already loaded, setting state');
+    // Check if PayPal is already loaded with all components as functions
+    if (window.paypal && 
+        typeof window.paypal.Buttons === 'function' && 
+        typeof window.paypal.CardFields === 'function') {
+      console.log('✅ PayPal SDK already loaded with all components, setting state');
       setPaypalLoaded(true);
       return;
+    } else if (window.paypal) {
+      console.log('⚠️ PayPal SDK exists but components not ready yet, will wait...');
+      console.log('- Buttons type:', typeof window.paypal.Buttons);
+      console.log('- CardFields type:', typeof window.paypal.CardFields);
+      // Don't return - continue to load the script properly
     }
 
     console.log('📦 Creating PayPal SDK script...');
@@ -167,11 +174,14 @@ export default function PaymentPage({ params }) {
       const checkPayPalReady = () => {
         console.log(`🔍 Checking PayPal readiness (attempt ${retryCount + 1}/${maxRetries})...`);
         console.log('- window.paypal:', !!window.paypal);
-        console.log('- window.paypal.Buttons:', !!window.paypal?.Buttons);
-        console.log('- window.paypal.CardFields:', !!window.paypal?.CardFields);
-        console.log('- window.paypal.Messages:', !!window.paypal?.Messages);
+        console.log('- window.paypal.Buttons type:', typeof window.paypal?.Buttons);
+        console.log('- window.paypal.CardFields type:', typeof window.paypal?.CardFields);
+        console.log('- window.paypal.Messages type:', typeof window.paypal?.Messages);
         
-        if (window.paypal && window.paypal.Buttons && window.paypal.CardFields) {
+        // Check if Buttons and CardFields are actually functions
+        if (window.paypal && 
+            typeof window.paypal.Buttons === 'function' && 
+            typeof window.paypal.CardFields === 'function') {
           console.log('✅ PayPal fully ready with all components!');
           setPaypalLoaded(true);
           return;
@@ -182,15 +192,21 @@ export default function PaymentPage({ params }) {
           setTimeout(checkPayPalReady, 500);
         } else {
           console.error('❌ PayPal components not available after maximum retries');
+          console.error('❌ Final state:', {
+            hasPaypal: !!window.paypal,
+            ButtonsType: typeof window.paypal?.Buttons,
+            CardFieldsType: typeof window.paypal?.CardFields,
+            paypalKeys: window.paypal ? Object.keys(window.paypal) : []
+          });
           toast({
-            title: 'Payment System Loading',
-            description: 'Payment system is taking longer than usual. Please wait or refresh the page.',
-            status: 'warning',
-            duration: 7000,
+            title: 'Payment System Error',
+            description: 'PayPal components failed to load. Please refresh the page.',
+            status: 'error',
+            duration: 10000,
             isClosable: true,
           });
-          // Set it anyway to allow at least PayPal button to work
-          setPaypalLoaded(true);
+          // DO NOT set paypalLoaded to true if components aren't functions
+          // setPaypalLoaded(true); // REMOVED - this was causing the error
         }
       };
       
@@ -250,6 +266,13 @@ export default function PaymentPage({ params }) {
         console.log('PayPal buttons container found, initializing...');
         paypalButtonsContainer.innerHTML = '';
         initializePayPalButtons();
+        
+        // Initialize CardFields AFTER PayPal buttons, with a delay
+        setTimeout(() => {
+          console.log('Now initializing CardFields after PayPal buttons...');
+          initializeCardFields();
+        }, 1000); // 1 second delay to ensure everything is ready
+        
       } else {
         retryCount++;
         console.log(`PayPal buttons container not found (attempt ${retryCount}/${maxRetries})`);
@@ -269,8 +292,6 @@ export default function PaymentPage({ params }) {
       }
     };
 
-    initializeCardFields();
-
     // Start with a small delay
     const timer = setTimeout(tryInitialize, 500);
 
@@ -288,6 +309,24 @@ export default function PaymentPage({ params }) {
         description: 'Unable to load PayPal buttons. Please refresh the page.',
         status: 'error',
         duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    // Check if PayPal Buttons component is available
+    if (!window.paypal || typeof window.paypal.Buttons !== 'function') {
+      console.error('❌ window.paypal.Buttons is not available:', {
+        hasPaypal: !!window.paypal,
+        paypalKeys: window.paypal ? Object.keys(window.paypal) : [],
+        ButtonsType: window.paypal ? typeof window.paypal.Buttons : 'undefined'
+      });
+      
+      toast({
+        title: 'Payment System Error',
+        description: 'PayPal buttons component not loaded. Please refresh the page.',
+        status: 'error',
+        duration: 7000,
         isClosable: true,
       });
       return;
@@ -327,9 +366,9 @@ export default function PaymentPage({ params }) {
           });
 
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Create order failed:', response.status, errorText);
-            throw new Error(`Payment order creation failed: ${response.status}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Create order failed:', response.status, errorData);
+            throw new Error(errorData.error || `Payment order creation failed: ${response.status}`);
           }
 
           const data = await response.json();
@@ -369,9 +408,9 @@ export default function PaymentPage({ params }) {
           });
 
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Capture failed:', response.status, errorText);
-            throw new Error(`Payment capture failed: ${response.status}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Capture failed:', response.status, errorData);
+            throw new Error(errorData.error || `Payment capture failed: ${response.status}`);
           }
 
           const result = await response.json();
@@ -493,9 +532,9 @@ export default function PaymentPage({ params }) {
           });
 
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Create order failed:', response.status, errorText);
-            throw new Error(`Payment order creation failed: ${response.status}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Create order failed:', response.status, errorData);
+            throw new Error(errorData.error || `Payment order creation failed: ${response.status}`);
           }
 
           const data = await response.json();
@@ -536,9 +575,9 @@ export default function PaymentPage({ params }) {
           });
 
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Capture failed:', response.status, errorText);
-            throw new Error(`Payment capture failed: ${response.status}`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Capture failed:', response.status, errorData);
+            throw new Error(errorData.error || `Payment capture failed: ${response.status}`);
           }
 
           const result = await response.json();
@@ -677,6 +716,19 @@ export default function PaymentPage({ params }) {
     console.log('- window.paypal.CardFields available:', !!window.paypal?.CardFields);
     console.log('- paypalLoaded state:', paypalLoaded);
 
+    // Check if DOM elements exist (with correct IDs including -container suffix)
+    const cardNumberField = document.getElementById('card-number-field-container');
+    const cardExpiryField = document.getElementById('card-expiry-field-container');
+    const cardCvvField = document.getElementById('card-cvv-field-container');
+    const cardNameField = document.getElementById('card-name-field-container');
+    
+    console.log('- DOM elements check:', {
+      cardNumberField: !!cardNumberField,
+      cardExpiryField: !!cardExpiryField,
+      cardCvvField: !!cardCvvField,
+      cardNameField: !!cardNameField
+    });
+
     if (!window.paypal || !window.paypal.CardFields) {
       console.error('❌ PayPal CardFields not available, retrying...');
       
@@ -710,6 +762,46 @@ export default function PaymentPage({ params }) {
       
       // Start retry after 1 second
       setTimeout(retryInitialize, 1000);
+      return;
+    }
+    
+    // Check if DOM elements exist, if not retry
+    if (!cardNumberField || !cardExpiryField || !cardCvvField || !cardNameField) {
+      console.error('❌ Card field DOM elements not ready, retrying...');
+      
+      let retryAttempt = 0;
+      const maxRetries = 3;
+      
+      const retryDOM = () => {
+        retryAttempt++;
+        console.log(`🔄 Retry attempt ${retryAttempt}/${maxRetries} for DOM elements...`);
+        
+        const cardNumberField = document.getElementById('card-number-field-container');
+        const cardExpiryField = document.getElementById('card-expiry-field-container');
+        const cardCvvField = document.getElementById('card-cvv-field-container');
+        const cardNameField = document.getElementById('card-name-field-container');
+        
+        if (cardNumberField && cardExpiryField && cardCvvField && cardNameField) {
+          console.log('✅ DOM elements now ready, initializing...');
+          initializeCardFields(); // Recursive call now that DOM is ready
+          return;
+        }
+        
+        if (retryAttempt < maxRetries) {
+          setTimeout(retryDOM, 500);
+        } else {
+          console.error('❌ Card field DOM elements not ready after retries');
+          toast({
+            title: 'Payment System Error',
+            description: 'Card payment form not loaded. Please refresh the page or use PayPal wallet.',
+            status: 'error',
+            duration: 7000,
+            isClosable: true,
+          });
+        }
+      };
+      
+      setTimeout(retryDOM, 500);
       return;
     }
 
