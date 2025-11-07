@@ -293,18 +293,16 @@ export default function PaymentPage({ params }) {
       return;
     }
 
-    console.log('Initializing PayPal buttons for wallet payments...');
+    console.log('Initializing PayPal buttons for wallet payments (PayPal + Venmo)...');
 
     window.paypal.Buttons({
       style: {
         layout: 'vertical',
-        color: 'blue',
         shape: 'rect',
-        label: 'paypal',
         height: 50,
         tagline: false
       },
-      fundingSource: window.paypal.FUNDING.PAYPAL,
+      // NO fundingSource restriction - allows PayPal AND Venmo buttons to render
       createOrder: async () => {
         setIsProcessingPayment(true);
 
