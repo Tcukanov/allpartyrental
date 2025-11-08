@@ -257,44 +257,92 @@ export default function TransactionDetailsPage({ params }) {
         </CardBody>
       </Card>
 
-      {/* Transaction Payment Information */}
-      {transaction.paymentIntentId && (
+      {/* Client Information */}
+      {transaction.offer?.client && (
         <Card mb={6}>
           <CardHeader>
-            <Heading size="md">Payment Information</Heading>
+            <Heading size="md">Client Information</Heading>
           </CardHeader>
           <CardBody>
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
               <Box>
-                <Text fontWeight="bold" mb={1}>Payment ID:</Text>
-                <Text mb={4}>{transaction.paymentIntentId}</Text>
+                <Text fontWeight="bold" mb={1}>Name:</Text>
+                <Text mb={4}>{transaction.offer.client.name || 'N/A'}</Text>
+                
+                <Text fontWeight="bold" mb={1}>Email:</Text>
+                <Text mb={4}>{transaction.offer.client.email || 'N/A'}</Text>
+              </Box>
+              <Box>
+                {transaction.party && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>Party Name:</Text>
+                    <Text mb={4}>{transaction.party.name || 'N/A'}</Text>
+                    
+                    <Text fontWeight="bold" mb={1}>Party Date:</Text>
+                    <Text mb={4}>{transaction.party.date ? new Date(transaction.party.date).toLocaleDateString() : 'N/A'}</Text>
+                  </>
+                )}
+              </Box>
+            </SimpleGrid>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Service Information */}
+      {transaction.offer?.service && (
+        <Card mb={6}>
+          <CardHeader>
+            <Heading size="md">Service Information</Heading>
+          </CardHeader>
+          <CardBody>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Service Name:</Text>
+                <Text mb={4}>{transaction.offer.service.name || 'N/A'}</Text>
+              </Box>
+              <Box>
+                <Text fontWeight="bold" mb={1}>Service Price:</Text>
+                <Text fontSize="lg" fontWeight="bold" color="blue.500">
+                  ${transaction.offer.price ? formatAmount(transaction.offer.price) : '0.00'}
+                </Text>
+              </Box>
+            </SimpleGrid>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* PayPal Payment Information */}
+      {(transaction.paypalOrderId || transaction.paypalCaptureId) && (
+        <Card mb={6}>
+          <CardHeader>
+            <Heading size="md">PayPal Payment Information</Heading>
+          </CardHeader>
+          <CardBody>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+              <Box>
+                {transaction.paypalOrderId && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>PayPal Order ID:</Text>
+                    <Text mb={4} fontFamily="monospace" fontSize="sm">{transaction.paypalOrderId}</Text>
+                  </>
+                )}
+                
+                {transaction.paypalCaptureId && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>PayPal Capture ID:</Text>
+                    <Text mb={4} fontFamily="monospace" fontSize="sm">{transaction.paypalCaptureId}</Text>
+                  </>
+                )}
+
+                {transaction.paypalTransactionId && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>PayPal Transaction ID:</Text>
+                    <Text mb={4} fontFamily="monospace" fontSize="sm">{transaction.paypalTransactionId}</Text>
+                  </>
+                )}
                 
                 <Text fontWeight="bold" mb={1}>Payment Status:</Text>
                 <StatusBadge status={transaction.status} />
-
-                {transaction.transferId && (
-                  <>
-                    <Text fontWeight="bold" mt={4} mb={1}>Transfer ID:</Text>
-                    <Flex align="center">
-                      <Text>{transaction.transferId}</Text>
-                      <IconButton
-                        aria-label="View in PayPal"
-                        icon={<FiExternalLink />}
-                        size="sm"
-                        variant="ghost"
-                        ml={2}
-                        onClick={() => {
-                          // Use same link function as dashboard
-                          const usesSandbox = transaction.provider?.paypalEnvironment === 'SANDBOX';
-                          const baseUrl = usesSandbox
-                            ? 'https://sandbox.paypal.com/merchantapps/home#/activity/all'
-                            : 'https://paypal.com/merchantapps/home#/activity/all';
-                          window.open(baseUrl, '_blank');
-                        }}
-                      />
-                    </Flex>
-                  </>
-                )}
               </Box>
               
               <Box>
@@ -302,17 +350,20 @@ export default function TransactionDetailsPage({ params }) {
                 <Text fontSize="xl" fontWeight="bold" color="green.500" mb={4}>
                   ${formatAmount(transaction.amount)}
                 </Text>
-                
-                <Text fontWeight="bold" mb={1}>Debug Information:</Text>
-                <HStack>
-                  <Button 
-                    size="sm" 
-                    leftIcon={<FiInfo />}
-                    onClick={() => window.open(`/api/debug/paypal-order?transactionId=${transaction.id}`, '_blank')}
-                  >
-                    View PayPal Details
-                  </Button>
-                </HStack>
+
+                {transaction.paypalPayerId && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>Payer ID:</Text>
+                    <Text mb={4} fontFamily="monospace" fontSize="sm">{transaction.paypalPayerId}</Text>
+                  </>
+                )}
+
+                {transaction.paypalStatus && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>PayPal Status:</Text>
+                    <Text mb={4}>{transaction.paypalStatus}</Text>
+                  </>
+                )}
               </Box>
             </SimpleGrid>
           </CardBody>

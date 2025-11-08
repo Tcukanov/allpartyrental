@@ -44,7 +44,8 @@ export async function GET(request, { params }) {
               select: {
                 id: true,
                 name: true,
-                photos: true
+                photos: true,
+                price: true
               }
             },
             provider: {
@@ -54,6 +55,15 @@ export async function GET(request, { params }) {
                 paypalEnvironment: true
               }
             }
+          }
+        },
+        party: {
+          select: {
+            id: true,
+            name: true,
+            date: true,
+            startTime: true,
+            guestCount: true
           }
         }
       }
