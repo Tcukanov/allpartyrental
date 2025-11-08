@@ -482,18 +482,43 @@ class PayPalClientFixed {
    * Refund a captured payment
    * @param {string} captureId - The PayPal capture ID to refund
    * @param {object} refundData - Refund details including amount and note
+   * @param {string} merchantId - The provider's PayPal merchant ID (for auth assertion)
    */
-  async refundCapture(captureId, refundData) {
+  async refundCapture(captureId, refundData, merchantId) {
     console.log('💸 Refunding capture:', captureId);
     const token = await this.getAccessToken();
 
+    // Create PayPal-Auth-Assertion header for acting on behalf of merchant
+    const authAssertion = merchantId 
+      ? Buffer.from(JSON.stringify({
+          "alg": "none"
+        }) + '.' + JSON.stringify({
+          "iss": this.clientId,
+          "payer_id": merchantId
+        }) + '.').toString('base64')
+      : null;
+
+    console.log('💸 Refund request details:', {
+      captureId,
+      merchantId,
+      hasAuthAssertion: !!authAssertion,
+      amount: refundData.amount?.value
+    });
+
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'PayPal-Partner-Attribution-Id': 'NYCKIDSPARTYENT_SP_PPCP'
+    };
+
+    // Add auth assertion if we have a merchant ID
+    if (authAssertion) {
+      headers['PayPal-Auth-Assertion'] = authAssertion;
+    }
+
     const response = await fetch(`${this.baseURL}/v2/payments/captures/${captureId}/refund`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'PayPal-Partner-Attribution-Id': 'NYCKIDSPARTYENT_SP_PPCP'
-      },
+      headers,
       body: JSON.stringify(refundData)
     });
 

@@ -740,14 +740,32 @@ export class PaymentService {
   async refundPayment(transactionId, reason = 'Requested by customer') {
     try {
       const transaction = await this.prisma.transaction.findUnique({
-        where: { id: transactionId }
+        where: { id: transactionId },
+        include: {
+          offer: {
+            include: {
+              provider: true
+            }
+          }
+        }
       });
 
       if (!transaction || !transaction.paypalCaptureId) {
         throw new Error('Transaction not found or not captured');
       }
 
-      // Process refund via PayPal
+      if (!transaction.offer?.provider?.paypalMerchantId) {
+        throw new Error('Provider PayPal merchant ID not found');
+      }
+
+      console.log('💸 Processing refund:', {
+        transactionId,
+        captureId: transaction.paypalCaptureId,
+        amount: transaction.amount,
+        merchantId: transaction.offer.provider.paypalMerchantId
+      });
+
+      // Process refund via PayPal with merchant authorization
       const refundResult = await paypalClient.refundCapture(
         transaction.paypalCaptureId,
         {
@@ -756,7 +774,8 @@ export class PaymentService {
             value: transaction.amount.toString()
           },
           note_to_payer: reason
-        }
+        },
+        transaction.offer.provider.paypalMerchantId // Pass merchant ID for auth assertion
       );
 
       // Update transaction status
