@@ -479,6 +479,61 @@ class PayPalClientFixed {
   }
 
   /**
+   * Refund a captured payment
+   * @param {string} captureId - The PayPal capture ID to refund
+   * @param {object} refundData - Refund details including amount and note
+   */
+  async refundCapture(captureId, refundData) {
+    console.log('💸 Refunding capture:', captureId);
+    const token = await this.getAccessToken();
+
+    const response = await fetch(`${this.baseURL}/v2/payments/captures/${captureId}/refund`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'PayPal-Partner-Attribution-Id': 'NYCKIDSPARTYENT_SP_PPCP'
+      },
+      body: JSON.stringify(refundData)
+    });
+
+    console.log('💸 Refund response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Refund failed:', errorText);
+      
+      // Parse error for specific messages
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.details && errorData.details.length > 0) {
+          const issue = errorData.details[0].issue;
+          if (issue === 'INSUFFICIENT_FUNDS') {
+            throw new Error('Insufficient funds in your PayPal account. Please add funds and try again.');
+          }
+        }
+      } catch (parseError) {
+        // If parsing fails, throw generic error
+      }
+      
+      throw new Error(`Failed to refund payment: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Refund successful:', {
+      refundId: result.id,
+      status: result.status,
+      amount: result.amount?.value
+    });
+
+    return result;
+  }
+
+  /**
    * Create PayPal webhook for receiving real-time notifications
    * Required for marketplace functionality per integration guide
    */
