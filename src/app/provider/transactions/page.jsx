@@ -32,7 +32,7 @@ import {
 } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 import { getSession } from 'next-auth/react';
-import { FiClock, FiCalendar, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
+import { FiClock, FiCalendar, FiDollarSign, FiCheck, FiX, FiInfo } from 'react-icons/fi';
 import Link from 'next/link';
 import { getTransactionStatusConfig, transactionRequiresAction } from '@/utils/statusConfig';
 
@@ -248,14 +248,25 @@ export default function ProviderTransactionsPage() {
             <Divider mb={4} />
             
             <Flex justify="space-between" align="center" wrap="wrap" gap={2}>
-              <Button 
-                as={Link}
-                href={`/services/${transaction.service?.id}`}
-                size="sm"
-                variant="outline"
-              >
-                View Service
-              </Button>
+              <Flex gap={2}>
+                <Button 
+                  as={Link}
+                  href={`/provider/transactions/${transaction.id}`}
+                  size="sm"
+                  colorScheme="blue"
+                  leftIcon={<FiInfo />}
+                >
+                  View Details
+                </Button>
+                <Button 
+                  as={Link}
+                  href={`/services/${transaction.service?.id}`}
+                  size="sm"
+                  variant="outline"
+                >
+                  View Service
+                </Button>
+              </Flex>
               
               {transactionRequiresAction(transaction.status) && (
                 <Flex gap={2}>
