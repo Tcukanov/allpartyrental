@@ -412,12 +412,26 @@ export class PaymentService {
        }
 
       // Update transaction with capture details
+      // NOTE: captureResult.id is the ORDER ID, the actual capture ID is in payments.captures[0].id
+      const actualCaptureId = captureResult.purchase_units[0]?.payments?.captures[0]?.id;
+      
+      if (!actualCaptureId) {
+        console.error('⚠️ No capture ID found in capture result!', JSON.stringify(captureResult, null, 2));
+        throw new Error('Payment was approved but no capture ID was returned');
+      }
+      
+      console.log('💾 Saving capture details:', {
+        orderId: captureResult.id,
+        captureId: actualCaptureId,
+        payerId: captureResult.payer?.payer_id
+      });
+      
       const updatedTransaction = await this.prisma.transaction.update({
         where: { id: transaction.id },
         data: {
           status: 'COMPLETED',
-          paypalCaptureId: captureResult.id,
-          paypalTransactionId: captureResult.purchase_units[0]?.payments?.captures[0]?.id,
+          paypalCaptureId: actualCaptureId, // This is the ACTUAL capture ID for refunds
+          paypalTransactionId: actualCaptureId, // Same as capture ID
           paypalPayerId: captureResult.payer?.payer_id,
           paypalStatus: captureResult.status,
           escrowStartTime: new Date(),
@@ -432,7 +446,7 @@ export class PaymentService {
       return {
         success: true,
         transaction: updatedTransaction,
-        captureId: captureResult.id,
+        captureId: actualCaptureId, // Return the actual capture ID, not order ID
         status: captureResult.status,
         // Payment details for thank you page
         paymentDetails: {
