@@ -73,27 +73,37 @@ export default function PayPalSettingsPage() {
       
     } else if (status === 'failed') {
       toast({
-        title: 'PayPal Connection Failed',
-        description: 'There was an issue connecting your PayPal account. Please try again.',
-        status: 'error',
-        duration: 5000,
+        title: 'PayPal Onboarding Cancelled',
+        description: 'You cancelled the PayPal onboarding process. Click "Connect PayPal Account" to try again.',
+        status: 'warning',
+        duration: 7000,
         isClosable: true,
       });
       
       // Clear URL parameters
       window.history.replaceState({}, '', '/provider/dashboard/paypal');
+      
+      // Refresh data to show clean state
+      setTimeout(() => {
+        fetchProviderData();
+      }, 500);
       
     } else if (status === 'error') {
       toast({
         title: 'Connection Error',
-        description: message || 'An unexpected error occurred.',
+        description: message || 'An unexpected error occurred. Please try connecting again.',
         status: 'error',
-        duration: 5000,
+        duration: 7000,
         isClosable: true,
       });
       
       // Clear URL parameters
       window.history.replaceState({}, '', '/provider/dashboard/paypal');
+      
+      // Refresh data to show clean state
+      setTimeout(() => {
+        fetchProviderData();
+      }, 500);
     }
   }, [searchParams, toast]);
 
@@ -478,9 +488,9 @@ export default function PayPalSettingsPage() {
                   <Alert status="info">
                     <AlertIcon />
                     <Box>
-                      <AlertTitle>Onboarding Completed!</AlertTitle>
+                      <AlertTitle>Verify Connection Status</AlertTitle>
                       <AlertDescription>
-                        You've successfully completed PayPal onboarding. Click "Refresh Status" below to sync your connection and enable payments.
+                        We're checking your PayPal connection. Click "Refresh Status" below to verify if your account was successfully connected. If onboarding wasn't completed, you can start a new onboarding process.
                       </AlertDescription>
                     </Box>
                   </Alert>
