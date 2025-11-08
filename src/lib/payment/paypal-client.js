@@ -29,6 +29,44 @@ class PayPalClientFixed {
   }
 
   /**
+   * Create PayPal-Auth-Assertion header for third-party actions
+   * Format: base64url(header).base64url(payload).
+   */
+  createAuthAssertion(merchantId) {
+    const header = {
+      "alg": "none"
+    };
+    
+    const payload = {
+      "iss": this.clientId,
+      "payer_id": merchantId
+    };
+    
+    // Base64url encode (replace + with -, / with _, and remove padding =)
+    const base64url = (str) => {
+      return Buffer.from(str)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+    };
+    
+    const encodedHeader = base64url(JSON.stringify(header));
+    const encodedPayload = base64url(JSON.stringify(payload));
+    
+    // JWT format with empty signature (algorithm is "none")
+    const assertion = `${encodedHeader}.${encodedPayload}.`;
+    
+    console.log('🔐 Created Auth Assertion:', {
+      merchantId,
+      clientId: this.clientId?.substring(0, 10) + '...',
+      assertion: assertion.substring(0, 50) + '...'
+    });
+    
+    return assertion;
+  }
+
+  /**
    * Get PayPal access token
    */
   async getAccessToken() {
@@ -489,13 +527,9 @@ class PayPalClientFixed {
     const token = await this.getAccessToken();
 
     // Create PayPal-Auth-Assertion header for acting on behalf of merchant
+    // Format: base64url(header).base64url(payload).
     const authAssertion = merchantId 
-      ? Buffer.from(JSON.stringify({
-          "alg": "none"
-        }) + '.' + JSON.stringify({
-          "iss": this.clientId,
-          "payer_id": merchantId
-        }) + '.').toString('base64')
+      ? this.createAuthAssertion(merchantId)
       : null;
 
     console.log('💸 Refund request details:', {
