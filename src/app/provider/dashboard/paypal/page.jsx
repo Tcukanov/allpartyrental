@@ -63,12 +63,13 @@ export default function PayPalSettingsPage() {
         isClosable: true,
       });
       
-      // Auto-refresh status after successful connection
-      // Wait 1 second for PayPal API to propagate, then refresh the page
+      // Clear URL parameters first to prevent infinite loop
+      window.history.replaceState({}, '', '/provider/dashboard/paypal');
+      
+      // Auto-refresh data after successful connection
       setTimeout(() => {
-        router.replace('/provider/dashboard/paypal');
-        window.location.reload();
-      }, 1000);
+        fetchProviderData();
+      }, 1500);
       
     } else if (status === 'failed') {
       toast({
@@ -80,7 +81,7 @@ export default function PayPalSettingsPage() {
       });
       
       // Clear URL parameters
-      router.replace('/provider/dashboard/paypal');
+      window.history.replaceState({}, '', '/provider/dashboard/paypal');
       
     } else if (status === 'error') {
       toast({
@@ -92,9 +93,9 @@ export default function PayPalSettingsPage() {
       });
       
       // Clear URL parameters
-      router.replace('/provider/dashboard/paypal');
+      window.history.replaceState({}, '', '/provider/dashboard/paypal');
     }
-  }, [searchParams, toast, router]);
+  }, [searchParams, toast]);
 
   // Load PayPal status from API
   useEffect(() => {
