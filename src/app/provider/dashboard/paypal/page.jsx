@@ -57,11 +57,19 @@ export default function PayPalSettingsPage() {
     if (status === 'success') {
       toast({
         title: 'PayPal Connected Successfully!',
-        description: 'Your PayPal account has been connected. You can now receive payments.',
+        description: 'Your PayPal account has been connected. Refreshing status...',
         status: 'success',
         duration: 5000,
         isClosable: true,
       });
+      
+      // Auto-refresh status after successful connection
+      // Wait 1 second for PayPal API to propagate, then refresh the page
+      setTimeout(() => {
+        router.replace('/provider/dashboard/paypal');
+        window.location.reload();
+      }, 1000);
+      
     } else if (status === 'failed') {
       toast({
         title: 'PayPal Connection Failed',
@@ -70,6 +78,10 @@ export default function PayPalSettingsPage() {
         duration: 5000,
         isClosable: true,
       });
+      
+      // Clear URL parameters
+      router.replace('/provider/dashboard/paypal');
+      
     } else if (status === 'error') {
       toast({
         title: 'Connection Error',
@@ -78,10 +90,8 @@ export default function PayPalSettingsPage() {
         duration: 5000,
         isClosable: true,
       });
-    }
-
-    // Clear URL parameters
-    if (status) {
+      
+      // Clear URL parameters
       router.replace('/provider/dashboard/paypal');
     }
   }, [searchParams, toast, router]);
@@ -446,9 +456,16 @@ export default function PayPalSettingsPage() {
                     {paypalStatus.issues.map((issue, index) => (
                       <Alert key={index} status="warning">
                         <AlertIcon />
-                        <Box>
+                        <Box flex="1">
                           <AlertTitle>Attention Required!</AlertTitle>
-                          <AlertDescription>{issue.message}</AlertDescription>
+                          <AlertDescription>
+                            {issue.message}
+                            {issue.type === 'STATUS_CHECK_FAILED' && (
+                              <Text mt={2} fontSize="sm" fontWeight="semibold">
+                                Click "Refresh Status" button below to update your connection status.
+                              </Text>
+                            )}
+                          </AlertDescription>
                         </Box>
                       </Alert>
                     ))}
