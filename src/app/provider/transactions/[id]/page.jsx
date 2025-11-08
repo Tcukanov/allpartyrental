@@ -34,6 +34,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { getSession } from 'next-auth/react';
 import { FiExternalLink, FiInfo, FiDollarSign } from 'react-icons/fi';
+import ProviderLayout from '../../components/ProviderLayout';
 
 // Status Badge Component
 const StatusBadge = ({ status }) => {
@@ -188,28 +189,33 @@ export default function TransactionDetailsPage({ params }) {
 
   if (loading) {
     return (
-      <Container maxW="container.lg" py={8}>
-        <Skeleton height="300px" />
-      </Container>
+      <ProviderLayout>
+        <Container maxW="container.lg" py={8}>
+          <Skeleton height="300px" />
+        </Container>
+      </ProviderLayout>
     );
   }
 
   if (error || !transaction) {
     return (
-      <Container maxW="container.lg" py={8}>
-        <Card>
-          <CardBody>
-            <Text color="red.500">
-              {error || 'Transaction not found'}
-            </Text>
-          </CardBody>
-        </Card>
-      </Container>
+      <ProviderLayout>
+        <Container maxW="container.lg" py={8}>
+          <Card>
+            <CardBody>
+              <Text color="red.500">
+                {error || 'Transaction not found'}
+              </Text>
+            </CardBody>
+          </Card>
+        </Container>
+      </ProviderLayout>
     );
   }
 
   return (
-    <Container maxW="container.lg" py={8}>
+    <ProviderLayout>
+      <Container maxW="container.lg" py={8}>
       <Flex justify="space-between" align="center" mb={6}>
         <Heading>Transaction Details</Heading>
         {canRefund(transaction) && (
@@ -365,5 +371,6 @@ export default function TransactionDetailsPage({ params }) {
         </ModalContent>
       </Modal>
     </Container>
+    </ProviderLayout>
   );
 } 

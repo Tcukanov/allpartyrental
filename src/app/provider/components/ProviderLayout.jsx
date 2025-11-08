@@ -88,7 +88,7 @@ const ProviderLayout = ({ children }) => {
     },
     {
       label: 'Transactions',
-      href: '/provider/dashboard/payments',
+      href: '/provider/transactions',
       icon: FiDollarSign,
       description: 'Payment history & earnings'
     },
@@ -338,8 +338,8 @@ const ProviderLayout = ({ children }) => {
                 <MenuItem as={Link} href="/provider/cabinet" icon={<Icon as={FiUser} />}>
                   Profile & Cabinet
                 </MenuItem>
-                <MenuItem as={Link} href="/provider/dashboard/payments" icon={<Icon as={FiDollarSign} />}>
-                  Payments
+                <MenuItem as={Link} href="/provider/transactions" icon={<Icon as={FiDollarSign} />}>
+                  Transactions
                 </MenuItem>
                 <MenuItem as={Link} href="/provider/dashboard/paypal" icon={<Icon as={FiCreditCard} />}>
                   PayPal Settings

@@ -35,6 +35,7 @@ import { getSession } from 'next-auth/react';
 import { FiClock, FiCalendar, FiDollarSign, FiCheck, FiX, FiInfo } from 'react-icons/fi';
 import Link from 'next/link';
 import { getTransactionStatusConfig, transactionRequiresAction } from '@/utils/statusConfig';
+import ProviderLayout from '../components/ProviderLayout';
 
 const TransactionStatusBadge = ({ status }) => {
   const config = getTransactionStatusConfig(status);
@@ -298,19 +299,22 @@ export default function ProviderTransactionsPage() {
   
   if (loading) {
     return (
-      <Container maxW="container.lg" py={10}>
-        <Heading as="h1" mb={6}>My Transactions</Heading>
-        <Stack spacing={8}>
-          <Skeleton height="100px" />
-          <Skeleton height="100px" />
-          <Skeleton height="100px" />
-        </Stack>
-      </Container>
+      <ProviderLayout>
+        <Container maxW="container.lg" py={10}>
+          <Heading as="h1" mb={6}>My Transactions</Heading>
+          <Stack spacing={8}>
+            <Skeleton height="100px" />
+            <Skeleton height="100px" />
+            <Skeleton height="100px" />
+          </Stack>
+        </Container>
+      </ProviderLayout>
     );
   }
 
   return (
-    <Container maxW="container.lg" py={10}>
+    <ProviderLayout>
+      <Container maxW="container.lg" py={10}>
       <Heading as="h1" mb={6}>My Transactions</Heading>
       
       {error ? (
@@ -437,5 +441,6 @@ export default function ProviderTransactionsPage() {
         </AlertDialogOverlay>
       </AlertDialog>
     </Container>
+    </ProviderLayout>
   );
 } 
