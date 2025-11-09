@@ -64,19 +64,25 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Build the where clause for offers - use the Provider ID, not User ID
+    // We need to show offers where:
+    // 1. Transaction is completed/approved (not PENDING)
+    // 2. OR there's no transaction at all (legacy offers)
     const where: any = {
       providerId: user.provider.id,  // Use provider.id instead of user.id
-      // Only show offers where payment was completed OR no transaction exists yet (legacy data)
       OR: [
         {
+          // Case 1: Transaction exists and is NOT pending (payment was captured)
           transaction: {
             status: {
-              not: 'PENDING' // Exclude unpaid orders
+              not: 'PENDING'
             }
           }
         },
         {
-          transaction: null // Include offers without transactions (legacy or pre-payment)
+          // Case 2: No transaction exists at all (legacy offers or direct bookings)
+          transaction: {
+            is: null
+          }
         }
       ]
     };
