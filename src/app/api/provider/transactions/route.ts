@@ -48,10 +48,14 @@ export async function GET(request: NextRequest) {
     // First try to fetch transactions via the Offer relation
     try {
       // Fetch all transactions for this provider's offers
+      // Exclude PENDING transactions (unpaid orders) - only show after payment is captured
       const transactions = await prisma.transaction.findMany({
         where: {
           offer: {
             providerId: provider.id
+          },
+          status: {
+            not: 'PENDING' // Don't show unpaid orders to providers
           }
         },
         include: {
