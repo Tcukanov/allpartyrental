@@ -1,4 +1,5 @@
 'use client';
+// Version: 2024-11-09 - Authorization-first payment flow
 
 import React, {useState, useEffect, use, useRef} from 'react'
 import {
