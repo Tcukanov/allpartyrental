@@ -58,7 +58,7 @@ This document explains how offer statuses work in the payment flow and why they'
 
 ---
 
-## Complete Payment & Booking Flow
+## Complete Payment & Booking Flow (AUTHORIZATION → CAPTURE)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -67,17 +67,19 @@ This document explains how offer statuses work in the payment flow and why they'
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. User Clicks PayPal/Card Button                            │
+│ 2. User Clicks PayPal/Card Button (createOrder)              │
 │    - Offer created with status: PAYMENT_PENDING              │
 │    - Transaction created with status: PENDING                │
-│    - ❌ NOT visible to provider                              │
+│    - PayPal Order created (intent: CAPTURE)                  │
+│    - ❌ NOT visible to provider yet                          │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                     ┌─────┴──────┐
                     │            │
         ┌───────────▼─┐    ┌─────▼──────────┐
-        │  Payment    │    │  Payment       │
-        │  Succeeds   │    │  Fails/Cancel  │
+        │  User       │    │  User          │
+        │  Approves   │    │  Cancels       │
+        │  in PayPal  │    │                │
         └───────────┬─┘    └─────┬──────────┘
                     │            │
                     │            ▼
@@ -89,25 +91,31 @@ This document explains how offer statuses work in the payment flow and why they'
                     │
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. Payment Captured Successfully                             │
+│ 3. Payment AUTHORIZED (onApprove → /api/payments/authorize) │
 │    - Offer status: PAYMENT_PENDING → PENDING                 │
-│    - Transaction status: PENDING → COMPLETED                 │
-│    - ✅ NOW visible to provider                              │
+│    - Transaction status: PENDING (no change)                 │
+│    - Payment held but NOT captured yet                       │
+│    - ✅ NOW visible to provider for review                   │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                     ┌─────┴──────┐
                     │            │
         ┌───────────▼─┐    ┌─────▼──────────┐
         │  Provider   │    │  Provider      │
-        │  Accepts    │    │  Rejects       │
+        │  Approves   │    │  Rejects       │
         └───────────┬─┘    └─────┬──────────┘
                     │            │
                     ▼            ▼
         ┌────────────────┐  ┌────────────────┐
-        │ Offer:         │  │ Offer:         │
-        │ APPROVED       │  │ REJECTED       │
+        │ CAPTURE        │  │ CANCEL         │
+        │ Payment        │  │ Authorization  │
+        │                │  │                │
+        │ Transaction:   │  │ Transaction:   │
+        │ COMPLETED      │  │ DECLINED       │
         │                │  │                │
         │ ✅ Confirmed   │  │ ❌ Declined    │
+        │ ✅ Money       │  │ ✅ Funds       │
+        │    captured    │  │    released    │
         └────────────────┘  └────────────────┘
 ```
 

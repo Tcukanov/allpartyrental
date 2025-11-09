@@ -395,29 +395,35 @@ export default function PaymentPage({ params }) {
       },
       onApprove: async (data) => {
         try {
-          console.log('Payment approved:', data.orderID);
+          console.log('Payment approved (authorization):', data.orderID);
 
-          const response = await fetch('/api/payments/capture', {
+          // IMPORTANT: We only AUTHORIZE here, not capture
+          // Payment will be captured when provider approves the booking
+          const response = await fetch('/api/payments/authorize', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              orderId: data.orderID
+              orderID: data.orderID,
+              serviceId: bookingData.serviceId,
+              bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
+              hours: bookingData.bookingDetails.duration || 4,
+              addons: []
             }),
           });
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-            console.error('Capture failed:', response.status, errorData);
-            throw new Error(errorData.error || `Payment capture failed: ${response.status}`);
+            console.error('Authorization failed:', response.status, errorData);
+            throw new Error(errorData.error || `Payment authorization failed: ${response.status}`);
           }
 
           const result = await response.json();
-          console.log('Payment captured:', result);
+          console.log('Payment authorized:', result);
 
           if (!result.success) {
-            throw new Error(result.error || 'Payment capture failed');
+            throw new Error(result.error || 'Payment authorization failed');
           }
 
           // Clear booking data from sessionStorage
@@ -562,29 +568,35 @@ export default function PaymentPage({ params }) {
 
       onApprove: async (data) => {
         try {
-          console.log('Card payment approved:', data.orderID);
+          console.log('Card payment approved (authorization):', data.orderID);
 
-          const response = await fetch('/api/payments/capture', {
+          // IMPORTANT: We only AUTHORIZE here, not capture
+          // Payment will be captured when provider approves the booking
+          const response = await fetch('/api/payments/authorize', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              orderId: data.orderID
+              orderID: data.orderID,
+              serviceId: bookingData.serviceId,
+              bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
+              hours: bookingData.bookingDetails.duration || 4,
+              addons: []
             }),
           });
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-            console.error('Capture failed:', response.status, errorData);
-            throw new Error(errorData.error || `Payment capture failed: ${response.status}`);
+            console.error('Authorization failed:', response.status, errorData);
+            throw new Error(errorData.error || `Payment authorization failed: ${response.status}`);
           }
 
           const result = await response.json();
-          console.log('Card payment captured:', result);
+          console.log('Card payment authorized:', result);
 
           if (!result.success) {
-            throw new Error(result.error || 'Payment capture failed');
+            throw new Error(result.error || 'Payment authorization failed');
           }
 
           // Clear booking data from sessionStorage

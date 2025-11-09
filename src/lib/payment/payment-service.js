@@ -459,16 +459,8 @@ export class PaymentService {
         }
       });
 
-      // Update offer status from PAYMENT_PENDING to PENDING (now visible to provider)
-      if (transaction.offer.status === 'PAYMENT_PENDING') {
-        console.log('✅ Payment captured! Changing offer status from PAYMENT_PENDING to PENDING');
-        await this.prisma.offer.update({
-          where: { id: transaction.offer.id },
-          data: {
-            status: 'PENDING'  // Now visible to provider for acceptance
-          }
-        });
-      }
+      // Note: Offer status should already be PENDING at this point (changed in saveAuthorization)
+      // Capture is only called when provider approves, so no need to update offer status here
 
       // Extract payment details for thank you page
       const capture = captureResult.purchase_units?.[0]?.payments?.captures?.[0];
@@ -572,6 +564,17 @@ export class PaymentService {
       price: offer.price,
       status: offer.status
     });
+
+    // Update offer status from PAYMENT_PENDING to PENDING (payment authorized, awaiting provider approval)
+    if (offer.status === 'PAYMENT_PENDING') {
+      console.log('✅ Payment authorized! Changing offer status from PAYMENT_PENDING to PENDING');
+      await this.prisma.offer.update({
+        where: { id: offer.id },
+        data: {
+          status: 'PENDING'  // Now visible to provider for acceptance
+        }
+      });
+    }
 
     console.log('💾 Creating transaction record...');
     const transaction = await this.prisma.transaction.create({
