@@ -905,25 +905,63 @@ export default function PaymentPage({ params }) {
 
       onApprove: async (data) => {
         try {
+          console.log('Card payment approved (authorization):', data.orderID);
 
-          const { orderID } = data;
+          // IMPORTANT: We only AUTHORIZE here, not capture
+          // Payment will be captured when provider approves the booking
+          const response = await fetch('/api/payments/authorize', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              orderID: data.orderID,
+              serviceId: bookingData.serviceId,
+              bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
+              hours: bookingData.bookingDetails.duration || 4,
+              addons: []
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Authorization failed:', response.status, errorData);
+            throw new Error(errorData.error || `Payment authorization failed: ${response.status}`);
+          }
+
+          const result = await response.json();
+          console.log('Card payment authorized:', result);
+
+          if (!result.success) {
+            throw new Error(result.error || 'Payment authorization failed');
+          }
+
+          // Clear booking data from sessionStorage
           orderId = '';
           sessionStorage.removeItem('pendingBooking');
+
           // Show success message
           toast({
-            title: 'Booking Created Successfully! 🎉',
+            title: 'Payment Successful!',
             description: 'Your booking has been submitted to the provider for confirmation.',
             status: 'success',
             duration: 5000,
             isClosable: true,
           });
 
-          // Redirect to confirmation page with the real transaction ID
-          router.push(`/book/${serviceId}/confirmed?orderId=${orderID}&transactionId=${transactionId}`);
+          // Redirect to confirmation page
+          router.push(`/book/${serviceId}/confirmed?orderId=${data.orderID}`);
+
         } catch (err) {
-          console.error('Payment failed', err);
-          const userMsg = extractPayPalErrorMessage(err, 'Payment failed');
-          toast({ title: 'Payment failed', description: userMsg, status: 'error' });
+          console.error('Card payment authorization error:', err);
+          const userMsg = extractPayPalErrorMessage(err, 'Payment authorization failed');
+          toast({ 
+            title: 'Payment Processing Failed', 
+            description: userMsg, 
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
         } finally {
           orderId = '';
           setIsProcessingPayment(false);
