@@ -92,39 +92,9 @@ export class PaymentService {
     try {
       const { serviceId, userId, bookingDate, hours, paymentMethod = '', addons = [] } = bookingData;
 
-
-      // Check if offer already exists
-      // PAYMENT_PENDING = payment not captured yet
-      // PENDING = payment captured, awaiting provider acceptance
-      const existedOffer = await this.prisma.offer.findFirst({
-        where: {
-          serviceId,
-          clientId: userId,
-          status: {
-            in: ['PAYMENT_PENDING', 'PENDING']
-          }
-        },
-        include: {
-          transaction: {
-            select: {
-              id: true,
-              status: true
-            }
-          }
-        }
-      });
-
-      // Only block if there's a completed/successful transaction
-      // Allow retry if transaction is PENDING (payment failed or cancelled)
-      if(existedOffer && existedOffer.transaction?.status === 'COMPLETED') {
-        console.log('⚠️ Offer already exists with completed payment');
-        throw new Error('You have already booked this service. Please check your bookings.');
-      }
-      
-      // If offer exists with PENDING transaction, we'll reuse it (handled below)
-      if(existedOffer && existedOffer.transaction?.status === 'PENDING') {
-        console.log('♻️ Offer exists with pending payment - allowing retry');
-      }
+      // NOTE: No duplicate booking check here!
+      // Offers are created in saveAuthorization(), not here
+      // Duplicate check happens in saveAuthorization()
 
       console.log('🔍 Fetching service with provider information...');
       // Get service with provider information
@@ -262,60 +232,10 @@ export class PaymentService {
         linksCount: order.links?.length || 0
       });
 
-      console.log('🎯 Getting or creating offer...');
-      // Create database transaction record
-      const offer = await this.getOrCreateOffer(serviceId, userId, bookingData);
-
-      console.log('✅ Offer created/found:', {
-        offerId: offer.id,
-        price: offer.price,
-        status: offer.status
-      });
-
-      // Check if there's already a pending transaction for this offer
-      console.log('🔍 Checking for existing pending transactions...');
-      const existingTransaction = await this.prisma.transaction.findFirst({
-        where: {
-          offerId: offer.id,
-          status: 'PENDING'
-        }
-      });
-
-      let transaction;
-      if (existingTransaction) {
-        console.log('♻️ Found existing pending transaction, updating with new PayPal order...');
-        transaction = await this.prisma.transaction.update({
-          where: { id: existingTransaction.id },
-          data: {
-            paypalOrderId: order.id,
-            paypalStatus: order.status,
-            amount: total,
-            clientFeePercent: platformFeePercent,
-            providerFeePercent: 100 - platformFeePercent
-          }
-        });
-      } else {
-        console.log('💾 Creating new transaction record...');
-        transaction = await this.prisma.transaction.create({
-          data: {
-            offerId: offer.id,
-            amount: total,
-            status: 'PENDING',
-            paypalOrderId: order.id,
-            paypalStatus: order.status,
-            clientFeePercent: platformFeePercent,
-            providerFeePercent: 100 - platformFeePercent, // Provider gets the rest
-            termsAccepted: false
-          }
-        });
-      }
-
-      console.log('✅ Transaction created:', {
-        transactionId: transaction.id,
-        amount: transaction.amount,
-        status: transaction.status,
-        paypalOrderId: transaction.paypalOrderId
-      });
+      // IMPORTANT: We do NOT create offer/transaction here!
+      // Offer and transaction are ONLY created in saveAuthorization()
+      // when user actually approves payment in PayPal.
+      // This prevents "ghost bookings" when user cancels payment.
 
       const approvalUrl = order.links.find(link => link.rel === 'approve')?.href;
       console.log('🔗 Approval URL found:', !!approvalUrl);
@@ -323,7 +243,7 @@ export class PaymentService {
       const result = {
         success: true,
         orderId: order.id,
-        transactionId: transaction.id,
+        transactionId: null, // Transaction created in saveAuthorization, not here
         approvalUrl: approvalUrl,
         total: total,
         currency: 'USD'
@@ -532,6 +452,28 @@ export class PaymentService {
 
     const { serviceId, userId, bookingDate, hours, addons = [] } = bookingData;
 
+    // Check for duplicate booking (already paid)
+    const existingOffer = await this.prisma.offer.findFirst({
+      where: {
+        serviceId,
+        clientId: userId,
+        status: { in: ['PENDING', 'APPROVED'] }
+      },
+      include: {
+        transaction: {
+          select: {
+            id: true,
+            status: true
+          }
+        }
+      }
+    });
+
+    if (existingOffer && existingOffer.transaction?.status === 'COMPLETED') {
+      console.log('⚠️ Duplicate booking attempt - payment already completed');
+      throw new Error('You have already booked this service. Please check your bookings.');
+    }
+
     const service = await this.prisma.service.findUnique({
       where: { id: serviceId },
       include: {
@@ -565,17 +507,7 @@ export class PaymentService {
       status: offer.status
     });
 
-    // Update offer status from PAYMENT_PENDING to PENDING (payment authorized, awaiting provider approval)
-    if (offer.status === 'PAYMENT_PENDING') {
-      console.log('✅ Payment authorized! Changing offer status from PAYMENT_PENDING to PENDING');
-      await this.prisma.offer.update({
-        where: { id: offer.id },
-        data: {
-          status: 'PENDING'  // Now visible to provider for acceptance
-        }
-      });
-    }
-
+    // Offer is already PENDING and visible to provider
     console.log('💾 Creating transaction record...');
     const transaction = await this.prisma.transaction.create({
       data: {
@@ -702,7 +634,6 @@ export class PaymentService {
       });
 
       // Create new offer with required partyServiceId
-      // Status is PAYMENT_PENDING until payment is captured
       offer = await this.prisma.offer.create({
         data: {
           providerId: service.providerId,
@@ -711,7 +642,7 @@ export class PaymentService {
           partyServiceId: partyService.id,
           price: service.price * hours,
           description: `Booking for ${hours} hours on ${new Date(bookingDate).toLocaleDateString()}`,
-          status: 'PAYMENT_PENDING'  // Hidden from provider until payment captured
+          status: 'PENDING'  // Visible to provider after authorization
         }
       });
     }

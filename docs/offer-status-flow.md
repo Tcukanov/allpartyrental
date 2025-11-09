@@ -14,17 +14,13 @@ This document explains how offer statuses work in the payment flow and why they'
 
 ## Offer Status Definitions
 
-### `PAYMENT_PENDING`
-- **When**: Offer created when user clicks PayPal button, before payment is captured
-- **Visible to Provider**: ❌ **NO** - Hidden from all provider views
-- **Visible to Client**: ✅ Yes - Shows as "Processing Payment"
-- **Purpose**: Tracks the booking attempt while payment is being processed
-- **Transitions to**: 
-  - `PENDING` (after successful payment capture)
-  - Stays `PAYMENT_PENDING` indefinitely if payment fails/cancelled
+### `PAYMENT_PENDING` (Legacy - No longer used)
+- **When**: Previously used for offers before payment authorization
+- **Status**: Deprecated - new offers use `PENDING` directly
+- **Note**: May still exist in database for old transactions
 
 ### `PENDING`
-- **When**: After payment is successfully captured, awaiting provider acceptance
+- **When**: Offer created when user authorizes payment (approves in PayPal)
 - **Visible to Provider**: ✅ **YES** - Shows in "Requests" tab
 - **Visible to Client**: ✅ Yes - Shows as "Pending Provider Approval"
 - **Purpose**: Indicates a paid booking request that needs provider review
@@ -68,10 +64,8 @@ This document explains how offer statuses work in the payment flow and why they'
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. User Clicks PayPal/Card Button (createOrder)              │
-│    - Offer created with status: PAYMENT_PENDING              │
-│    - Transaction created with status: PENDING                │
 │    - PayPal Order created (intent: CAPTURE)                  │
-│    - ❌ NOT visible to provider yet                          │
+│    - Offer NOT created yet                                   │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                     ┌─────┴──────┐
@@ -84,18 +78,17 @@ This document explains how offer statuses work in the payment flow and why they'
                     │            │
                     │            ▼
                     │      ┌─────────────────────────┐
-                    │      │ Offer: PAYMENT_PENDING  │
-                    │      │ Transaction: PENDING    │
-                    │      │ ❌ Hidden from provider │
+                    │      │ No offer created        │
+                    │      │ ❌ Nothing to show      │
                     │      └─────────────────────────┘
                     │
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 3. Payment AUTHORIZED (onApprove → /api/payments/authorize) │
-│    - Offer status: PAYMENT_PENDING → PENDING                 │
-│    - Transaction status: PENDING (no change)                 │
+│    - Offer created with status: PENDING                      │
+│    - Transaction created with status: PENDING                │
 │    - Payment held but NOT captured yet                       │
-│    - ✅ NOW visible to provider for review                   │
+│    - ✅ Visible to provider for review                       │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                     ┌─────┴──────┐
