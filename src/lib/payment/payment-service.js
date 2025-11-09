@@ -93,17 +93,33 @@ export class PaymentService {
       const { serviceId, userId, bookingDate, hours, paymentMethod = '', addons = [] } = bookingData;
 
 
+      // Check if offer already exists with a COMPLETED transaction (already paid)
       const existedOffer = await this.prisma.offer.findFirst({
         where: {
           serviceId,
           clientId: userId,
           status: 'PENDING'
+        },
+        include: {
+          transaction: {
+            select: {
+              id: true,
+              status: true
+            }
+          }
         }
       });
 
-      if(existedOffer) {
-        console.log('�� Offer already exists for this service and user');
-        throw new Error('Offer already exists');
+      // Only block if there's a completed/successful transaction
+      // Allow retry if transaction is PENDING (payment failed or cancelled)
+      if(existedOffer && existedOffer.transaction?.status === 'COMPLETED') {
+        console.log('⚠️ Offer already exists with completed payment');
+        throw new Error('You have already booked this service. Please check your bookings.');
+      }
+      
+      // If offer exists with PENDING transaction, we'll reuse it (handled below)
+      if(existedOffer && existedOffer.transaction?.status === 'PENDING') {
+        console.log('♻️ Offer exists with pending payment - allowing retry');
       }
 
       console.log('🔍 Fetching service with provider information...');
