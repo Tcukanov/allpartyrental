@@ -93,12 +93,16 @@ export class PaymentService {
       const { serviceId, userId, bookingDate, hours, paymentMethod = '', addons = [] } = bookingData;
 
 
-      // Check if offer already exists with a COMPLETED transaction (already paid)
+      // Check if offer already exists
+      // PAYMENT_PENDING = payment not captured yet
+      // PENDING = payment captured, awaiting provider acceptance
       const existedOffer = await this.prisma.offer.findFirst({
         where: {
           serviceId,
           clientId: userId,
-          status: 'PENDING'
+          status: {
+            in: ['PAYMENT_PENDING', 'PENDING']
+          }
         },
         include: {
           transaction: {
@@ -455,6 +459,17 @@ export class PaymentService {
         }
       });
 
+      // Update offer status from PAYMENT_PENDING to PENDING (now visible to provider)
+      if (transaction.offer.status === 'PAYMENT_PENDING') {
+        console.log('✅ Payment captured! Changing offer status from PAYMENT_PENDING to PENDING');
+        await this.prisma.offer.update({
+          where: { id: transaction.offer.id },
+          data: {
+            status: 'PENDING'  // Now visible to provider for acceptance
+          }
+        });
+      }
+
       // Extract payment details for thank you page
       const capture = captureResult.purchase_units?.[0]?.payments?.captures?.[0];
       const paymentSource = this.getPaymentSource(captureResult);
@@ -684,6 +699,7 @@ export class PaymentService {
       });
 
       // Create new offer with required partyServiceId
+      // Status is PAYMENT_PENDING until payment is captured
       offer = await this.prisma.offer.create({
         data: {
           providerId: service.providerId,
@@ -692,7 +708,7 @@ export class PaymentService {
           partyServiceId: partyService.id,
           price: service.price * hours,
           description: `Booking for ${hours} hours on ${new Date(bookingDate).toLocaleDateString()}`,
-          status: 'PENDING'
+          status: 'PAYMENT_PENDING'  // Hidden from provider until payment captured
         }
       });
     }

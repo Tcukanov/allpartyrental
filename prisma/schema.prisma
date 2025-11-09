@@ -405,7 +405,8 @@ enum PartyStatus {
 }
 
 enum OfferStatus {
-  PENDING
+  PAYMENT_PENDING  // Offer created but payment not captured yet - hidden from provider
+  PENDING          // Payment captured, awaiting provider acceptance
   APPROVED
   REJECTED
   CANCELLED

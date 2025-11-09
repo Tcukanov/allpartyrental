@@ -58,6 +58,11 @@ export const transactionStatusConfig = {
 
 // Offer status configuration
 export const offerStatusConfig = {
+  PAYMENT_PENDING: {
+    color: 'gray',
+    label: 'Payment Processing',
+    requiresAction: false
+  },
   PENDING: { 
     color: 'yellow', 
     label: 'Pending',
