@@ -65,14 +65,27 @@ export async function GET(request: NextRequest) {
 
     // Build the where clause for offers - use the Provider ID, not User ID
     const where: any = {
-      providerId: user.provider.id  // Use provider.id instead of user.id
+      providerId: user.provider.id,  // Use provider.id instead of user.id
+      // Only show offers where payment was completed OR no transaction exists yet (legacy data)
+      OR: [
+        {
+          transaction: {
+            status: {
+              not: 'PENDING' // Exclude unpaid orders
+            }
+          }
+        },
+        {
+          transaction: null // Include offers without transactions (legacy or pre-payment)
+        }
+      ]
     };
 
     if (status) {
       where.status = status;
     }
 
-    console.log(`Looking for offers with provider ID: ${user.provider.id} (user ID: ${user.id})`);
+    console.log(`Looking for offers with provider ID: ${user.provider.id} (user ID: ${user.id}) - excluding unpaid orders`);
     
     // Get offers with related data
     const offers = await prisma.offer.findMany({
