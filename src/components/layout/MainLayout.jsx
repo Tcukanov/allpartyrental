@@ -429,7 +429,7 @@ export default function MainLayout({ children }) {
               <Box>
                 <Text fontWeight="bold" fontSize="lg" mb={4}>For Providers</Text>
                 <VStack align="flex-start" spacing={2}>
-                  <Link href="/provider/join">Join as Provider</Link>
+                  <Link href="/auth/provider-signup">Join as Provider</Link>
                   <Link href="/provider/how-it-works">How It Works</Link>
                   <Link href="/provider/advertising">Advertise</Link>
                 </VStack>

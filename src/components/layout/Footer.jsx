@@ -19,7 +19,7 @@ export default function Footer() {
     {
       title: 'For Providers',
       links: [
-        { label: 'Join as Provider', href: '/auth/register?role=provider' },
+        { label: 'Join as Provider', href: '/auth/provider-signup' },
         { label: 'List Your Services', href: '/provider/services/new' },
         { label: 'Advertising Options', href: '/provider/advertising' },
         { label: 'Provider Guidelines', href: '/provider-guidelines' }
