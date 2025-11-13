@@ -92,6 +92,12 @@ export default function PaymentPage({ params }) {
       if (storedBooking) {
         const parsed = JSON.parse(storedBooking);
         if (parsed.serviceId === serviceId) {
+          // Ensure pricing values are numbers
+          if (parsed.pricing) {
+            parsed.pricing.basePrice = parseFloat(parsed.pricing.basePrice) || 0;
+            parsed.pricing.serviceFee = parseFloat(parsed.pricing.serviceFee) || 0;
+            parsed.pricing.total = parseFloat(parsed.pricing.total) || 0;
+          }
           setBookingData(parsed);
         } else {
           throw new Error('Booking data mismatch');
