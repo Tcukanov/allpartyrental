@@ -653,6 +653,19 @@ export class PaymentService {
           status: 'PENDING'  // Visible to provider after authorization
         }
       });
+
+      // Create chat for communication between client and provider
+      try {
+        await this.prisma.chat.create({
+          data: {
+            offerId: offer.id
+          }
+        });
+        console.log('✅ Chat created for offer:', offer.id);
+      } catch (chatError) {
+        console.error('⚠️ Failed to create chat:', chatError);
+        // Don't fail the whole flow if chat creation fails
+      }
     }
 
     return offer;
