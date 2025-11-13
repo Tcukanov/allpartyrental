@@ -196,7 +196,6 @@ export async function GET(request) {
     }, 0);
 
     // Calculate this month's earnings
-    const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const thisMonthEarnings = completedTransactions
       .filter(tx => new Date(tx.createdAt) >= startOfMonth)
