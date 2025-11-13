@@ -121,38 +121,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the filter using raw query
-    const filterId = await prisma.$queryRaw`
-      INSERT INTO "CategoryFilter" (
-        id, 
-        "categoryId", 
-        name, 
-        type, 
-        options, 
-        "isRequired", 
-        "iconUrl", 
-        "createdAt", 
-        "updatedAt"
-      )
-      VALUES (
-        gen_random_uuid(), 
-        ${categoryId}, 
-        ${name}, 
-        ${type}, 
-        ${JSON.stringify(sanitizedOptions)}::jsonb, 
-        ${isRequired}, 
-        ${iconUrl}, 
-        NOW(), 
-        NOW()
-      )
-      RETURNING id
-    `;
-    
-    // Fetch the created filter
-    const filter = await prisma.$queryRaw`
-      SELECT * FROM "CategoryFilter" 
-      WHERE id = ${Array.isArray(filterId) && filterId.length > 0 ? filterId[0].id : null}
-    `;
+    // Create the filter using Prisma ORM instead of raw query
+    const filter = await prisma.categoryFilter.create({
+      data: {
+        categoryId,
+        name,
+        type,
+        options: sanitizedOptions,
+        isRequired,
+        iconUrl
+      }
+    });
 
     return NextResponse.json({ success: true, data: filter }, { status: 201 });
   } catch (error: any) {
