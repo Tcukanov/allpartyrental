@@ -1659,6 +1659,19 @@ export default function PaymentPage({ params }) {
                     <Text>${bookingData.pricing.total.toFixed(2)}</Text>
                   </HStack>
 
+                  <Box bg="blue.50" p={3} borderRadius="md" borderWidth="1px" borderColor="blue.200">
+                    <VStack spacing={2} align="stretch">
+                      <HStack justify="space-between">
+                        <Text fontSize="sm" fontWeight="semibold">Due today</Text>
+                        <Text fontSize="sm" fontWeight="bold" color="green.600">$0.00</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text fontSize="sm">Due after provider approval</Text>
+                        <Text fontSize="sm" fontWeight="bold">${bookingData.pricing.total.toFixed(2)}</Text>
+                      </HStack>
+                    </VStack>
+                  </Box>
+
                   <Alert status="info" size="sm">
                     <AlertIcon />
                     <Text fontSize="xs">
