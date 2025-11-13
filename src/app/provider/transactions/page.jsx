@@ -202,8 +202,9 @@ export default function ProviderTransactionsPage() {
             flexShrink={0}
           >
             <Image
-              src={transaction.service?.imageUrl || '/images/placeholder-service.jpg'}
+              src={transaction.service?.photos?.[0] || '/images/placeholder-service.jpg'}
               alt={transaction.service?.name || 'Service'}
+              fallbackSrc="/images/placeholder-service.jpg"
               borderRadius="md"
               objectFit="cover"
               width="100%"
