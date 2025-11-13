@@ -1662,7 +1662,7 @@ export default function PaymentPage({ params }) {
                   <Alert status="info" size="sm">
                     <AlertIcon />
                     <Text fontSize="xs">
-                      You'll be charged immediately. The provider will then confirm your booking.
+                      Your payment will be authorized (held) but not charged yet. You'll only be charged after the provider confirms your booking.
                     </Text>
                   </Alert>
                 </VStack>
