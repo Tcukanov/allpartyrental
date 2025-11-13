@@ -50,6 +50,7 @@ import {
   FiAlertCircle,
   FiFileText,
   FiMap,
+  FiUserCheck,
 } from 'react-icons/fi';
 import { MdDashboard } from 'react-icons/md';
 import NotificationComponent from '@/components/notification/notificationComponent';
@@ -64,6 +65,11 @@ export const AdminNavbarItems = [
     label: 'Users',
     href: '/admin/users',
     icon: FiUsers,
+  },
+  {
+    label: 'Provider Applications',
+    href: '/admin/providers',
+    icon: FiUserCheck,
   },
   {
     label: 'Services',
