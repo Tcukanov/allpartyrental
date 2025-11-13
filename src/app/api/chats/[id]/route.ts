@@ -27,7 +27,7 @@ export async function GET(
         offer: {
           OR: [
             { clientId: session.user.id },
-            { providerId: session.user.id }
+            { provider: { userId: session.user.id } }
           ]
         }
       },
