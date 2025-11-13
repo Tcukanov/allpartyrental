@@ -21,7 +21,9 @@ import {
   Icon,
   List,
   ListItem,
-  ListIcon
+  ListIcon,
+  Divider,
+  Image
 } from '@chakra-ui/react';
 import { CheckCircleIcon, CalendarIcon, PhoneIcon, EmailIcon } from '@chakra-ui/icons';
 import { useRouter, useSearchParams } from 'next/navigation';
