@@ -241,6 +241,7 @@ export async function POST(request: Request) {
         ...serviceData,
         metadata, // Store filterValues in metadata as JSON
         providerId: provider.id,  // Use Provider ID, not User ID
+        status: 'PENDING_APPROVAL', // Require admin approval before service is visible
         ...addonData // Include addons if any
       },
       include: {
@@ -260,6 +261,47 @@ export async function POST(request: Request) {
     });
 
     console.log(`Successfully created service: ${service.id} for provider: ${provider.id}`);
+
+    // Create a notification for the provider
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: session.user.id as string,
+          type: 'SYSTEM',
+          title: 'Service Pending Review',
+          content: `Your service "${service.name}" has been submitted and is pending admin approval.`,
+        },
+      });
+
+      // Find admins to notify them about the new service
+      const admins = await prisma.user.findMany({
+        where: {
+          role: 'ADMIN',
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      // Create notifications for all admins
+      if (admins.length > 0) {
+        await Promise.all(
+          admins.map((admin) =>
+            prisma.notification.create({
+              data: {
+                userId: admin.id,
+                type: 'SYSTEM',
+                title: 'New Service Requires Approval',
+                content: `Provider ${session.user.name} has submitted a new service "${service.name}" that requires approval.`,
+              },
+            })
+          )
+        );
+      }
+    } catch (notificationError) {
+      console.error('Failed to create notifications:', notificationError);
+      // Don't fail the service creation if notifications fail
+    }
 
     return NextResponse.json({ success: true, data: service });
   } catch (error) {
