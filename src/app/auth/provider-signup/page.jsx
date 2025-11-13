@@ -273,8 +273,8 @@ export default function ProviderSignUpPage() {
                     </GridItem>
                     
                     <GridItem colSpan={{ base: 1, md: 2 }}>
-                      <FormControl id="serviceLocations" isRequired>
-                        <FormLabel>Service Locations</FormLabel>
+                      <FormControl id="serviceLocations">
+                        <FormLabel>Service Locations <Text as="span" color="red.500">*</Text></FormLabel>
                         
                         {/* Selected locations display */}
                         {serviceLocations.length > 0 && (

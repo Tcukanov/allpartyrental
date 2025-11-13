@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
-import bcrypt from 'bcryptjs';
+import { hash } from 'bcrypt';
+import { sendMail, generateProviderApplicationEmailHtml } from '@/lib/mail/send-mail';
 
 export async function POST(request: Request) {
   try {
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await hash(password, 10);
 
     // Create user with PROVIDER role but not verified yet
     const user = await prisma.user.create({
@@ -99,6 +100,18 @@ export async function POST(request: Request) {
           })
         )
       );
+    }
+
+    // Send confirmation email to provider
+    const emailHtml = generateProviderApplicationEmailHtml(companyName, contactPerson);
+    const emailSent = await sendMail({
+      to: email,
+      subject: 'Thank You for Your Provider Application',
+      html: emailHtml
+    });
+
+    if (!emailSent) {
+      console.error(`Failed to send provider application confirmation email to ${email}`);
     }
 
     return NextResponse.json({

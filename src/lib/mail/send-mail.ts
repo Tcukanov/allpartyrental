@@ -263,4 +263,48 @@ export function generatePasswordResetEmailHtml(username: string, resetLink: stri
       </div>
     </div>
   `;
+}
+
+/**
+ * Generate provider application submitted email HTML content
+ */
+export function generateProviderApplicationEmailHtml(companyName: string, contactPerson: string): string {
+  const appName = process.env.APP_NAME || 'Party Vendors';
+  const primaryColor = '#ED8936'; // Peach color - brand primary
+  const accentColor = '#FEEBC8'; // Light peach background - brand accent
+  
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+      <div style="background-color: ${primaryColor}; padding: 20px; text-align: center; color: white;">
+        <h1 style="margin: 0; font-size: 24px;">${appName}</h1>
+      </div>
+      <div style="padding: 30px; border: 1px solid #e2e8f0; border-top: none; background-color: #ffffff;">
+        <h2 style="color: #2D3748; margin-top: 0;">Thank You for Your Application!</h2>
+        <p style="color: #4A5568;">Hello ${contactPerson},</p>
+        <p style="color: #4A5568;">Thank you for applying to become a service provider with ${appName}. We have received your application for <strong>${companyName}</strong>.</p>
+        
+        <div style="background-color: ${accentColor}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #2D3748; margin-top: 0; font-size: 18px;">What Happens Next?</h3>
+          <ul style="color: #4A5568; padding-left: 20px; margin: 10px 0;">
+            <li style="margin-bottom: 10px;">Our team will carefully review your application and company information.</li>
+            <li style="margin-bottom: 10px;">We typically complete the review process within 2-3 business days.</li>
+            <li style="margin-bottom: 10px;">You will receive an email notification once your application has been approved.</li>
+            <li style="margin-bottom: 10px;">After approval, you'll be able to access your provider dashboard and start listing your services.</li>
+          </ul>
+        </div>
+        
+        <p style="color: #4A5568;">We appreciate your patience and look forward to having you as part of our platform!</p>
+        
+        <p style="color: #718096; font-size: 14px; margin-top: 20px;">If you have any questions in the meantime, please don't hesitate to contact our support team.</p>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+          <p style="color: #4A5568; margin-bottom: 5px;">Best regards,</p>
+          <p style="color: #4A5568; font-weight: bold; margin-top: 0;">The ${appName} Team</p>
+        </div>
+      </div>
+      <div style="text-align: center; padding: 15px; background-color: #f7fafc; color: #718096; font-size: 12px;">
+        <p style="margin: 0;">&copy; ${new Date().getFullYear()} ${appName}. All rights reserved.</p>
+      </div>
+    </div>
+  `;
 } 
