@@ -26,7 +26,7 @@ export async function GET(
         id: id,
         offer: {
           OR: [
-            { partyService: { party: { clientId: session.user.id } } },
+            { clientId: session.user.id },
             { providerId: session.user.id }
           ]
         }
@@ -110,7 +110,11 @@ export async function GET(
       clientId: chat.offer.clientId,
       providerId: chat.offer.providerId,
       client: chat.offer.client,
-      provider: chat.offer.provider,
+      provider: {
+        id: chat.offer.provider.user.id,
+        name: chat.offer.provider.user.name,
+        email: chat.offer.provider.user.email
+      },
       messages: chat.messages,
       createdAt: chat.createdAt,
       updatedAt: chat.updatedAt
