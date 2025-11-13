@@ -138,8 +138,8 @@ export class PaymentService {
       console.log('💰 Calculating pricing...');
       // Calculate pricing
       // Price is fixed, not multiplied by hours
-      const basePrice = service.price;
-      const addonTotal = addons.reduce((sum, addon) => sum + addon.price, 0);
+      const basePrice = parseFloat(service.price);
+      const addonTotal = addons.reduce((sum, addon) => sum + parseFloat(addon.price), 0);
       const subtotal = basePrice + addonTotal;
 
       // Platform fees (configurable)
@@ -489,8 +489,9 @@ export class PaymentService {
 
     console.log('💰 Calculating pricing...');
     // Calculate pricing
-    const basePrice = service.price * hours;
-    const addonTotal = addons.reduce((sum, addon) => sum + addon.price, 0);
+    // Price is fixed, not multiplied by hours
+    const basePrice = parseFloat(service.price);
+    const addonTotal = addons.reduce((sum, addon) => sum + parseFloat(addon.price), 0);
     const subtotal = basePrice + addonTotal;
 
     // Platform fees (configurable)
