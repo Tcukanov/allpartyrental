@@ -35,7 +35,15 @@ export async function POST(
         id: id
       },
       include: {
-        offer: true
+        offer: {
+          include: {
+            provider: {
+              select: {
+                userId: true
+              }
+            }
+          }
+        }
       }
     });
 
@@ -47,7 +55,10 @@ export async function POST(
     }
 
     // Check if user is authorized to send messages in this chat
-    if (chat.offer.clientId !== session.user.id && chat.offer.providerId !== session.user.id) {
+    const isClient = chat.offer.clientId === session.user.id;
+    const isProvider = chat.offer.provider.userId === session.user.id;
+    
+    if (!isClient && !isProvider) {
       return NextResponse.json(
         { success: false, error: { message: 'You are not a participant in this chat' } },
         { status: 403 }
@@ -57,8 +68,10 @@ export async function POST(
     // Determine the receiver ID based on the sender's role
     let actualReceiverId = receiverId;
     if (!receiverId) {
-      actualReceiverId = session.user.id === chat.offer.clientId
-        ? chat.offer.providerId
+      // If sender is client, receiver is provider's user
+      // If sender is provider, receiver is client
+      actualReceiverId = isClient
+        ? chat.offer.provider.userId
         : chat.offer.clientId;
     }
 
