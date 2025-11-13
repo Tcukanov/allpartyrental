@@ -48,29 +48,12 @@ export default function PopularServicesCarousel() {
   const cardBg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
-  // Number of items to show per view
-  const itemsPerView = { base: 1, md: 2, lg: 3 };
-  const [itemsToShow, setItemsToShow] = useState(3);
+  // Always show 3 items per row (fixed width)
+  const itemsPerRow = 3;
+  const cardWidth = 360; // Fixed width in pixels
 
   useEffect(() => {
     fetchPopularServices();
-  }, []);
-
-  // Handle responsive items per view
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setItemsToShow(1);
-      } else if (window.innerWidth < 1024) {
-        setItemsToShow(2);
-      } else {
-        setItemsToShow(3);
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const fetchPopularServices = async () => {
@@ -90,41 +73,39 @@ export default function PopularServicesCarousel() {
     }
   };
 
+  const maxSlides = Math.max(0, Math.ceil(services.length / itemsPerRow) - 1);
+
   const nextSlide = () => {
-    if (isAnimating || services.length <= itemsToShow) return;
+    if (isAnimating || services.length <= itemsPerRow) return;
     setIsAnimating(true);
-    setCurrentIndex((prev) => 
-      prev >= services.length - itemsToShow ? 0 : prev + 1
-    );
+    setCurrentIndex((prev) => (prev >= maxSlides ? 0 : prev + 1));
     setTimeout(() => setIsAnimating(false), 500);
   };
 
   const prevSlide = () => {
-    if (isAnimating || services.length <= itemsToShow) return;
+    if (isAnimating || services.length <= itemsPerRow) return;
     setIsAnimating(true);
-    setCurrentIndex((prev) => 
-      prev === 0 ? services.length - itemsToShow : prev - 1
-    );
+    setCurrentIndex((prev) => (prev === 0 ? maxSlides : prev - 1));
     setTimeout(() => setIsAnimating(false), 500);
   };
 
   // Auto-advance carousel
   useEffect(() => {
-    if (services.length <= itemsToShow) return;
+    if (services.length <= itemsPerRow) return;
     
     const interval = setInterval(() => {
       nextSlide();
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [currentIndex, services.length, itemsToShow, isAnimating]);
+  }, [currentIndex, services.length, isAnimating]);
 
   if (loading) {
     return (
-      <Flex gap={6} w="full" overflow="hidden">
+      <Flex gap={6} w="full" justify="center">
         {[1, 2, 3].map((i) => (
-          <Box key={i} flex="1" minW={{ base: '100%', md: '45%', lg: '30%' }}>
-            <Skeleton height="400px" borderRadius="lg" />
+          <Box key={i} w={`${cardWidth}px`}>
+            <Skeleton height="450px" borderRadius="lg" />
           </Box>
         ))}
       </Flex>
@@ -142,13 +123,13 @@ export default function PopularServicesCarousel() {
   return (
     <Box position="relative" w="full">
       {/* Navigation buttons */}
-      {services.length > itemsToShow && (
+      {services.length > itemsPerRow && (
         <>
           <IconButton
             aria-label="Previous"
             icon={<ChevronLeftIcon boxSize={8} />}
             position="absolute"
-            left={{ base: -2, md: -12 }}
+            left={{ base: -2, md: -16 }}
             top="50%"
             transform="translateY(-50%)"
             zIndex={2}
@@ -163,7 +144,7 @@ export default function PopularServicesCarousel() {
             aria-label="Next"
             icon={<ChevronRightIcon boxSize={8} />}
             position="absolute"
-            right={{ base: -2, md: -12 }}
+            right={{ base: -2, md: -16 }}
             top="50%"
             transform="translateY(-50%)"
             zIndex={2}
@@ -178,19 +159,16 @@ export default function PopularServicesCarousel() {
       )}
 
       {/* Carousel container */}
-      <Box overflow="hidden" w="full" px={{ base: 4, md: 0 }}>
+      <Box overflow="hidden" w="full" mx="auto" maxW={`${(cardWidth + 24) * itemsPerRow}px`}>
         <Flex
           gap={6}
           transition="transform 0.5s ease-in-out"
-          transform={`translateX(-${currentIndex * (100 / itemsToShow)}%)`}
+          transform={`translateX(-${currentIndex * ((cardWidth + 24) * itemsPerRow)}px)`}
         >
           {services.map((service) => (
             <Box
               key={service.id}
-              minW={{
-                base: '100%',
-                md: `calc(${100 / itemsToShow}% - ${(6 * (itemsToShow - 1)) / itemsToShow}px)`,
-              }}
+              w={`${cardWidth}px`}
               flex="0 0 auto"
             >
               <Card
@@ -283,9 +261,9 @@ export default function PopularServicesCarousel() {
       </Box>
 
       {/* Carousel indicators */}
-      {services.length > itemsToShow && (
+      {services.length > itemsPerRow && (
         <Flex justify="center" mt={8} gap={2}>
-          {Array.from({ length: Math.ceil(services.length - itemsToShow + 1) }).map((_, index) => (
+          {Array.from({ length: maxSlides + 1 }).map((_, index) => (
             <Box
               key={index}
               w={currentIndex === index ? '8' : '2'}

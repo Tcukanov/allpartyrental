@@ -12,10 +12,19 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '12');
 
-    // Fetch services ordered by viewCount
+    // Fetch only ACTIVE (approved) services from providers who:
+    // 1. Have ACTIVE service status (admin approved)
+    // 2. Are connected to PayPal (have merchantId)
+    // 3. Can receive payments (paypalCanReceivePayments = true)
     const services = await prisma.service.findMany({
       where: {
-        status: 'ACTIVE',
+        status: 'ACTIVE', // Only show approved, active listings
+        provider: {
+          paypalMerchantId: {
+            not: null, // Provider must be connected to PayPal
+          },
+          paypalCanReceivePayments: true, // Provider must be able to receive payments
+        },
       },
       include: {
         category: {
@@ -29,6 +38,8 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             businessName: true,
+            paypalMerchantId: true,
+            paypalCanReceivePayments: true,
             user: {
               select: {
                 id: true,

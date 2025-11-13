@@ -208,6 +208,26 @@ export default function HomeContent() {
                   >
                     <LocationServiceSearch />
                   </Box>
+                  
+                  {/* Trustpilot Badge */}
+                  <Box 
+                    mt={6}
+                    textAlign={{ base: "center", md: "left" }}
+                    w="full"
+                    maxW={{ base: "100%", md: "900px" }}
+                    mx="auto"
+                  >
+                    <Image
+                      src="/images/trustpilot.png"
+                      alt="Trustpilot Reviews"
+                      height={{ base: "100px", md: "125px" }}
+                      width="auto"
+                      mx={{ base: "auto", md: "0" }}
+                      opacity={0.95}
+                      transition="opacity 0.3s"
+                      _hover={{ opacity: 1 }}
+                    />
+                  </Box>
                 </VStack>
               </VStack>
             </Container>
