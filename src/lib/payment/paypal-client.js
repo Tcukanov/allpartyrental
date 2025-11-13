@@ -266,6 +266,7 @@ class PayPalClientFixed {
 
   /**
    * Capture payment
+   * CRITICAL: Must include BN Code (PayPal-Partner-Attribution-Id) for certification
    */
   async captureOrder(orderId) {
     const token = await this.getAccessToken();
@@ -275,6 +276,7 @@ class PayPalClientFixed {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'PayPal-Partner-Attribution-Id': 'NYCKIDSPARTYENT_SP_PPCP' // BN Code - REQUIRED
       },
       body: JSON.stringify({})
     });
@@ -335,12 +337,16 @@ class PayPalClientFixed {
             integration_method: "PAYPAL",
             integration_type: "THIRD_PARTY",
             third_party_details: {
-              features: ["PAYMENT", "REFUND"]
+              features: [
+                "PAYMENT",
+                "REFUND",
+                "ACCESS_MERCHANT_INFORMATION" // REQUIRED: Access to merchant status
+              ]
             }
           }
         }
       }],
-      products: ["EXPRESS_CHECKOUT"],
+      products: ["PPCP"], // CHANGED: From EXPRESS_CHECKOUT to PPCP (PayPal Commerce Platform)
       legal_consents: [{
         type: "SHARE_DATA_CONSENT",
         granted: true
@@ -365,11 +371,12 @@ class PayPalClientFixed {
     console.log('🌐 Using callback URLs:', baseUrl);
 
     // Add seller information if provided
-    if (sellerData.email) {
+    // NOTE: Email is REMOVED per PayPal certification requirements
+    if (sellerData.firstName && sellerData.lastName) {
       referralData.customer_data = {
         customer_type: "MERCHANT",
         person_details: {
-          email_address: sellerData.email,
+          // email_address: REMOVED per certification requirements
           name: {
             given_name: sellerData.firstName,
             surname: sellerData.lastName
@@ -435,10 +442,13 @@ class PayPalClientFixed {
       }
     });
 
+    // CRITICAL: Log PayPal-Debug-Id for certification
+    const debugId = response.headers.get('PayPal-Debug-Id');
     console.log('🔍 Merchant status response:', {
       status: response.status,
       statusText: response.statusText,
-      ok: response.ok
+      ok: response.ok,
+      debugId: debugId || 'N/A' // Debug ID for PayPal support
     });
 
     if (!response.ok) {
@@ -446,13 +456,14 @@ class PayPalClientFixed {
       console.error('❌ Merchant status check failed:', {
         status: response.status,
         statusText: response.statusText,
-        errorBody: errorText
+        errorBody: errorText,
+        debugId: debugId || 'N/A'
       });
-      throw new Error(`Failed to get merchant status: ${response.status} - ${errorText}`);
+      throw new Error(`Failed to get merchant status: ${response.status} - ${errorText} (Debug ID: ${debugId || 'N/A'})`);
     }
 
     const result = await response.json();
-    console.log('✅ Merchant status retrieved:', result);
+    console.log('✅ Merchant status retrieved (Debug ID: ' + (debugId || 'N/A') + '):', result);
     return result;
   }
 
@@ -469,14 +480,14 @@ class PayPalClientFixed {
       if (!status.primary_email_confirmed) {
         issues.push({
           type: 'EMAIL_NOT_CONFIRMED',
-          message: 'Please confirm your email address on https://www.paypal.com/businessprofile/settings in order to receive payments! You currently cannot receive payments.'
+          message: 'Attention: Please confirm your email address on https://www.paypal.com/businessprofile/settings in order to receive payments! You currently cannot receive payments.'
         });
       }
 
       if (!status.payments_receivable) {
         issues.push({
           type: 'CANNOT_RECEIVE_PAYMENTS',
-          message: 'You currently cannot receive payments due to restriction on your PayPal account. Please reach out to PayPal Customer Support or connect to https://www.paypal.com for more information.'
+          message: 'Attention: You currently cannot receive payments due to restriction on your PayPal account. Please reach out to PayPal Customer Support or connect to https://www.paypal.com for more information.'
         });
       }
 
