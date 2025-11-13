@@ -195,10 +195,12 @@ export async function GET(request) {
       return sum + providerAmount;
     }, 0);
 
-    // Calculate this month's earnings
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const thisMonthEarnings = completedTransactions
-      .filter(tx => new Date(tx.createdAt) >= startOfMonth)
+    // Calculate earnings for the selected timeframe (uses startDate and endDate from filter)
+    const periodEarnings = completedTransactions
+      .filter(tx => {
+        const txDate = new Date(tx.createdAt);
+        return txDate >= startDate && txDate <= endDate;
+      })
       .reduce((sum, tx) => {
         const amount = Number(tx.amount);
         const feePercent = tx.providerFeePercent || 10;
@@ -220,7 +222,7 @@ export async function GET(request) {
       transactions: transformedTransactions,
       // Statistics at top level for frontend compatibility
       totalEarnings: totalEarnings,
-      thisMonthEarnings: thisMonthEarnings,
+      thisMonthEarnings: periodEarnings, // Use period earnings instead of hardcoded "this month"
       pendingPayments: pendingPayments,
       completedTransactions: completedTransactions.length,
       pendingTransactionsCount: pendingTransactions.length,
