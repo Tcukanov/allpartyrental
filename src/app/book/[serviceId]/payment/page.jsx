@@ -410,7 +410,14 @@ export default function PaymentPage({ params }) {
               serviceId: bookingData.serviceId,
               bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
               hours: bookingData.bookingDetails.duration || 4,
-              addons: []
+              addons: [],
+              address: bookingData.bookingDetails.address,
+              city: bookingData.bookingDetails.city,
+              zipCode: bookingData.bookingDetails.zipCode,
+              guestCount: bookingData.bookingDetails.guestCount,
+              contactPhone: bookingData.bookingDetails.contactPhone,
+              contactEmail: bookingData.bookingDetails.contactEmail,
+              comments: bookingData.bookingDetails.specialRequests
             }),
           });
 
@@ -583,7 +590,14 @@ export default function PaymentPage({ params }) {
               serviceId: bookingData.serviceId,
               bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
               hours: bookingData.bookingDetails.duration || 4,
-              addons: []
+              addons: [],
+              address: bookingData.bookingDetails.address,
+              city: bookingData.bookingDetails.city,
+              zipCode: bookingData.bookingDetails.zipCode,
+              guestCount: bookingData.bookingDetails.guestCount,
+              contactPhone: bookingData.bookingDetails.contactPhone,
+              contactEmail: bookingData.bookingDetails.contactEmail,
+              comments: bookingData.bookingDetails.specialRequests
             }),
           });
 
@@ -919,7 +933,14 @@ export default function PaymentPage({ params }) {
               serviceId: bookingData.serviceId,
               bookingDate: new Date(bookingData.bookingDetails.date + 'T' + bookingData.bookingDetails.time).toISOString(),
               hours: bookingData.bookingDetails.duration || 4,
-              addons: []
+              addons: [],
+              address: bookingData.bookingDetails.address,
+              city: bookingData.bookingDetails.city,
+              zipCode: bookingData.bookingDetails.zipCode,
+              guestCount: bookingData.bookingDetails.guestCount,
+              contactPhone: bookingData.bookingDetails.contactPhone,
+              contactEmail: bookingData.bookingDetails.contactEmail,
+              comments: bookingData.bookingDetails.specialRequests
             }),
           });
 

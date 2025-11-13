@@ -8,7 +8,20 @@ export async function POST(request) {
     const requestBody = await request.json();
     console.log('📝 Request body received:', requestBody);
 
-    const { orderID, serviceId, bookingDate, hours, addons = [] } = requestBody;
+    const { 
+        orderID, 
+        serviceId, 
+        bookingDate, 
+        hours, 
+        addons = [],
+        address,
+        city,
+        zipCode,
+        guestCount,
+        contactPhone,
+        contactEmail,
+        comments
+    } = requestBody;
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {
@@ -28,7 +41,14 @@ export async function POST(request) {
         userId: session.user.id,
         bookingDate,
         hours,
-        addons
+        addons,
+        address,
+        city,
+        zipCode,
+        guestCount,
+        contactPhone,
+        contactEmail,
+        comments
     }, order)
 
     return NextResponse.json(auth)

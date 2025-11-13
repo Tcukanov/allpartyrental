@@ -624,10 +624,18 @@ export class PaymentService {
           serviceId: serviceId,
           specificOptions: {
             hours: hours,
+            duration: hours, // Add duration explicitly
             addons: addons,
             notes: bookingData.comments || '',
+            comments: bookingData.comments || '',
+            specialRequests: bookingData.comments || '',
             address: bookingData.address || 'Address to be provided',
+            city: bookingData.city || '',
+            zipCode: bookingData.zipCode || '',
+            guestCount: bookingData.guestCount || party.guestCount || 1,
             contactPhone: bookingData.contactPhone || '',
+            contactEmail: bookingData.contactEmail || '',
+            bookingDate: bookingDate, // Store the booking date/time
             bookingType: 'direct_booking'
           }
         }
