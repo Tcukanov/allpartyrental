@@ -192,13 +192,12 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       transactions: transformedTransactions,
-      statistics: {
-        totalEarnings: totalEarnings,
-        thisMonthEarnings: thisMonthEarnings,
-        pendingPayments: pendingPayments,
-        completedTransactions: completedTransactions.length,
-        pendingTransactionsCount: pendingTransactions.length
-      },
+      // Statistics at top level for frontend compatibility
+      totalEarnings: totalEarnings,
+      thisMonthEarnings: thisMonthEarnings,
+      pendingPayments: pendingPayments,
+      completedTransactions: completedTransactions.length,
+      pendingTransactionsCount: pendingTransactions.length,
       meta: {
         total: totalCount,
         page,
