@@ -207,7 +207,7 @@ export default function ProviderServicesPage() {
         <Box mb={6} p={4} bg="blue.50" color="blue.800" borderRadius="md">
           <Text fontWeight="medium">Service Approval Process</Text>
           <Text fontSize="sm">
-            All new services require admin approval before they become visible to clients. 
+            All new services and updates to active listings require admin approval before they become visible to clients. 
             Services with <Badge colorScheme="orange" size="sm">Pending Approval</Badge> status are under review. 
             Once approved, the status will change to <Badge colorScheme="green" size="sm">Active</Badge>.
           </Text>

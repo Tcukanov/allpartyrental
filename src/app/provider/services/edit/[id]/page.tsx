@@ -590,11 +590,16 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
       
       const result = await response.json();
       
+      // Check if the update requires approval
+      const needsApproval = result.data?.status === 'PENDING_APPROVAL';
+      
       toast({
-        title: 'Service updated',
-        description: 'Your service has been updated successfully',
-        status: 'success',
-        duration: 5000,
+        title: needsApproval ? 'Changes Submitted for Review' : 'Service updated',
+        description: result.message || (needsApproval 
+          ? 'Your changes have been submitted and are pending admin approval.' 
+          : 'Your service has been updated successfully'),
+        status: needsApproval ? 'info' : 'success',
+        duration: 7000,
         isClosable: true,
       });
       
@@ -807,6 +812,32 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
             Update your service listing information
           </Text>
         </Box>
+
+        {formData.status === 'ACTIVE' && (
+          <Alert status="info" borderRadius="md">
+            <AlertIcon />
+            <Box>
+              <Text fontWeight="bold">Approval Required for Changes</Text>
+              <Text fontSize="sm">
+                When you update an active service listing, your changes will be submitted for admin review 
+                before going live. This ensures quality and accuracy for all listings on the platform.
+              </Text>
+            </Box>
+          </Alert>
+        )}
+
+        {formData.status === 'PENDING_APPROVAL' && (
+          <Alert status="warning" borderRadius="md">
+            <AlertIcon />
+            <Box>
+              <Text fontWeight="bold">Pending Admin Approval</Text>
+              <Text fontSize="sm">
+                This service is currently pending admin approval. You can continue to make edits, 
+                but the service will remain under review until approved by an administrator.
+              </Text>
+            </Box>
+          </Alert>
+        )}
         
         <form onSubmit={handleSubmit}>
           <VStack spacing={6} align="stretch">

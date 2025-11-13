@@ -116,6 +116,11 @@ export async function PUT(
         availableHoursEnd: true,
         minRentalHours: true,
         maxRentalHours: true,
+        provider: {
+          select: {
+            userId: true
+          }
+        }
       }
     });
     
@@ -143,7 +148,12 @@ export async function PUT(
     }
     
     // Check if user owns the service or is an admin
-    if (existingService.providerId !== session.user.id && session.user.role !== 'ADMIN') {
+    // Provider role: check if the user.id matches the provider's userId
+    // Admin role: allow all updates
+    const isOwner = existingService.provider.userId === session.user.id;
+    const isAdmin = session.user.role === 'ADMIN';
+    
+    if (!isOwner && !isAdmin) {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'You do not have permission to update this service' } },
         { status: 403 }
@@ -250,6 +260,20 @@ export async function PUT(
       }
     }
     
+    // APPROVAL WORKFLOW: If provider is editing an ACTIVE service, set to PENDING_APPROVAL
+    // Admins can edit without approval, and providers can deactivate services directly
+    const isStatusOnlyChange = Object.keys(updateData).length === 1 && 'status' in updateData;
+    const isDeactivating = updateData.status === 'INACTIVE';
+    
+    if (!isAdmin && existingService.status === 'ACTIVE' && !isStatusOnlyChange) {
+      console.log('📝 Provider editing ACTIVE service - setting to PENDING_APPROVAL for admin review');
+      updateData.status = 'PENDING_APPROVAL';
+    } else if (!isAdmin && existingService.status === 'ACTIVE' && isStatusOnlyChange && !isDeactivating) {
+      // If they're just trying to change status but service is already active, keep it active
+      console.log('✅ Service is already ACTIVE - no status change needed');
+      delete updateData.status;
+    }
+    
     // Update service
     try {
       console.log("Updating service with data:", updateData);
@@ -258,7 +282,15 @@ export async function PUT(
         data: updateData,
       });
       
-      return NextResponse.json({ success: true, data: service }, { status: 200 });
+      const needsApproval = service.status === 'PENDING_APPROVAL' && existingService.status === 'ACTIVE';
+      
+      return NextResponse.json({ 
+        success: true, 
+        data: service,
+        message: needsApproval 
+          ? 'Your changes have been submitted and are pending admin approval.'
+          : 'Service updated successfully.'
+      }, { status: 200 });
     } catch (error) {
       console.error('Prisma error updating service:', error);
       

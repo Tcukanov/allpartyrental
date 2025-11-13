@@ -123,6 +123,24 @@ export async function PUT(
 
     const requestData = await request.json();
     
+    // Get the current service to check its status
+    const currentService = await prisma.service.findUnique({
+      where: {
+        id: id,
+        providerId: session.user.id
+      }
+    });
+
+    if (!currentService) {
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: 'SERVICE_NOT_FOUND',
+          message: 'Service not found or you do not have permission to edit it'
+        }
+      }, { status: 404 });
+    }
+    
     // PAYPAL CONNECTION REQUIREMENT: Check if trying to set status to ACTIVE
     if (requestData.status === 'ACTIVE') {
       console.log('📊 Provider attempting to activate service - checking PayPal connection');
@@ -190,6 +208,21 @@ export async function PUT(
       serviceData.metadata = metadata;
     }
 
+    // APPROVAL WORKFLOW: If the service is currently ACTIVE and provider is making changes,
+    // set status to PENDING_APPROVAL to require admin review
+    // Exception: If they're just changing status to INACTIVE, allow that directly
+    const isStatusOnlyChange = Object.keys(serviceData).length === 1 && 'status' in serviceData;
+    const isDeactivating = serviceData.status === 'INACTIVE';
+    
+    if (currentService.status === 'ACTIVE' && !isStatusOnlyChange) {
+      console.log('📝 Provider editing ACTIVE service - setting to PENDING_APPROVAL for admin review');
+      serviceData.status = 'PENDING_APPROVAL';
+    } else if (currentService.status === 'ACTIVE' && isStatusOnlyChange && !isDeactivating) {
+      // If they're just trying to change status but service is already active, keep it active
+      console.log('✅ Service is already ACTIVE - no status change needed');
+      delete serviceData.status;
+    }
+
     const updatedService = await prisma.service.update({
       where: {
         id: id,
@@ -201,7 +234,15 @@ export async function PUT(
       }
     });
 
-    return NextResponse.json({ success: true, data: updatedService });
+    const needsApproval = updatedService.status === 'PENDING_APPROVAL' && currentService.status === 'ACTIVE';
+
+    return NextResponse.json({ 
+      success: true, 
+      data: updatedService,
+      message: needsApproval 
+        ? 'Your changes have been submitted and are pending admin approval.'
+        : 'Service updated successfully.'
+    });
   } catch (error) {
     console.error('Error updating service:', error);
     return NextResponse.json(
