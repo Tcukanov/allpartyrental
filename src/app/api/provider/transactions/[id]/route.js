@@ -54,6 +54,12 @@ export async function GET(request, { params }) {
                 businessName: true,
                 paypalEnvironment: true
               }
+            },
+            partyService: {
+              select: {
+                id: true,
+                specificOptions: true
+              }
             }
           }
         },

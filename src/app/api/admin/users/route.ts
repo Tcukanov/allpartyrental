@@ -1,85 +1,66 @@
-export const dynamic = 'force-dynamic';
-
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
+import { prisma } from '@/lib/prisma/client';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
+    // Check if user is authenticated and is an admin
     const session = await getServerSession(authOptions);
     
-    if (!session || !session.user) {
+    if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
+        { success: false, error: { message: 'Unauthorized' } },
         { status: 401 }
       );
     }
 
-    // Check if user is admin
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } },
-        { status: 403 }
-      );
-    }
-
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const role = searchParams.get('role');
-    const search = searchParams.get('search');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const skip = (page - 1) * limit;
-
-    // Build where clause
-    const where: any = {};
-    if (role) {
-      where.role = role;
-    }
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
-    // Get users
+    // Fetch all users with their provider data and transaction counts
     const users = await prisma.user.findMany({
-      where,
       include: {
-        profile: true,
+        provider: {
+          select: {
+            id: true,
+            businessName: true,
+            isVerified: true
+          }
+        },
+        _count: {
+          select: {
+            receivedOffers: true,
+            clientParties: true
+          }
+        }
       },
-      skip,
-      take: limit,
       orderBy: {
-        createdAt: 'desc',
-      },
+        createdAt: 'desc'
+      }
     });
 
-    // Count total users
-    const total = await prisma.user.count({ where });
-
-    // Remove sensitive information
-    const usersWithoutPassword = users.map(user => {
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword;
-    });
+    // Format users for response
+    const formattedUsers = users.map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.emailVerified ? 'ACTIVE' : 'PENDING',
+      createdAt: user.createdAt.toISOString(),
+      lastLogin: null, // User model doesn't have lastLogin field
+      transactions: user._count.receivedOffers + user._count.clientParties,
+      isProvider: !!user.provider,
+      providerVerified: user.provider?.isVerified || false,
+      businessName: user.provider?.businessName || null
+    }));
 
     return NextResponse.json({
       success: true,
-      data: usersWithoutPassword,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-      },
-    }, { status: 200 });
+      data: formattedUsers
+    });
+
   } catch (error) {
-    console.error('Get users error:', error);
+    console.error('Error fetching users:', error);
     return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { success: false, error: { message: 'Internal server error' } },
       { status: 500 }
     );
   }

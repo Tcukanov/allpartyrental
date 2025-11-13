@@ -168,7 +168,7 @@ const ProviderLayout = ({ children }) => {
           </Text>
         ) : (
           <Text fontSize="xl" fontWeight="bold" color="blue.600">
-            AllPartyRent
+            AllPartyRental
           </Text>
         )}
       </Box>

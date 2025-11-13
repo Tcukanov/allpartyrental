@@ -75,34 +75,31 @@ export default function AdminUsersPage() {
       try {
         setLoading(true);
         
-        // Simulated data for demonstration
-        // In a real application, you would fetch this data from an API
-        const mockUsers = [
-          { id: '1', name: 'John Smith', email: 'john@example.com', role: 'USER', status: 'ACTIVE', createdAt: '2023-01-15T08:30:00Z', lastLogin: '2023-06-01T10:15:00Z', transactions: 8 },
-          { id: '2', name: 'Sarah Johnson', email: 'sarah@example.com', role: 'USER', status: 'ACTIVE', createdAt: '2023-02-10T14:20:00Z', lastLogin: '2023-06-02T09:45:00Z', transactions: 12 },
-          { id: '3', name: 'Michael Brown', email: 'michael@example.com', role: 'ADMIN', status: 'ACTIVE', createdAt: '2023-01-05T11:00:00Z', lastLogin: '2023-06-03T16:30:00Z', transactions: 5 },
-          { id: '4', name: 'Emma Wilson', email: 'emma@example.com', role: 'USER', status: 'INACTIVE', createdAt: '2023-03-20T09:15:00Z', lastLogin: '2023-05-15T13:10:00Z', transactions: 3 },
-          { id: '5', name: 'David Lee', email: 'david@example.com', role: 'USER', status: 'ACTIVE', createdAt: '2023-04-08T16:45:00Z', lastLogin: '2023-06-02T11:20:00Z', transactions: 7 },
-          { id: '6', name: 'Jessica Clark', email: 'jessica@example.com', role: 'USER', status: 'SUSPENDED', createdAt: '2023-02-25T10:30:00Z', lastLogin: '2023-04-10T14:50:00Z', transactions: 2 },
-          { id: '7', name: 'Daniel Martin', email: 'daniel@example.com', role: 'PROVIDER', status: 'ACTIVE', createdAt: '2023-03-15T13:40:00Z', lastLogin: '2023-06-03T08:25:00Z', transactions: 15 },
-          { id: '8', name: 'Olivia Rodriguez', email: 'olivia@example.com', role: 'PROVIDER', status: 'ACTIVE', createdAt: '2023-04-20T15:10:00Z', lastLogin: '2023-06-01T17:30:00Z', transactions: 9 },
-          { id: '9', name: 'James Wilson', email: 'james@example.com', role: 'USER', status: 'PENDING', createdAt: '2023-05-12T08:50:00Z', lastLogin: null, transactions: 0 },
-          { id: '10', name: 'Sophia Garcia', email: 'sophia@example.com', role: 'PROVIDER', status: 'ACTIVE', createdAt: '2023-03-30T11:25:00Z', lastLogin: '2023-06-02T14:15:00Z', transactions: 11 },
-          { id: '11', name: 'William Anderson', email: 'william@example.com', role: 'USER', status: 'ACTIVE', createdAt: '2023-02-18T09:40:00Z', lastLogin: '2023-05-28T10:05:00Z', transactions: 6 },
-          { id: '12', name: 'Ava Thomas', email: 'ava@example.com', role: 'USER', status: 'INACTIVE', createdAt: '2023-04-15T14:55:00Z', lastLogin: '2023-05-10T16:40:00Z', transactions: 1 },
-        ];
+        const response = await fetch('/api/admin/users');
+        const data = await response.json();
         
-        setUsers(mockUsers);
+        if (data.success) {
+          setUsers(data.data);
+        } else {
+          throw new Error(data.error?.message || 'Failed to fetch users');
+        }
       } catch (err) {
         console.error('Error fetching users:', err);
         setError(err.message);
+        toast({
+          title: 'Error',
+          description: 'Failed to load users',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
       } finally {
         setLoading(false);
       }
     }
     
     fetchUsers();
-  }, []);
+  }, [toast]);
   
   // Filter users based on search term and filters
   const filteredUsers = users.filter(user => {

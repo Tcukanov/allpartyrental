@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/auth-options';
 
 export async function GET(request: NextRequest) {
   try {
@@ -55,6 +57,238 @@ export async function GET(request: NextRequest) {
         success: false, 
         error: { 
           message: 'Failed to fetch categories',
+          details: error instanceof Error ? error.message : 'Unknown error' 
+        } 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // Check authentication and authorization
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, error: { message: 'Unauthorized' } },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { name, slug, description } = body;
+
+    // Validate required fields
+    if (!name || !slug) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { message: 'Name and slug are required' } 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if slug already exists
+    const existingCategory = await prisma.serviceCategory.findUnique({
+      where: { slug }
+    });
+
+    if (existingCategory) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { message: 'A category with this slug already exists' } 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Create the category
+    const category = await prisma.serviceCategory.create({
+      data: {
+        name,
+        slug,
+        description: description || null
+      }
+    });
+
+    console.log('Category created:', category);
+
+    return NextResponse.json(
+      { success: true, data: category },
+      { status: 201 }
+    );
+
+  } catch (error) {
+    console.error('Error creating category:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: { 
+          message: 'Failed to create category',
+          details: error instanceof Error ? error.message : 'Unknown error' 
+        } 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    // Check authentication and authorization
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, error: { message: 'Unauthorized' } },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { id, name, slug, description } = body;
+
+    // Validate required fields
+    if (!id || !name || !slug) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { message: 'ID, name and slug are required' } 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if category exists
+    const existingCategory = await prisma.serviceCategory.findUnique({
+      where: { id }
+    });
+
+    if (!existingCategory) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { message: 'Category not found' } 
+        },
+        { status: 404 }
+      );
+    }
+
+    // Check if slug is taken by another category
+    if (slug !== existingCategory.slug) {
+      const slugTaken = await prisma.serviceCategory.findFirst({
+        where: {
+          slug,
+          NOT: { id }
+        }
+      });
+
+      if (slugTaken) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: { message: 'A category with this slug already exists' } 
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Update the category
+    const category = await prisma.serviceCategory.update({
+      where: { id },
+      data: {
+        name,
+        slug,
+        description: description || null
+      }
+    });
+
+    console.log('Category updated:', category);
+
+    return NextResponse.json(
+      { success: true, data: category },
+      { status: 200 }
+    );
+
+  } catch (error) {
+    console.error('Error updating category:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: { 
+          message: 'Failed to update category',
+          details: error instanceof Error ? error.message : 'Unknown error' 
+        } 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    // Check authentication and authorization
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, error: { message: 'Unauthorized' } },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { message: 'Category ID is required' } 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if category has services
+    const servicesCount = await prisma.service.count({
+      where: { categoryId: id }
+    });
+
+    if (servicesCount > 0) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: { message: `Cannot delete category with ${servicesCount} associated service(s)` } 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Delete the category
+    await prisma.serviceCategory.delete({
+      where: { id }
+    });
+
+    console.log('Category deleted:', id);
+
+    return NextResponse.json(
+      { success: true, message: 'Category deleted successfully' },
+      { status: 200 }
+    );
+
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: { 
+          message: 'Failed to delete category',
           details: error instanceof Error ? error.message : 'Unknown error' 
         } 
       },

@@ -299,14 +299,122 @@ export default function TransactionDetailsPage({ params }) {
               <Box>
                 <Text fontWeight="bold" mb={1}>Service Name:</Text>
                 <Text mb={4}>{transaction.offer.service.name || 'N/A'}</Text>
-              </Box>
-              <Box>
+                
                 <Text fontWeight="bold" mb={1}>Service Price:</Text>
-                <Text fontSize="lg" fontWeight="bold" color="blue.500">
+                <Text fontSize="lg" fontWeight="bold" color="blue.500" mb={4}>
                   ${transaction.offer.price ? formatAmount(transaction.offer.price) : '0.00'}
                 </Text>
               </Box>
+              <Box>
+                {transaction.offer.partyService?.specificOptions && (
+                  <>
+                    {transaction.offer.partyService.specificOptions.duration && (
+                      <>
+                        <Text fontWeight="bold" mb={1}>Duration:</Text>
+                        <Text mb={4}>{transaction.offer.partyService.specificOptions.duration} hours</Text>
+                      </>
+                    )}
+                    
+                    {transaction.offer.partyService.specificOptions.guestCount && (
+                      <>
+                        <Text fontWeight="bold" mb={1}>Guest Count:</Text>
+                        <Text mb={4}>{transaction.offer.partyService.specificOptions.guestCount}</Text>
+                      </>
+                    )}
+                  </>
+                )}
+              </Box>
             </SimpleGrid>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Booking Details */}
+      {transaction.offer?.partyService?.specificOptions && (
+        <Card mb={6}>
+          <CardHeader>
+            <Heading size="md">Booking Details</Heading>
+          </CardHeader>
+          <CardBody>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+              <Box>
+                {transaction.offer.partyService.specificOptions.bookingDate && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>Event Date:</Text>
+                    <Text mb={4}>{new Date(transaction.offer.partyService.specificOptions.bookingDate).toLocaleDateString()}</Text>
+                  </>
+                )}
+                
+                {transaction.offer.partyService.specificOptions.address && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>Address:</Text>
+                    <Text mb={4}>{transaction.offer.partyService.specificOptions.address}</Text>
+                  </>
+                )}
+                
+                {transaction.offer.partyService.specificOptions.city && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>City:</Text>
+                    <Text mb={4}>{transaction.offer.partyService.specificOptions.city}</Text>
+                  </>
+                )}
+                
+                {transaction.offer.partyService.specificOptions.zipCode && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>Zip Code:</Text>
+                    <Text mb={4}>{transaction.offer.partyService.specificOptions.zipCode}</Text>
+                  </>
+                )}
+              </Box>
+              
+              <Box>
+                {transaction.offer.partyService.specificOptions.contactPhone && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>Contact Phone:</Text>
+                    <Text mb={4}>{transaction.offer.partyService.specificOptions.contactPhone}</Text>
+                  </>
+                )}
+                
+                {transaction.offer.partyService.specificOptions.contactEmail && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>Contact Email:</Text>
+                    <Text mb={4}>{transaction.offer.partyService.specificOptions.contactEmail}</Text>
+                  </>
+                )}
+                
+                {transaction.offer.partyService.specificOptions.comments && (
+                  <>
+                    <Text fontWeight="bold" mb={1}>Special Requests:</Text>
+                    <Text mb={4}>{transaction.offer.partyService.specificOptions.comments}</Text>
+                  </>
+                )}
+              </Box>
+            </SimpleGrid>
+            
+            {/* Pricing Breakdown */}
+            {transaction.offer.partyService.specificOptions.pricing && (
+              <>
+                <Box mt={6} pt={6} borderTop="1px solid" borderColor="gray.200">
+                  <Heading size="sm" mb={4}>Pricing Breakdown</Heading>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                    <Flex justify="space-between">
+                      <Text>Base Price:</Text>
+                      <Text fontWeight="bold">${formatAmount(transaction.offer.partyService.specificOptions.pricing.basePrice || 0)}</Text>
+                    </Flex>
+                    
+                    <Flex justify="space-between">
+                      <Text>Service Fee:</Text>
+                      <Text fontWeight="bold">${formatAmount(transaction.offer.partyService.specificOptions.pricing.serviceFee || 0)}</Text>
+                    </Flex>
+                    
+                    <Flex justify="space-between" gridColumn={{ md: "span 2" }} pt={2} borderTop="1px solid" borderColor="gray.200">
+                      <Text fontWeight="bold" fontSize="lg">Total:</Text>
+                      <Text fontWeight="bold" fontSize="lg" color="green.500">${formatAmount(transaction.offer.partyService.specificOptions.pricing.total || 0)}</Text>
+                    </Flex>
+                  </SimpleGrid>
+                </Box>
+              </>
+            )}
           </CardBody>
         </Card>
       )}

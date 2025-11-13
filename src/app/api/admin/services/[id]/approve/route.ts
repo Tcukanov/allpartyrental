@@ -76,10 +76,10 @@ export async function PUT(
       },
     });
 
-    // Create notification for the provider
+    // Create notification for the provider's user
     await prisma.notification.create({
       data: {
-        userId: service.providerId,
+        userId: service.provider.user.id, // Use user ID, not provider ID
         type: NotificationType.SYSTEM,
         title: 'Service Approved',
         content: `Your service "${service.name}" has been approved and is now visible to clients.`,

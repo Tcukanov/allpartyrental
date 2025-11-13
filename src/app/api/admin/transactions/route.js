@@ -49,8 +49,14 @@ export async function GET() {
             provider: {
               select: {
                 id: true,
-                name: true,
-                email: true
+                businessName: true,
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true
+                  }
+                }
               }
             },
             service: {
@@ -79,15 +85,17 @@ export async function GET() {
         status: transaction.status,
         createdAt: transaction.createdAt.toISOString(),
         updatedAt: transaction.updatedAt.toISOString(),
-        paymentIntentId: transaction.paymentIntentId || null,
-        paymentMethod: transaction.paymentMethodId ? 'PayPal' : 'Unknown',
+        paypalOrderId: transaction.paypalOrderId || null,
+        paypalCaptureId: transaction.paypalCaptureId || null,
+        paymentMethod: transaction.paypalOrderId ? 'PayPal' : 'Unknown',
         partyId: transaction.party?.id || null,
         partyName: transaction.party?.name || 'Unknown Party',
         userId: transaction.offer?.client?.id || null,
         userName: transaction.offer?.client?.name || 'Unknown User',
         userEmail: transaction.offer?.client?.email || 'unknown@example.com',
         providerId: transaction.offer?.provider?.id || null,
-        providerName: transaction.offer?.provider?.name || 'Unknown Provider',
+        providerName: transaction.offer?.provider?.businessName || transaction.offer?.provider?.user?.name || 'Unknown Provider',
+        providerEmail: transaction.offer?.provider?.user?.email || 'unknown@example.com',
         serviceName: transaction.offer?.service?.name || 'Unknown Service',
         escrowStartTime: transaction.escrowStartTime ? transaction.escrowStartTime.toISOString() : null,
         escrowEndTime: transaction.escrowEndTime ? transaction.escrowEndTime.toISOString() : null,

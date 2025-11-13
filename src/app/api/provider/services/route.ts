@@ -385,6 +385,7 @@ export async function POST(request: Request) {
         colors,
         metadata: JSON.stringify(metadata),
         blockedDates: parsedBlockedDates,
+        status: 'PENDING_APPROVAL', // Require admin approval before service is visible
       }
     });
     
@@ -415,15 +416,37 @@ export async function POST(request: Request) {
       console.log(`Successfully created add-ons for service ${service.id}`);
     }
     
-    // Create notifications for provider
+    // Create notification for provider
     await prisma.notification.create({
       data: {
         userId: session.user.id,  // Use User ID, not Provider ID
         type: "SYSTEM",
-        title: "Service Created",
-        content: `Your service "${name}" has been created and is awaiting approval.`
+        title: "Service Pending Review",
+        content: `Your service "${name}" has been submitted and is pending admin approval.`
       }
     });
+
+    // Create notifications for all admins
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      select: { id: true }
+    });
+
+    if (admins.length > 0) {
+      await Promise.all(
+        admins.map((admin) =>
+          prisma.notification.create({
+            data: {
+              userId: admin.id,
+              type: 'SYSTEM',
+              title: 'New Service Requires Approval',
+              content: `${session.user.name} has submitted a new service "${name}" for approval.`,
+              isRead: false,
+            },
+          })
+        )
+      );
+    }
     
     // Prepare the response
     // Get the complete service with its category info
