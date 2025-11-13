@@ -137,7 +137,8 @@ export class PaymentService {
 
       console.log('💰 Calculating pricing...');
       // Calculate pricing
-      const basePrice = service.price * hours;
+      // Price is fixed, not multiplied by hours
+      const basePrice = service.price;
       const addonTotal = addons.reduce((sum, addon) => sum + addon.price, 0);
       const subtotal = basePrice + addonTotal;
 
@@ -648,7 +649,7 @@ export class PaymentService {
           clientId,
           serviceId,
           partyServiceId: partyService.id,
-          price: service.price * hours,
+          price: service.price,
           description: `Booking for ${hours} hours on ${new Date(bookingDate).toLocaleDateString()}`,
           status: 'PENDING'  // Visible to provider after authorization
         }
