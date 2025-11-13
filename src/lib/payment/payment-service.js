@@ -197,9 +197,9 @@ export class PaymentService {
             description: `${service.category.name} service for ${hours} hours`,
             unit_amount: {
               currency_code: 'USD',
-              value: service.price.toFixed(2)
+              value: basePrice.toFixed(2)
             },
-            quantity: hours.toString(),
+            quantity: '1',
             category: 'DIGITAL_GOODS'
           }],
           // Add soft descriptor for better transaction descriptions
