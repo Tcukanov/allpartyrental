@@ -6,7 +6,7 @@ import { sendMail } from '@/lib/mail/send-mail';
 
 export async function POST(
   request: Request,
-  { params }: { params: { providerId: string } }
+  { params }: { params: Promise<{ providerId: string }> }
 ) {
   try {
     // Check if user is authenticated and is an admin
@@ -19,7 +19,7 @@ export async function POST(
       );
     }
 
-    const { providerId } = params;
+    const { providerId } = await params;
 
     // Find the provider with user data
     const provider = await prisma.provider.findUnique({
