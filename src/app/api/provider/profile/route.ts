@@ -243,9 +243,25 @@ export async function GET(request: Request): Promise<NextResponse> {
     
     console.log('Fetching profile for user:', user.id);
     console.log('Profile found:', user.profile);
+    console.log('Provider found:', user.provider);
+    
+    // Combine provider and profile data for the cabinet page
+    const combinedData = {
+      companyName: user.provider?.businessName || user.name || '',
+      contactPerson: user.profile?.contactPerson || user.name || '',
+      email: user.email,
+      phone: user.provider?.phone || user.profile?.phone || '',
+      address: user.profile?.address || '',
+      website: user.provider?.website || user.profile?.website || '',
+      googleBusinessUrl: user.profile?.googleBusinessUrl || '',
+      description: user.provider?.bio || user.profile?.description || '',
+      avatar: user.profile?.avatar || '',
+      socialLinks: user.profile?.socialLinks || {}
+    };
     
     return NextResponse.json({ 
       success: true, 
+      data: combinedData,
       user: {
         id: user.id,
         email: user.email,
