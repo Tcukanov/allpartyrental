@@ -144,9 +144,61 @@ export async function GET(request) {
     // Count total matching transactions for pagination
     const totalCount = await prisma.transaction.count({ where });
 
+    // Calculate earnings statistics
+    const allTransactions = await prisma.transaction.findMany({
+      where: {
+        offer: {
+          providerId: provider.id
+        }
+      },
+      select: {
+        amount: true,
+        status: true,
+        createdAt: true,
+        providerFeePercent: true
+      }
+    });
+
+    // Calculate total earnings (completed transactions)
+    const completedTransactions = allTransactions.filter(tx => tx.status === 'COMPLETED');
+    const totalEarnings = completedTransactions.reduce((sum, tx) => {
+      const amount = Number(tx.amount);
+      const feePercent = tx.providerFeePercent || 10;
+      const providerAmount = amount * (1 - (feePercent / 100));
+      return sum + providerAmount;
+    }, 0);
+
+    // Calculate this month's earnings
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonthEarnings = completedTransactions
+      .filter(tx => new Date(tx.createdAt) >= startOfMonth)
+      .reduce((sum, tx) => {
+        const amount = Number(tx.amount);
+        const feePercent = tx.providerFeePercent || 10;
+        const providerAmount = amount * (1 - (feePercent / 100));
+        return sum + providerAmount;
+      }, 0);
+
+    // Calculate pending payments
+    const pendingTransactions = allTransactions.filter(tx => tx.status === 'PENDING');
+    const pendingPayments = pendingTransactions.reduce((sum, tx) => {
+      const amount = Number(tx.amount);
+      const feePercent = tx.providerFeePercent || 10;
+      const providerAmount = amount * (1 - (feePercent / 100));
+      return sum + providerAmount;
+    }, 0);
+
     return NextResponse.json({
       success: true,
       transactions: transformedTransactions,
+      statistics: {
+        totalEarnings: totalEarnings,
+        thisMonthEarnings: thisMonthEarnings,
+        pendingPayments: pendingPayments,
+        completedTransactions: completedTransactions.length,
+        pendingTransactionsCount: pendingTransactions.length
+      },
       meta: {
         total: totalCount,
         page,
