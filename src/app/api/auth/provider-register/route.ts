@@ -13,15 +13,15 @@ export async function POST(request: Request) {
       phone, 
       website, 
       companyDescription, 
-      serviceLocation 
+      serviceLocations 
     } = body;
 
     // Validate required fields
-    if (!companyName || !contactPerson || !email || !password || !phone || !companyDescription || !serviceLocation) {
+    if (!companyName || !contactPerson || !email || !password || !phone || !companyDescription || !serviceLocations || !Array.isArray(serviceLocations) || serviceLocations.length === 0) {
       return NextResponse.json(
         { 
           success: false, 
-          error: { message: 'All required fields must be filled' } 
+          error: { message: 'All required fields must be filled and at least one service location must be selected' } 
         },
         { status: 400 }
       );
@@ -71,12 +71,12 @@ export async function POST(request: Request) {
       }
     });
 
-    // Link provider to service location (city)
-    await prisma.providerCity.create({
-      data: {
+    // Link provider to multiple service locations (cities)
+    await prisma.providerCity.createMany({
+      data: serviceLocations.map((cityId: string) => ({
         providerId: provider.id,
-        cityId: serviceLocation
-      }
+        cityId: cityId
+      }))
     });
 
     // Create notification for admins

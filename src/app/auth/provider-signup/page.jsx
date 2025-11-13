@@ -24,7 +24,15 @@ import {
   AlertDescription,
   FormHelperText,
   Grid,
-  GridItem
+  GridItem,
+  Checkbox,
+  CheckboxGroup,
+  Stack,
+  Wrap,
+  WrapItem,
+  Tag,
+  TagLabel,
+  TagCloseButton
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon, EmailIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
@@ -43,7 +51,7 @@ export default function ProviderSignUpPage() {
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
   const [companyDescription, setCompanyDescription] = useState('');
-  const [serviceLocation, setServiceLocation] = useState('');
+  const [serviceLocations, setServiceLocations] = useState([]);
   const [cities, setCities] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -69,10 +77,10 @@ export default function ProviderSignUpPage() {
     e.preventDefault();
     
     // Validate input
-    if (!companyName || !contactPerson || !email || !password || !confirmPassword || !phone || !companyDescription || !serviceLocation) {
+    if (!companyName || !contactPerson || !email || !password || !confirmPassword || !phone || !companyDescription || serviceLocations.length === 0) {
       toast({
         title: 'Error',
-        description: 'Please fill in all required fields',
+        description: 'Please fill in all required fields and select at least one service location',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -119,7 +127,7 @@ export default function ProviderSignUpPage() {
           phone,
           website,
           companyDescription,
-          serviceLocation,
+          serviceLocations,
         }),
       });
       
@@ -265,20 +273,54 @@ export default function ProviderSignUpPage() {
                     </GridItem>
                     
                     <GridItem colSpan={{ base: 1, md: 2 }}>
-                      <FormControl id="serviceLocation" isRequired>
-                        <FormLabel>Service Location</FormLabel>
-                        <Select 
-                          value={serviceLocation}
-                          onChange={(e) => setServiceLocation(e.target.value)}
-                          placeholder="Select your service area"
+                      <FormControl id="serviceLocations" isRequired>
+                        <FormLabel>Service Locations</FormLabel>
+                        
+                        {/* Selected locations display */}
+                        {serviceLocations.length > 0 && (
+                          <Wrap spacing={2} mb={3}>
+                            {serviceLocations.map((cityId) => {
+                              const city = cities.find(c => c.id === cityId);
+                              return city ? (
+                                <WrapItem key={cityId}>
+                                  <Tag size="md" colorScheme="blue" borderRadius="full">
+                                    <TagLabel>{city.name}</TagLabel>
+                                    <TagCloseButton 
+                                      onClick={() => {
+                                        setServiceLocations(serviceLocations.filter(id => id !== cityId));
+                                      }}
+                                    />
+                                  </Tag>
+                                </WrapItem>
+                              ) : null;
+                            })}
+                          </Wrap>
+                        )}
+                        
+                        {/* City selection checkboxes */}
+                        <Box 
+                          maxH="250px" 
+                          overflowY="auto" 
+                          border="1px solid" 
+                          borderColor="gray.200" 
+                          borderRadius="md" 
+                          p={4}
                         >
-                          {cities.map((city) => (
-                            <option key={city.id} value={city.id}>
-                              {city.name}
-                            </option>
-                          ))}
-                        </Select>
-                        <FormHelperText>Select the primary area where you provide services</FormHelperText>
+                          <CheckboxGroup 
+                            value={serviceLocations}
+                            onChange={(values) => setServiceLocations(values)}
+                          >
+                            <Stack spacing={2}>
+                              {cities.map((city) => (
+                                <Checkbox key={city.id} value={city.id}>
+                                  {city.name}
+                                </Checkbox>
+                              ))}
+                            </Stack>
+                          </CheckboxGroup>
+                        </Box>
+                        
+                        <FormHelperText>Select all areas where you provide services (multiple selection allowed)</FormHelperText>
                       </FormControl>
                     </GridItem>
                     
