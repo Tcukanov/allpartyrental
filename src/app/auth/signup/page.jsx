@@ -264,20 +264,6 @@ export default function SignUpPage() {
                   />
                 </FormControl>
                 
-                <FormControl id="role" isRequired>
-                  <FormLabel>I want to:</FormLabel>
-                  <RadioGroup 
-                    onChange={setRole} 
-                    value={role}
-                    colorScheme="brand"
-                  >
-                    <Stack direction="row">
-                      <Radio value="CLIENT">Organize Parties</Radio>
-                      <Radio value="PROVIDER">Provide Services</Radio>
-                    </Stack>
-                  </RadioGroup>
-                </FormControl>
-                
                 <Button 
                   leftIcon={<EmailIcon />}
                   type="submit" 
