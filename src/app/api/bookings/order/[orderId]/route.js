@@ -85,15 +85,32 @@ export async function GET(request, context) {
     console.log('=================');
 
     // Transform data to match expected format
+    const specificOptions = transaction.offer.partyService?.specificOptions || {};
+    
     const bookingData = {
       id: transaction.id,
       amount: transaction.amount,
       status: transaction.status,
-      bookingDate: transaction.party?.date || '',
-      address: transaction.offer.partyService?.specificOptions?.address || '',
-      comments: transaction.offer.partyService?.specificOptions?.comments || '',
-      service: transaction.offer.service,
-      user: transaction.offer.client
+      bookingDate: transaction.party?.date || specificOptions.bookingDate || '',
+      address: specificOptions.address || '',
+      city: specificOptions.city || '',
+      zipCode: specificOptions.zipCode || '',
+      guestCount: transaction.party?.guestCount || specificOptions.guestCount || 0,
+      duration: specificOptions.duration || 4,
+      contactPhone: specificOptions.contactPhone || '',
+      contactEmail: specificOptions.contactEmail || transaction.offer.client.email || '',
+      comments: specificOptions.specialRequests || specificOptions.comments || '',
+      service: {
+        ...transaction.offer.service,
+        photos: transaction.offer.service.photos || []
+      },
+      user: transaction.offer.client,
+      // Pricing breakdown
+      pricing: {
+        basePrice: parseFloat(transaction.offer.service.price || 0),
+        serviceFee: parseFloat(transaction.amount || 0) - parseFloat(transaction.offer.service.price || 0),
+        total: parseFloat(transaction.amount || 0)
+      }
     };
 
     return NextResponse.json({

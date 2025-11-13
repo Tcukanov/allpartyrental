@@ -167,51 +167,145 @@ export default function BookingConfirmedPage({ params }) {
           </CardHeader>
           <CardBody>
             {booking ? (
-              <VStack spacing={4} align="stretch">
-                <Box>
-                  <Text fontWeight="bold" mb={1}>Service</Text>
-                  <Text>{booking.service?.name || 'Service details'}</Text>
-                  <Text color="gray.600" fontSize="sm">${booking.amount || '0.00'}</Text>
-                </Box>
-                
-                <Box>
-                  <Text fontWeight="bold" mb={1}>Date & Time</Text>
-                  <Text>{new Date(booking.bookingDate).toLocaleDateString()} at {new Date(booking.bookingDate).toLocaleTimeString()}</Text>
-                </Box>
-                
-                <Box>
-                  <Text fontWeight="bold" mb={1}>Location</Text>
-                  <Text>{booking.address}</Text>
-                </Box>
-
-                {booking.guestCount && (
+              <VStack spacing={6} align="stretch">
+                {/* Service with Photo */}
+                {booking.service?.photos?.[0] && (
                   <Box>
-                    <Text fontWeight="bold" mb={1}>Guest Count</Text>
-                    <Text>{booking.guestCount} guests</Text>
+                    <Card variant="outline">
+                      <CardBody p={0}>
+                        <Flex direction={{ base: 'column', md: 'row' }} gap={4}>
+                          <Box width={{ base: '100%', md: '200px' }} height="150px" overflow="hidden">
+                            <Image 
+                              src={booking.service.photos[0]} 
+                              alt={booking.service.name}
+                              objectFit="cover"
+                              width="100%"
+                              height="100%"
+                            />
+                          </Box>
+                          <VStack align="start" justify="center" p={4} flex="1">
+                            <Heading size="md">{booking.service?.name || 'Service details'}</Heading>
+                            <Text color="gray.600">${parseFloat(booking.amount || 0).toFixed(2)}</Text>
+                          </VStack>
+                        </Flex>
+                      </CardBody>
+                    </Card>
                   </Box>
                 )}
 
-                {booking.contactPhone && (
+                {!booking.service?.photos?.[0] && (
                   <Box>
-                    <Text fontWeight="bold" mb={1}>Contact Phone</Text>
-                    <Text>{booking.contactPhone}</Text>
+                    <Text fontWeight="bold" mb={1}>Service</Text>
+                    <Text>{booking.service?.name || 'Service details'}</Text>
+                    <Text color="gray.600" fontSize="sm">${parseFloat(booking.amount || 0).toFixed(2)}</Text>
                   </Box>
                 )}
                 
+                {/* Event Details */}
+                <Box>
+                  <Text fontWeight="bold" mb={2} fontSize="lg" color="blue.600">Event Details</Text>
+                  <VStack spacing={3} align="stretch" pl={2}>
+                    <HStack>
+                      <Icon as={CalendarIcon} color="blue.500" />
+                      <Box>
+                        <Text fontWeight="semibold">Date & Time</Text>
+                        <Text>{new Date(booking.bookingDate).toLocaleDateString()} at {new Date(booking.bookingDate).toLocaleTimeString()}</Text>
+                      </Box>
+                    </HStack>
+
+                    {booking.duration && (
+                      <HStack>
+                        <Icon as={Icon} color="purple.500" />
+                        <Box>
+                          <Text fontWeight="semibold">Duration</Text>
+                          <Text>{booking.duration} hours</Text>
+                        </Box>
+                      </HStack>
+                    )}
+
+                    {booking.guestCount && (
+                      <HStack>
+                        <Icon as={Icon} color="green.500" />
+                        <Box>
+                          <Text fontWeight="semibold">Guest Count</Text>
+                          <Text>{booking.guestCount} guests</Text>
+                        </Box>
+                      </HStack>
+                    )}
+                  </VStack>
+                </Box>
+                
+                {/* Location */}
+                <Box>
+                  <Text fontWeight="bold" mb={2} fontSize="lg" color="blue.600">Location</Text>
+                  <VStack spacing={1} align="stretch" pl={2}>
+                    <Text>{booking.address}</Text>
+                    {(booking.city || booking.zipCode) && (
+                      <Text color="gray.600">{booking.city}{booking.city && booking.zipCode ? ', ' : ''}{booking.zipCode}</Text>
+                    )}
+                  </VStack>
+                </Box>
+
+                {/* Contact Information */}
+                <Box>
+                  <Text fontWeight="bold" mb={2} fontSize="lg" color="blue.600">Contact Information</Text>
+                  <VStack spacing={2} align="stretch" pl={2}>
+                    {booking.contactPhone && (
+                      <HStack>
+                        <Icon as={PhoneIcon} color="green.500" />
+                        <Text>{booking.contactPhone}</Text>
+                      </HStack>
+                    )}
+                    {booking.contactEmail && (
+                      <HStack>
+                        <Icon as={EmailIcon} color="blue.500" />
+                        <Text>{booking.contactEmail}</Text>
+                      </HStack>
+                    )}
+                  </VStack>
+                </Box>
+                
+                {/* Special Requests */}
                 {booking.comments && (
                   <Box>
                     <Text fontWeight="bold" mb={1}>Special Requests</Text>
-                    <Text>{booking.comments}</Text>
+                    <Text bg="gray.50" p={3} borderRadius="md">{booking.comments}</Text>
                   </Box>
                 )}
 
+                {/* Pricing Breakdown */}
+                {booking.pricing && (
+                  <Box>
+                    <Text fontWeight="bold" mb={2} fontSize="lg" color="blue.600">Payment Summary</Text>
+                    <VStack spacing={2} align="stretch" pl={2}>
+                      <HStack justify="space-between">
+                        <Text>Service Price:</Text>
+                        <Text fontWeight="semibold">${booking.pricing.basePrice.toFixed(2)}</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text>Service Fee (5%):</Text>
+                        <Text fontWeight="semibold">${booking.pricing.serviceFee.toFixed(2)}</Text>
+                      </HStack>
+                      <Divider />
+                      <HStack justify="space-between">
+                        <Text fontWeight="bold" fontSize="lg">Total Paid:</Text>
+                        <Text fontWeight="bold" fontSize="lg" color="green.600">${booking.pricing.total.toFixed(2)}</Text>
+                      </HStack>
+                    </VStack>
+                  </Box>
+                )}
+
+                {/* Status */}
                 <Box>
-                  <Text fontWeight="bold" mb={1}>Status</Text>
+                  <Text fontWeight="bold" mb={1}>Booking Status</Text>
                   <Badge 
-                    colorScheme={booking.status === 'confirmed' ? 'green' : 'yellow'}
+                    colorScheme={booking.status === 'COMPLETED' ? 'green' : 'yellow'}
+                    fontSize="md"
+                    px={3}
+                    py={1}
                     textTransform="capitalize"
                   >
-                    {booking.status === 'pending_confirmation' ? 'Pending Confirmation' : (booking.status || 'Pending Confirmation')}
+                    {booking.status === 'PENDING' ? 'Pending Provider Confirmation' : (booking.status || 'Pending Confirmation')}
                   </Badge>
                 </Box>
               </VStack>
