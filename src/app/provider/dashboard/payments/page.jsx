@@ -161,6 +161,16 @@ export default function PaymentsDashboardPage() {
     }
   };
 
+  const getTimeframeLabel = () => {
+    switch (timeframe) {
+      case 'today': return 'Today';
+      case 'this_week': return 'This Week';
+      case 'this_month': return 'This Month';
+      case 'this_year': return 'This Year';
+      default: return 'This Period';
+    }
+  };
+
   if (loading) {
     return (
       <ProviderLayout>
@@ -184,9 +194,9 @@ export default function PaymentsDashboardPage() {
             
             <HStack spacing={3}>
               <Select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} w="200px">
+                <option value="today">Today</option>
                 <option value="this_week">This Week</option>
                 <option value="this_month">This Month</option>
-                <option value="last_month">Last Month</option>
                 <option value="this_year">This Year</option>
               </Select>
               
@@ -229,13 +239,10 @@ export default function PaymentsDashboardPage() {
             <Card flex="1" minW="250px">
               <CardBody>
                 <Stat>
-                  <StatLabel>This Month</StatLabel>
+                  <StatLabel>{getTimeframeLabel()}</StatLabel>
                   <StatNumber>{formatCurrency(paymentData.thisMonthEarnings)}</StatNumber>
                   <StatHelpText>
-                    <HStack>
-                      <FiTrendingUp color="green" />
-                      <Text color="green.500">+12% from last month</Text>
-                    </HStack>
+                    Selected period
                   </StatHelpText>
                 </Stat>
               </CardBody>

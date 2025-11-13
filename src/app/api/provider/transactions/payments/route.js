@@ -48,12 +48,43 @@ export async function GET(request) {
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')) : undefined;
-    const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')) : undefined;
+    const timeframe = searchParams.get('timeframe') || 'this_month';
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '50');
     const page = parseInt(searchParams.get('page') || '1');
     const skip = (page - 1) * limit;
+
+    // Calculate date range based on timeframe
+    const now = new Date();
+    let startDate, endDate;
+
+    switch (timeframe) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+        break;
+      case 'this_week':
+        const dayOfWeek = now.getDay();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - dayOfWeek);
+        startOfWeek.setHours(0, 0, 0, 0);
+        startDate = startOfWeek;
+        endDate = new Date(now);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'this_month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'this_year':
+        startDate = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+        break;
+      default:
+        // Default to this month
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    }
     
     // Always use sandbox mode for now
     const useSandbox = true;
@@ -69,16 +100,12 @@ export async function GET(request) {
     const where = {
       offer: {
         providerId: provider.id  // Use Provider ID instead of User ID
-      }
-    };
-
-    // Apply date filter if provided
-    if (startDate && endDate) {
-      where.createdAt = {
+      },
+      createdAt: {
         gte: startDate,
         lte: endDate
-      };
-    }
+      }
+    };
 
     // Apply status filter if provided
     if (status) {
