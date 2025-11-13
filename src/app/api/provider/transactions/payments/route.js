@@ -138,8 +138,9 @@ export async function GET(request) {
     const transformedTransactions = transactions.map(tx => {
       // Calculate provider amount (original amount minus fees)
       const originalAmount = Number(tx.amount);
-      const providerFeePercent = tx.providerFeePercent || 10;
-      const providerAmount = originalAmount * (1 - (providerFeePercent / 100));
+      // providerFeePercent represents what provider RECEIVES (e.g., 95 means provider gets 95%)
+      const providerReceivePercent = tx.providerFeePercent || 90; // Default: provider gets 90%
+      const providerAmount = originalAmount * (providerReceivePercent / 100);
       
       // Format transferId for sandbox
       let transferId = tx.transferId;
@@ -190,8 +191,9 @@ export async function GET(request) {
     const completedTransactions = allTransactions.filter(tx => tx.status === 'COMPLETED');
     const totalEarnings = completedTransactions.reduce((sum, tx) => {
       const amount = Number(tx.amount);
-      const feePercent = tx.providerFeePercent || 10;
-      const providerAmount = amount * (1 - (feePercent / 100));
+      // providerFeePercent represents what provider RECEIVES (e.g., 95 means provider gets 95%)
+      const providerReceivePercent = tx.providerFeePercent || 90; // Default: provider gets 90%
+      const providerAmount = amount * (providerReceivePercent / 100);
       return sum + providerAmount;
     }, 0);
 
@@ -203,8 +205,9 @@ export async function GET(request) {
       })
       .reduce((sum, tx) => {
         const amount = Number(tx.amount);
-        const feePercent = tx.providerFeePercent || 10;
-        const providerAmount = amount * (1 - (feePercent / 100));
+        // providerFeePercent represents what provider RECEIVES (e.g., 95 means provider gets 95%)
+        const providerReceivePercent = tx.providerFeePercent || 90; // Default: provider gets 90%
+        const providerAmount = amount * (providerReceivePercent / 100);
         return sum + providerAmount;
       }, 0);
 
@@ -212,8 +215,9 @@ export async function GET(request) {
     const pendingTransactions = allTransactions.filter(tx => tx.status === 'PENDING');
     const pendingPayments = pendingTransactions.reduce((sum, tx) => {
       const amount = Number(tx.amount);
-      const feePercent = tx.providerFeePercent || 10;
-      const providerAmount = amount * (1 - (feePercent / 100));
+      // providerFeePercent represents what provider RECEIVES (e.g., 95 means provider gets 95%)
+      const providerReceivePercent = tx.providerFeePercent || 90; // Default: provider gets 90%
+      const providerAmount = amount * (providerReceivePercent / 100);
       return sum + providerAmount;
     }, 0);
 
