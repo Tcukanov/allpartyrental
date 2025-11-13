@@ -1,6 +1,7 @@
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import MainLayout from '@/components/layout/MainLayout';
+import GoogleAnalytics from '@/components/analytics/GoogleAnalytics';
 import '@/styles/globals.css';
 import { Inter, Nunito } from 'next/font/google';
 import { ReactNode } from 'react';
@@ -53,6 +54,9 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" className={`${inter.className} ${nunito.variable}`}>
+      <head>
+        <GoogleAnalytics />
+      </head>
       <body className={`${inter.className} ${nunito.variable}`}>
         <SessionProvider>
           <ThemeProvider>

@@ -253,6 +253,11 @@ export default function ServiceDetailPage({ params }) {
             setIsOwner(false);
           }
           
+          // Track view count (don't wait for response)
+          fetch(`/api/services/${data.data.id}/view`, {
+            method: 'POST',
+          }).catch(err => console.error('Failed to track view:', err));
+          
           // Fetch service add-ons
           await fetchServiceAddons(data.data.id);
           

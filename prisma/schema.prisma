@@ -149,6 +149,7 @@ model Service {
   metadata            String?
   blockedDates        DateTime[]      @default([]) @db.Timestamp
   slug                String?         @unique
+  viewCount           Int             @default(0)
   offers              Offer[]
   partyServices       PartyService[]
   category            ServiceCategory @relation(fields: [categoryId], references: [id])

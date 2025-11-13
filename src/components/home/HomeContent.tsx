@@ -2,6 +2,7 @@
 
 import { Box, Container, Heading, Text, VStack, SimpleGrid, Card, CardBody, Image, Button, useColorModeValue, Center, Icon, Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon, Avatar, Stack, Flex, Divider, Circle, IconButton, HStack } from '@chakra-ui/react';
 import LocationServiceSearch from '@/components/search/LocationServiceSearch';
+import PopularServicesCarousel from '@/components/home/PopularServicesCarousel';
 import Link from 'next/link';
 import { FiSearch, FiCheckCircle, FiClock, FiPackage, FiShield, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { useState, useEffect, useCallback } from 'react';
@@ -360,11 +361,51 @@ export default function HomeContent() {
         </Container>
       </Box>
 
-      {/* Testimonials - Modern Design */}
+      {/* Popular Products/Services Carousel - Section 3 */}
       <Box 
         py={{ base: 16, md: 24 }} 
         bg="gray.50"
         _dark={{ bg: "gray.800" }}
+        position="relative"
+        overflow="hidden"
+      >
+        <Container maxW="container.xl">
+          <VStack spacing={{ base: 10, md: 14 }}>
+            {/* Section header */}
+            <VStack spacing={4} textAlign="center" maxW="700px">
+              <Text 
+                color="brand.500" 
+                fontWeight="bold" 
+                fontSize="md" 
+                textTransform="uppercase" 
+                letterSpacing="wider"
+              >
+                Popular Services
+              </Text>
+              <Heading 
+                as="h2" 
+                fontSize={{ base: "3xl", md: "4xl" }}
+                fontWeight="bold"
+                lineHeight="1.2"
+              >
+                Trending Party Rentals
+              </Heading>
+              <Text fontSize={{ base: "md", md: "lg" }} color="gray.600" maxW="600px" pt={2}>
+                Discover our most popular party services and rentals loved by customers.
+              </Text>
+            </VStack>
+            
+            {/* Products carousel - we'll fetch this data */}
+            <PopularServicesCarousel />
+          </VStack>
+        </Container>
+      </Box>
+
+      {/* Testimonials - Modern Design */}
+      <Box 
+        py={{ base: 16, md: 24 }} 
+        bg="white"
+        _dark={{ bg: "gray.900" }}
         position="relative"
         overflow="hidden"
       >
