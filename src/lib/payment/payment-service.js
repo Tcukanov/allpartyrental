@@ -10,6 +10,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { PayPalClientFixed } from './paypal-client.js';
+import { getPlatformFees } from '@/lib/config/fees';
 
 const paypalClient = new PayPalClientFixed();
 
@@ -142,8 +143,9 @@ export class PaymentService {
       const addonTotal = addons.reduce((sum, addon) => sum + parseFloat(addon.price), 0);
       const subtotal = basePrice + addonTotal;
 
-      // Platform fees (10% from client)
-      const platformFeePercent = 10; // 10% platform fee charged to client
+      // Get platform fees from database
+      const fees = await getPlatformFees();
+      const platformFeePercent = fees.clientFeePercent;
       const platformFee = subtotal * (platformFeePercent / 100);
       const total = subtotal + platformFee;
 
@@ -151,10 +153,10 @@ export class PaymentService {
         basePrice,
         addonTotal,
         subtotal,
-        platformFeePercent: `${platformFeePercent}%`,
+        platformFeePercent: `${platformFeePercent}% (from database)`,
         platformFee,
         total,
-        note: 'Client pays service price + 10% platform fee'
+        note: 'Client pays service price + platform fee'
       });
 
       console.log('📋 Creating PayPal order with platform fees...');
@@ -454,15 +456,18 @@ export class PaymentService {
 
     const { serviceId, userId, bookingDate, hours, addons = [] } = bookingData;
 
-    // Check for duplicate booking (already paid)
-    const existingOffer = await this.prisma.offer.findFirst({
+    // Check for duplicate booking (already paid and completed)
+    const existingCompletedOffer = await this.prisma.offer.findFirst({
       where: {
         serviceId,
         clientId: userId,
-        status: { in: ['PENDING', 'APPROVED'] }
+        status: { in: ['APPROVED', 'COMPLETED'] }, // Only check approved/completed
       },
       include: {
         transaction: {
+          where: {
+            status: 'COMPLETED' // Only if transaction is completed
+          },
           select: {
             id: true,
             status: true
@@ -471,10 +476,12 @@ export class PaymentService {
       }
     });
 
-    if (existingOffer && existingOffer.transaction?.status === 'COMPLETED') {
+    if (existingCompletedOffer && existingCompletedOffer.transaction?.length > 0) {
       console.log('⚠️ Duplicate booking attempt - payment already completed');
       throw new Error('You have already booked this service. Please check your bookings.');
     }
+
+    console.log('✅ No duplicate booking found - proceeding with authorization');
 
     const service = await this.prisma.service.findUnique({
       where: { id: serviceId },
@@ -495,11 +502,10 @@ export class PaymentService {
     const addonTotal = addons.reduce((sum, addon) => sum + parseFloat(addon.price), 0);
     const subtotal = basePrice + addonTotal;
 
-    // Platform fees
-    // Client pays: service price + 10% platform fee
-    // Provider pays: 10% of service price as commission  
-    const clientFeePercent = 10; // 10% fee charged to client (added to price)
-    const providerFeePercent = 10; // 10% commission taken from provider payment
+    // Get platform fees from database
+    const fees = await getPlatformFees();
+    const clientFeePercent = fees.clientFeePercent;
+    const providerFeePercent = fees.providerFeePercent;
     const platformFee = subtotal * (clientFeePercent / 100);
     const total = subtotal + platformFee;
 
@@ -507,11 +513,11 @@ export class PaymentService {
       basePrice,
       addonTotal,
       subtotal,
-      clientFeePercent: `${clientFeePercent}% (added to total)`,
-      providerFeePercent: `${providerFeePercent}% (deducted from provider payment)`,
+      clientFeePercent: `${clientFeePercent}% (from database, added to total)`,
+      providerFeePercent: `${providerFeePercent}% (from database, deducted from provider payment)`,
       platformFee,
       total,
-      note: 'Client pays subtotal + 10%, Provider receives subtotal - 10%'
+      note: `Client pays subtotal + ${clientFeePercent}%, Provider receives subtotal - ${providerFeePercent}%`
     });
 
     console.log('🎯 Getting or creating offer...');

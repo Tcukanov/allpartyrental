@@ -137,11 +137,30 @@ export default function BookingDetailsPage({ params }) {
     }
   }, [serviceId, router, toast]);
 
-  // Update pricing when duration changes
+  // Fetch platform fee percentage
+  const [platformFeePercent, setPlatformFeePercent] = useState(10); // Default 10%
+
+  useEffect(() => {
+    async function fetchPlatformFee() {
+      try {
+        const response = await fetch('/api/config/platform-fee');
+        const data = await response.json();
+        if (data.success) {
+          setPlatformFeePercent(data.platformFeePercent);
+        }
+      } catch (error) {
+        console.error('Error fetching platform fee:', error);
+        // Keep default 10%
+      }
+    }
+    fetchPlatformFee();
+  }, []);
+
+  // Update pricing when duration or fee changes
   useEffect(() => {
     if (service) {
       const basePrice = parseFloat(service.price);
-      const serviceFee = basePrice * 0.05;
+      const serviceFee = basePrice * (platformFeePercent / 100);
       const total = basePrice + serviceFee;
       
       setPricing({
@@ -151,7 +170,7 @@ export default function BookingDetailsPage({ params }) {
         total
       });
     }
-  }, [service, bookingData.duration]);
+  }, [service, bookingData.duration, platformFeePercent]);
 
   // Handle form submission
   const handleSubmit = async (e) => {
