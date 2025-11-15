@@ -271,14 +271,27 @@ class PayPalClientFixed {
   async captureOrder(orderId) {
     const token = await this.getAccessToken();
 
+    console.log('🎯 CAPTURING PAYPAL ORDER WITH BN CODE:', {
+      orderId,
+      bnCode: 'NYCKIDSPARTYENT_SP_PPCP',
+      url: `${this.baseURL}/v2/checkout/orders/${orderId}/capture`
+    });
+
     const response = await fetch(`${this.baseURL}/v2/checkout/orders/${orderId}/capture`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'PayPal-Partner-Attribution-Id': 'NYCKIDSPARTYENT_SP_PPCP' // BN Code - REQUIRED
+        'PayPal-Partner-Attribution-Id': 'NYCKIDSPARTYENT_SP_PPCP' // BN Code - REQUIRED FOR CERTIFICATION
       },
       body: JSON.stringify({})
+    });
+
+    console.log('✅ PayPal capture response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      debugId: response.headers.get('PayPal-Debug-Id')
     });
 
     if (!response.ok) {

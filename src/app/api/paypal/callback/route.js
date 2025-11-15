@@ -67,18 +67,21 @@ export async function GET(req) {
     });
 
     // If onboarding was successful, check seller status
+    let statusCheckResult = null;
     if (permissionsGranted === 'true' && merchantIdInPayPal) {
       console.log('🔍 Checking seller status for merchant:', merchantIdInPayPal);
       try {
         const paypalClient = new PayPalClientFixed();
-        const statusCheck = await paypalClient.checkSellerStatus(merchantIdInPayPal);
+        statusCheckResult = await paypalClient.checkSellerStatus(merchantIdInPayPal);
         
-        console.log('📊 Seller status check result:', statusCheck);
+        console.log('📊 Seller status check result:', statusCheckResult);
         
         // Update status based on seller validation
         const statusUpdateData = {
-          paypalCanReceivePayments: statusCheck.canReceivePayments,
-          paypalStatusIssues: statusCheck.issues ? JSON.stringify(statusCheck.issues) : null
+          paypalCanReceivePayments: statusCheckResult.canReceivePayments,
+          paypalStatusIssues: statusCheckResult.issues && statusCheckResult.issues.length > 0 
+            ? JSON.stringify(statusCheckResult.issues) 
+            : null
         };
         
         console.log('💾 Updating status with:', statusUpdateData);
@@ -88,17 +91,52 @@ export async function GET(req) {
           data: statusUpdateData
         });
         
-        console.log('✅ Status updated successfully');
+        if (statusCheckResult.canReceivePayments) {
+          console.log('✅ Status updated successfully - account can receive payments');
+        } else {
+          console.log('⚠️ Status updated - account has issues preventing payments:', statusCheckResult.issues);
+        }
       } catch (error) {
         console.error('❌ Failed to check seller status:', error);
+        
+        // IMPORTANT: Save the API error to database so user knows there's an issue
+        const errorUpdateData = {
+          paypalCanReceivePayments: false,
+          paypalStatusIssues: JSON.stringify([{
+            type: 'STATUS_CHECK_FAILED',
+            message: 'Unable to verify PayPal account status. Please try again later.'
+          }])
+        };
+        
+        console.log('💾 Saving error status to database:', errorUpdateData);
+        
+        await prisma.provider.update({
+          where: { userId: session.user.id },
+          data: errorUpdateData
+        });
       }
     }
 
-    // Redirect back to provider dashboard with status
+    // Redirect back to provider dashboard with appropriate status
     const baseUrl = process.env.NEXTAUTH_URL || 'https://allpartyrental.com';
-    const redirectUrl = permissionsGranted === 'true' 
-      ? `${baseUrl}/provider/dashboard/paypal?status=success&merchant=${encodeURIComponent(merchantIdInPayPal || 'unknown')}`
-      : `${baseUrl}/provider/dashboard/paypal?status=failed`;
+    let redirectUrl;
+    
+    if (permissionsGranted !== 'true') {
+      // Onboarding was cancelled or failed
+      redirectUrl = `${baseUrl}/provider/dashboard/paypal?status=failed`;
+    } else if (!merchantIdInPayPal) {
+      // No merchant ID received
+      redirectUrl = `${baseUrl}/provider/dashboard/paypal?status=error&message=${encodeURIComponent('No merchant ID received from PayPal')}`;
+    } else if (statusCheckResult && !statusCheckResult.canReceivePayments) {
+      // Connected but has issues (email not confirmed, payments not receivable, etc.)
+      redirectUrl = `${baseUrl}/provider/dashboard/paypal?status=connected_with_issues&merchant=${encodeURIComponent(merchantIdInPayPal)}`;
+    } else if (statusCheckResult && statusCheckResult.canReceivePayments) {
+      // Fully connected and ready
+      redirectUrl = `${baseUrl}/provider/dashboard/paypal?status=success&merchant=${encodeURIComponent(merchantIdInPayPal)}`;
+    } else {
+      // Status check failed (API error)
+      redirectUrl = `${baseUrl}/provider/dashboard/paypal?status=verification_pending&merchant=${encodeURIComponent(merchantIdInPayPal)}`;
+    }
 
     console.log('🔄 Redirecting to:', redirectUrl);
     return NextResponse.redirect(redirectUrl);

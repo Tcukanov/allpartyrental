@@ -27,8 +27,8 @@ async function getFeeSettings() {
       }
     });
 
-    const clientFeePercent = settings.find(s => s.key === 'clientFeePercent')?.value || '5';
-    const providerFeePercent = settings.find(s => s.key === 'providerFeePercent')?.value || '12';
+    const clientFeePercent = settings.find(s => s.key === 'clientFeePercent')?.value || '10';
+    const providerFeePercent = settings.find(s => s.key === 'providerFeePercent')?.value || '10';
 
     return {
       clientFeePercent: parseFloat(clientFeePercent),
@@ -37,8 +37,8 @@ async function getFeeSettings() {
   } catch (error) {
     console.error('Error getting fee settings:', error);
     return {
-      clientFeePercent: 5.0,  // Default 5% client fee
-      providerFeePercent: 12.0 // Default 12% provider fee (platform commission)
+      clientFeePercent: 10.0,  // Default 10% client fee
+      providerFeePercent: 10.0 // Default 10% provider fee (platform commission)
     };
   }
 }
@@ -142,8 +142,8 @@ export class PaymentService {
       const addonTotal = addons.reduce((sum, addon) => sum + parseFloat(addon.price), 0);
       const subtotal = basePrice + addonTotal;
 
-      // Platform fees (configurable)
-      const platformFeePercent = 5; // 5% platform fee
+      // Platform fees (10% from client)
+      const platformFeePercent = 10; // 10% platform fee charged to client
       const platformFee = subtotal * (platformFeePercent / 100);
       const total = subtotal + platformFee;
 
@@ -151,9 +151,10 @@ export class PaymentService {
         basePrice,
         addonTotal,
         subtotal,
-        platformFeePercent,
+        platformFeePercent: `${platformFeePercent}%`,
         platformFee,
-        total
+        total,
+        note: 'Client pays service price + 10% platform fee'
       });
 
       console.log('📋 Creating PayPal order with platform fees...');
@@ -494,10 +495,24 @@ export class PaymentService {
     const addonTotal = addons.reduce((sum, addon) => sum + parseFloat(addon.price), 0);
     const subtotal = basePrice + addonTotal;
 
-    // Platform fees (configurable)
-    const platformFeePercent = 5; // 5% platform fee
-    const platformFee = subtotal * (platformFeePercent / 100);
+    // Platform fees
+    // Client pays: service price + 10% platform fee
+    // Provider pays: 10% of service price as commission  
+    const clientFeePercent = 10; // 10% fee charged to client (added to price)
+    const providerFeePercent = 10; // 10% commission taken from provider payment
+    const platformFee = subtotal * (clientFeePercent / 100);
     const total = subtotal + platformFee;
+
+    console.log('💰 Fee structure:', {
+      basePrice,
+      addonTotal,
+      subtotal,
+      clientFeePercent: `${clientFeePercent}% (added to total)`,
+      providerFeePercent: `${providerFeePercent}% (deducted from provider payment)`,
+      platformFee,
+      total,
+      note: 'Client pays subtotal + 10%, Provider receives subtotal - 10%'
+    });
 
     console.log('🎯 Getting or creating offer...');
     // Create database transaction record
@@ -518,8 +533,8 @@ export class PaymentService {
         status: 'PENDING',
         paypalOrderId: order.id,
         paypalStatus: order.status,
-        clientFeePercent: platformFeePercent,
-        providerFeePercent: 100 - platformFeePercent, // Provider gets the rest
+        clientFeePercent: clientFeePercent, // 10% charged to client
+        providerFeePercent: providerFeePercent, // 10% commission from provider
         termsAccepted: false
       }
     });

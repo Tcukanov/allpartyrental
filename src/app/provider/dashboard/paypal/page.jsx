@@ -57,7 +57,7 @@ export default function PayPalSettingsPage() {
     if (status === 'success') {
       toast({
         title: 'PayPal Connected Successfully!',
-        description: 'Your PayPal account has been connected. Refreshing status...',
+        description: 'Your PayPal account has been connected and verified. You can now receive payments.',
         status: 'success',
         duration: 5000,
         isClosable: true,
@@ -67,6 +67,40 @@ export default function PayPalSettingsPage() {
       window.history.replaceState({}, '', '/provider/dashboard/paypal');
       
       // Auto-refresh data after successful connection
+      setTimeout(() => {
+        fetchProviderData();
+      }, 1500);
+      
+    } else if (status === 'connected_with_issues') {
+      toast({
+        title: 'PayPal Connected - Action Required',
+        description: 'Your PayPal account is connected but requires attention. Please check the issues below and resolve them.',
+        status: 'warning',
+        duration: 10000,
+        isClosable: true,
+      });
+      
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/provider/dashboard/paypal');
+      
+      // Refresh data to show issues
+      setTimeout(() => {
+        fetchProviderData();
+      }, 1500);
+      
+    } else if (status === 'verification_pending') {
+      toast({
+        title: 'PayPal Connected - Verification Pending',
+        description: 'Your PayPal account is connected but we could not verify your account status. Click "Refresh Status" to try again.',
+        status: 'info',
+        duration: 10000,
+        isClosable: true,
+      });
+      
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/provider/dashboard/paypal');
+      
+      // Refresh data
       setTimeout(() => {
         fetchProviderData();
       }, 1500);
@@ -593,6 +627,19 @@ export default function PayPalSettingsPage() {
                           </AlertDescription>
                         </Box>
                       </Alert>
+                      
+                      {/* Display specific PayPal account issues */}
+                      {paypalStatus.issues && paypalStatus.issues.length > 0 && paypalStatus.issues.map((issue, index) => (
+                        <Alert key={index} status="error" variant="left-accent">
+                          <AlertIcon />
+                          <Box>
+                            <AlertTitle fontSize="md">PayPal Account Issue</AlertTitle>
+                            <AlertDescription fontSize="sm">
+                              {issue.message}
+                            </AlertDescription>
+                          </Box>
+                        </Alert>
+                      ))}
                       
                       <Alert status="info">
                         <AlertIcon />
