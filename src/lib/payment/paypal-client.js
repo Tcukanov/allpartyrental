@@ -11,9 +11,13 @@ class PayPalClientFixed {
     if (this.environment === 'sandbox') {
       this.clientId = process.env.PAYPAL_SANDBOX_CLIENT_ID;
       this.clientSecret = process.env.PAYPAL_SANDBOX_CLIENT_SECRET;
+      // Support both PAYPAL_SANDBOX_PARTNER_ID and PAYPAL_PARTNER_ID for backwards compatibility
+      this.partnerId = process.env.PAYPAL_SANDBOX_PARTNER_ID || process.env.PAYPAL_PARTNER_ID || this.clientId;
     } else {
       this.clientId = process.env.PAYPAL_LIVE_CLIENT_ID;
       this.clientSecret = process.env.PAYPAL_LIVE_CLIENT_SECRET;
+      // Support both PAYPAL_LIVE_PARTNER_ID and PAYPAL_PARTNER_ID for backwards compatibility
+      this.partnerId = process.env.PAYPAL_LIVE_PARTNER_ID || process.env.PAYPAL_PARTNER_ID || this.clientId;
     }
 
     this.baseURL = this.environment === 'sandbox'
@@ -23,6 +27,7 @@ class PayPalClientFixed {
     console.log('PayPal Client initialized:', {
       clientId: this.clientId ? this.clientId.substring(0, 10) + '...' : 'MISSING',
       clientSecret: this.clientSecret ? this.clientSecret.substring(0, 10) + '...' : 'MISSING',
+      partnerId: this.partnerId ? this.partnerId.substring(0, 10) + '...' : 'MISSING',
       environment: this.environment,
       baseURL: this.baseURL
     });
@@ -444,9 +449,10 @@ class PayPalClientFixed {
     const token = await this.getAccessToken();
 
     // Use correct API endpoint: /v1/customer/partners/{partner_id}/merchant-integrations/{merchant_id}
-    const partnerId = this.clientId; // Your Partner ID (Client ID)
-    const url = `${this.baseURL}/v1/customer/partners/${partnerId}/merchant-integrations/${merchantId}`;
+    // partnerId should be your PayPal Partner Account ID, which may differ from your app's Client ID
+    const url = `${this.baseURL}/v1/customer/partners/${this.partnerId}/merchant-integrations/${merchantId}`;
     console.log('🔍 Making merchant status request to:', url);
+    console.log('🔍 Using Partner ID:', this.partnerId ? this.partnerId.substring(0, 10) + '...' : 'MISSING');
 
     const response = await fetch(url, {
       method: 'GET',
