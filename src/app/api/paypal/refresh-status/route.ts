@@ -69,17 +69,8 @@ export async function POST(request: Request) {
         merchantIdFormat: provider.paypalMerchantId?.substring(0, 15) + '...'
       });
 
-      // For sandbox mode with real merchant IDs from onboarding, enable payments automatically
-      if (isSandboxMode && !isAutoMerchantId && provider.paypalMerchantId) {
-        console.log('🔧 Sandbox mode with real merchant ID - enabling payments automatically');
-        console.log('🔧 Skipping PayPal API status check due to partner permission requirements');
-        updateData = {
-          paypalCanReceivePayments: true,
-          paypalOnboardingStatus: 'COMPLETED',
-          paypalStatusIssues: null
-        };
-        statusMessage = 'Sandbox payments enabled - PayPal account ready to receive payments!';
-      } else if (isDevelopment && isAutoMerchantId) {
+      // For auto-generated test merchant IDs in development, skip API call
+      if (isDevelopment && isAutoMerchantId) {
         console.log('🔧 Development mode - enabling auto-merchant for payments');
         // For auto-generated merchant IDs in development, enable payments automatically
         updateData = {
