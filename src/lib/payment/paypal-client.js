@@ -443,7 +443,9 @@ class PayPalClientFixed {
     console.log('🔍 getMerchantStatus called with merchantId:', merchantId);
     const token = await this.getAccessToken();
 
-    const url = `${this.baseURL}/v1/customer/partners/${merchantId}`;
+    // Use correct API endpoint: /v1/customer/partners/{partner_id}/merchant-integrations/{merchant_id}
+    const partnerId = this.clientId; // Your Partner ID (Client ID)
+    const url = `${this.baseURL}/v1/customer/partners/${partnerId}/merchant-integrations/${merchantId}`;
     console.log('🔍 Making merchant status request to:', url);
 
     const response = await fetch(url, {
